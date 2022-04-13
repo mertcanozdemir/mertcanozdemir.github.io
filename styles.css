@@ -24,19 +24,19 @@ body * {
   /*Containers*/
   
   .image-section {
-    height: 100vh;
+    height: 50vh;
     -moz-text-align: center; /*works on Firefox */
     -webkit-text-align: center; /*works on Safari and Google Chrome*/
     text-align: center;
-    background-color: #262626;
+    background-color: #1d1f42;
     -moz-padding: 20px; /*works on Firefox */
     -webkit-padding: 20px; /*works on Safari and Google Chrome*/
     padding: 20px;
   }
   
   .image-section img {
-    max-width: 60%;
-    max-height: 60%;
+    max-width: 40%;
+    max-height: 40%;
     margin-top: 50px !important;
     object-fit: cover;
   }
