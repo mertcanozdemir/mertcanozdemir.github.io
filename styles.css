@@ -24,7 +24,7 @@ body * {
   /*Containers*/
   
   .image-section {
-    height: 50vh;
+    height: 100vh;
     -moz-text-align: center; /*works on Firefox */
     -webkit-text-align: center; /*works on Safari and Google Chrome*/
     text-align: center;
@@ -35,8 +35,8 @@ body * {
   }
   
   .image-section img {
-    max-width: 40%;
-    max-height: 40%;
+    max-width: 60%;
+    max-height: 60%;
     margin-top: 50px !important;
     object-fit: cover;
   }
