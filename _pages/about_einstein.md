@@ -1,5 +1,7 @@
-Write your biography here. Tell the world about yourself. Link to your favorite [subreddit](http://reddit.com). You can put a picture in, too. The code is already in, just name your picture `prof_pic.jpg` and put it in the `img/` folder.
+I am a highly motivated biomedical engineer with six years of experience in the field, with a strong focus on research and development. With a passion for applying engineering principles to solve healthcare problems, I have a proven track record of developing innovative solutions to improve patient outcomes.
 
-Put your address / P.O. box / other info right below your picture. You can also disable any these elements by editing `profile` property of the YAML header of your `_pages/about.md`. Edit `_bibliography/papers.bib` and Jekyll will render your [publications page](/al-folio/publications/) automatically.
+I am skilled in various key areas, including medical device design and development, and extensive experience in research and development, having worked on several projects resulting in patents and published papers. I can approach problems with a creative and analytical mindset and my dedication to developing effective and efficient solutions.
 
-Link to your social media connections, too. This theme is set up to use [Font Awesome icons](https://fontawesome.com/) and [Academicons](https://jpswalsh.github.io/academicons/), like the ones below. Add your Facebook, Twitter, LinkedIn, Google Scholar, or just disable all of them.
+My strengths include attention to detail, strong analytical skills, and the ability to work effectively independently and as part of a team. I am a skilled communicator and collaborator and enjoy working with colleagues and stakeholders to achieve shared goals.
+
+I am excited to bring my skills and experience in research and development to new challenges and opportunities in biomedical engineering. My favorite [subreddit](https://www.reddit.com/r/veYakinEvren/). 
