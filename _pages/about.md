@@ -14,11 +14,5 @@ news: true # includes a list of news items
 selected_papers: true # includes a list of papers marked as "selected={true}"
 social: true # includes social icons at the bottom of the page
 ---
-I am a highly motivated biomedical engineer with six years of experience in the field, with a strong focus on research and development. With a passion for applying engineering principles to solve healthcare problems, I have a proven track record of developing innovative solutions to improve patient outcomes.
 
-I am skilled in various key areas, including medical device design and development, and extensive experience in research and development, having worked on several projects resulting in patents and published papers. I can approach problems with a creative and analytical mindset and my dedication to developing effective and efficient solutions.
-
-My strengths include attention to detail, strong analytical skills, and the ability to work effectively independently and as part of a team. I am a skilled communicator and collaborator and enjoy working with colleagues and stakeholders to achieve shared goals.
-
-I am excited to bring my skills and experience in research and development to new challenges and opportunities in biomedical engineering. My favorite [subreddit](https://www.reddit.com/r/veYakinEvren/). 
-
+I'm a biomedical engineer, super motivated and with 6 years of experience. I'm all about research and development, and I love using engineering principles to solve healthcare problems. I'm proud to say I've developed some really innovative solutions that have improved patient outcomes. My areas of expertise are medical device design and development, and I've worked on some pretty cool projects that ended up with patents and published papers. When it comes to problem-solving, I like to think outside the box and bring my analytical skills to the table. I'm all about finding effective and efficient solutions. I pay attention to every little detail and am great at working both independently and as part of a team. I'm a great communicator and collaborator and love working with colleagues and stakeholders to achieve shared goals. I'm excited to keep applying my skills to new challenges and opportunities in biomedical engineering, it's my favorite thing to do! My favorite [subreddit](https://www.reddit.com/r/veYakinEvren/).
