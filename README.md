@@ -1,1 +1,1 @@
-It's a personal website of Mertcan Özdemirs
+It's a personal website of Mertcan Özdemir
