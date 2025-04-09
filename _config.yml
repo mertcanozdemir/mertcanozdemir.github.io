@@ -7,12 +7,12 @@ first_name: Mertcan
 middle_name:
 last_name: Ozdemir
 email: mertcanozdemir@yahoo.com
-description:  # the ">" symbol means to ignore newlines until "footer_text:"
-  
+description: # the ">" symbol means to ignore newlines until "footer_text:"
+
 footer_text: >
   Powered by <a href="https://jekyllrb.com/" target="_blank">Jekyll</a>
   Hosted by <a href="https://pages.github.com/" target="_blank">GitHub Pages</a>.
-keywords:  # add your own keywords or leave empty
+keywords: # add your own keywords or leave empty
 lang: en # the language of your site (for example: en, fr, cn, ru, etc.)
 icon: 🐱 # the emoji used as the favicon (alternatively, provide image name in /assets/img/)
 
@@ -104,7 +104,7 @@ zotero_username: # your zotero username
 wechat_qr: # filename of your wechat qr-code saved as an image (e.g., wechat-qr.png if saved to assets/img/wechat-qr.png)
 
 contact_note: >
- mertcanozdemir@yahoo.com
+  mertcanozdemir@yahoo.com
 
 # -----------------------------------------------------------------------------
 # Analytics and search engine verification
