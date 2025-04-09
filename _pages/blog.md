@@ -1,7 +1,7 @@
 ---
 layout: default
 permalink: /blog/
-title: MRI Physics Blog
+title: blog
 nav: true
 nav_order: 1
 pagination:
@@ -27,7 +27,7 @@ pagination:
     <h1>{{ site.blog_name }}</h1>
     <h2>{{ site.blog_description }}</h2>
   </div>
-{% endif %}
+  {% endif %}
 
 {% if site.display_tags or site.display_categories %}
 
@@ -54,184 +54,137 @@ pagination:
       {% endfor %}
     </ul>
   </div>
-{% endif %}
+  {% endif %}
 
 {% assign featured_posts = site.posts | where: "featured", "true" %}
 {% if featured_posts.size > 0 %}
 <br>
 
 <div class="container featured-posts">
-  <h4 class="featured-header">Featured Articles in MRI Physics</h4>
-  {% assign is_even = featured_posts.size | modulo: 2 %}
-  <div class="row row-cols-{% if featured_posts.size <= 2 or is_even == 0 %}2{% else %}3{% endif %}">
-  {% for post in featured_posts %}
-    <div class="card-item col">
-      <a href="{{ post.url | relative_url }}">
-        <div class="card hoverable">
-          <div class="row g-0">
-            <div class="col-md-12">
-              <div class="card-body">
-                <div class="float-right">
-                  <i class="fa-solid fa-magnet fa-xs"></i>
+{% assign is_even = featured_posts.size | modulo: 2 %}
+<div class="row row-cols-{% if featured_posts.size <= 2 or is_even == 0 %}2{% else %}3{% endif %}">
+{% for post in featured_posts %}
+<div class="card-item col">
+<a href="{{ post.url | relative_url }}">
+<div class="card hoverable">
+<div class="row g-0">
+<div class="col-md-12">
+<div class="card-body">
+<div class="float-right">
+<i class="fa-solid fa-thumbtack fa-xs"></i>
+</div>
+<h3 class="card-title text-lowercase">{{ post.title }}</h3>
+<p class="card-text">{{ post.description }}</p>
+
+                    {% if post.external_source == blank %}
+                      {% assign read_time = post.content | number_of_words | divided_by: 180 | plus: 1 %}
+                    {% else %}
+                      {% assign read_time = post.feed_content | strip_html | number_of_words | divided_by: 180 | plus: 1 %}
+                    {% endif %}
+                    {% assign year = post.date | date: "%Y" %}
+
+                    <p class="post-meta">
+                      {{ read_time }} min read &nbsp; &middot; &nbsp;
+                      <a href="{{ year | prepend: '/blog/' | prepend: site.baseurl}}">
+                        <i class="fa-solid fa-calendar fa-sm"></i> {{ year }} </a>
+                    </p>
+                  </div>
                 </div>
-                <h3 class="card-title">{{ post.title }}</h3>
-                <p class="card-text">{{ post.description }}</p>
-
-                {% if post.external_source == blank %}
-                  {% assign read_time = post.content | number_of_words | divided_by: 180 | plus: 1 %}
-                {% else %}
-                  {% assign read_time = post.feed_content | strip_html | number_of_words | divided_by: 180 | plus: 1 %}
-                {% endif %}
-                {% assign year = post.date | date: "%Y" %}
-
-                <p class="post-meta">
-                  {{ read_time }} min read &nbsp; &middot; &nbsp;
-                  <a href="{{ year | prepend: '/blog/' | prepend: site.baseurl}}">
-                    <i class="fa-solid fa-calendar fa-sm"></i> {{ year }} </a>
-                </p>
               </div>
             </div>
-          </div>
+          </a>
         </div>
-      </a>
+      {% endfor %}
+      </div>
     </div>
+    <hr>
 
-{% endfor %}
-
-  </div>
-</div>
-<hr>
 {% endif %}
 
-<h4 class="recent-header">Recent MRI Physics Articles</h4>
+  <ul class="post-list">
 
-<ul class="post-list">
-  {% if page.pagination.enabled %}
-    {% assign postlist = paginator.posts %}
-  {% else %}
-    {% assign postlist = site.posts %}
-  {% endif %}
+    {% if page.pagination.enabled %}
+      {% assign postlist = paginator.posts %}
+    {% else %}
+      {% assign postlist = site.posts %}
+    {% endif %}
 
-{% for post in postlist %}
-{% if post.external_source == blank %}
-{% assign read_time = post.content | number_of_words | divided_by: 180 | plus: 1 %}
-{% else %}
-{% assign read_time = post.feed_content | strip_html | number_of_words | divided_by: 180 | plus: 1 %}
-{% endif %}
-{% assign year = post.date | date: "%Y" %}
-{% assign tags = post.tags | join: "" %}
-{% assign categories = post.categories | join: "" %}
+    {% for post in postlist %}
+
+    {% if post.external_source == blank %}
+      {% assign read_time = post.content | number_of_words | divided_by: 180 | plus: 1 %}
+    {% else %}
+      {% assign read_time = post.feed_content | strip_html | number_of_words | divided_by: 180 | plus: 1 %}
+    {% endif %}
+    {% assign year = post.date | date: "%Y" %}
+    {% assign tags = post.tags | join: "" %}
+    {% assign categories = post.categories | join: "" %}
 
     <li>
-      {% if post.thumbnail %}
-        <div class="row">
+
+{% if post.thumbnail %}
+
+<div class="row">
           <div class="col-sm-9">
-      {% endif %}
-            <h3>
-              {% if post.redirect == blank %}
-                <a class="post-title" href="{{ post.url | relative_url }}">{{ post.title }}</a>
-              {% elsif post.redirect contains '://' %}
-                <a class="post-title" href="{{ post.redirect }}" target="_blank">{{ post.title }}</a>
-                <svg width="2rem" height="2rem" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M17 13.5v6H5v-12h6m3-3h6v6m0-6-9 9" class="icon_svg-stroke" stroke="#999" stroke-width="1.5" fill="none" fill-rule="evenodd" stroke-linecap="round" stroke-linejoin="round"></path>
-                </svg>
-              {% else %}
-                <a class="post-title" href="{{ post.redirect | relative_url }}">{{ post.title }}</a>
-              {% endif %}
-            </h3>
-            <p>{{ post.description }}</p>
-            <p class="post-meta">
-              {{ read_time }} min read &nbsp; &middot; &nbsp;
-              {{ post.date | date: '%B %d, %Y' }}
-              {% if post.external_source %}
-                &nbsp; &middot; &nbsp; {{ post.external_source }}
-              {% endif %}
-            </p>
-            <p class="post-tags">
-              <a href="{{ year | prepend: '/blog/' | prepend: site.baseurl}}">
-                <i class="fa-solid fa-calendar fa-sm"></i> {{ year }} </a>
+{% endif %}
+        <h3>
+        {% if post.redirect == blank %}
+          <a class="post-title" href="{{ post.url | relative_url }}">{{ post.title }}</a>
+        {% elsif post.redirect contains '://' %}
+          <a class="post-title" href="{{ post.redirect }}" target="_blank">{{ post.title }}</a>
+          <svg width="2rem" height="2rem" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+            <path d="M17 13.5v6H5v-12h6m3-3h6v6m0-6-9 9" class="icon_svg-stroke" stroke="#999" stroke-width="1.5" fill="none" fill-rule="evenodd" stroke-linecap="round" stroke-linejoin="round"></path>
+          </svg>
+        {% else %}
+          <a class="post-title" href="{{ post.redirect | relative_url }}">{{ post.title }}</a>
+        {% endif %}
+      </h3>
+      <p>{{ post.description }}</p>
+      <p class="post-meta">
+        {{ read_time }} min read &nbsp; &middot; &nbsp;
+        {{ post.date | date: '%B %d, %Y' }}
+        {% if post.external_source %}
+        &nbsp; &middot; &nbsp; {{ post.external_source }}
+        {% endif %}
+      </p>
+      <p class="post-tags">
+        <a href="{{ year | prepend: '/blog/' | prepend: site.baseurl}}">
+          <i class="fa-solid fa-calendar fa-sm"></i> {{ year }} </a>
 
-              {% if tags != "" %}
-                &nbsp; &middot; &nbsp;
-                {% for tag in post.tags %}
-                  <a href="{{ tag | slugify | prepend: '/blog/tag/' | prepend: site.baseurl}}">
-                    <i class="fa-solid fa-hashtag fa-sm"></i> {{ tag }}</a> &nbsp;
-                {% endfor %}
-              {% endif %}
+          {% if tags != "" %}
+          &nbsp; &middot; &nbsp;
+            {% for tag in post.tags %}
+            <a href="{{ tag | slugify | prepend: '/blog/tag/' | prepend: site.baseurl}}">
+              <i class="fa-solid fa-hashtag fa-sm"></i> {{ tag }}</a> &nbsp;
+              {% endfor %}
+          {% endif %}
 
-              {% if categories != "" %}
-                &nbsp; &middot; &nbsp;
-                {% for category in post.categories %}
-                  <a href="{{ category | slugify | prepend: '/blog/category/' | prepend: site.baseurl}}">
-                    <i class="fa-solid fa-tag fa-sm"></i> {{ category }}</a> &nbsp;
-                {% endfor %}
-              {% endif %}
-            </p>
+          {% if categories != "" %}
+          &nbsp; &middot; &nbsp;
+            {% for category in post.categories %}
+            <a href="{{ category | slugify | prepend: '/blog/category/' | prepend: site.baseurl}}">
+              <i class="fa-solid fa-tag fa-sm"></i> {{ category }}</a> &nbsp;
+              {% endfor %}
+          {% endif %}
+    </p>
 
-      {% if post.thumbnail %}
-          </div>
-          <div class="col-sm-3">
-            <img class="card-img" src="{{post.thumbnail | relative_url}}" style="object-fit: cover; height: 90%" alt="image">
-          </div>
-        </div>
-      {% endif %}
+{% if post.thumbnail %}
+
+</div>
+
+  <div class="col-sm-3">
+    <img class="card-img" src="{{post.thumbnail | relative_url}}" style="object-fit: cover; height: 90%" alt="image">
+  </div>
+</div>
+{% endif %}
     </li>
 
-{% endfor %}
+    {% endfor %}
 
-</ul>
+  </ul>
 
 {% if page.pagination.enabled %}
 {% include pagination.liquid %}
 {% endif %}
 
-<div class="mri-resources">
-  <h4>MRI Physics Resources</h4>
-  <ul>
-    <li><a href="#"><i class="fa-solid fa-book fa-sm"></i> Recommended Textbooks</a></li>
-    <li><a href="#"><i class="fa-solid fa-graduation-cap fa-sm"></i> Online Courses</a></li>
-    <li><a href="#"><i class="fa-solid fa-diagram-project fa-sm"></i> Simulation Tools</a></li>
-    <li><a href="#"><i class="fa-solid fa-flask fa-sm"></i> Research Papers</a></li>
-  </ul>
 </div>
-
-<div class="newsletter-signup">
-  <h4>Stay Updated on MRI Physics</h4>
-  <p>Subscribe to our newsletter for the latest advances in MRI technology and research.</p>
-  <form>
-    <div class="form-group">
-      <input type="email" class="form-control" placeholder="Your email address">
-      <button type="submit" class="btn btn-primary">Subscribe</button>
-    </div>
-  </form>
-</div>
-
-</div>
-
-<style>
-  .featured-header, .recent-header {
-    color: #2a7ae2;
-    margin-bottom: 1rem;
-  }
-  
-  .mri-resources, .newsletter-signup {
-    margin-top: 3rem;
-    padding: 1.5rem;
-    background-color: #f9f9f9;
-    border-radius: 5px;
-  }
-  
-  .newsletter-signup form {
-    display: flex;
-    margin-top: 1rem;
-  }
-  
-  .newsletter-signup input {
-    flex-grow: 1;
-    margin-right: 10px;
-  }
-  
-  .fa-magnet {
-    color: #d9534f;
-  }
-</style>
