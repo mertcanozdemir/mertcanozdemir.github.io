@@ -11,10 +11,13 @@ related_publications: true
 # Endotracheal Tube Cuff Pressure Monitoring and Control System
 
 ## Project Overview
+
 This TÜBİTAK-funded project (10M TRY grant) focused on developing a critical medical device to prevent ventilation-related illnesses in intensive care patients. The system monitors and controls endotracheal tube cuff pressure, ensuring optimal pressure levels to prevent complications while maintaining an effective seal.
 
 ## Clinical Significance
+
 Maintaining proper endotracheal tube cuff pressure is critical in intubated patients:
+
 - Too low pressure: Risk of aspiration pneumonia and ventilator-associated pneumonia
 - Too high pressure: Risk of tracheal tissue damage and ischemia
 - Our solution provides continuous monitoring and automatic adjustment to maintain optimal pressure range
@@ -37,7 +40,9 @@ Maintaining proper endotracheal tube cuff pressure is critical in intubated pati
 </div>
 
 ## My Contributions
+
 As project lead and proposal writer, I was responsible for:
+
 - Guiding the team in creating a solution for preventing ventilation-related illnesses
 - Developing the control software using C programming language
 - Designing an intuitive C++ GUI for medical professionals
@@ -57,7 +62,9 @@ As project lead and proposal writer, I was responsible for:
 </div>
 
 ## Technical Challenges
+
 The project presented several engineering challenges:
+
 - Creating a responsive pressure control system with medical-grade accuracy
 - Developing reliable pressure switching mechanisms
 - Designing fault-detection algorithms to ensure patient safety
@@ -65,7 +72,9 @@ The project presented several engineering challenges:
 - Meeting strict medical device regulatory requirements (MDR and ISO 62304)
 
 ## Impact and Outcomes
+
 This project has advanced patient care in intensive care units by:
+
 - Reducing the risk of ventilator-associated complications
 - Minimizing the need for manual monitoring by clinical staff
 - Providing consistent pressure maintenance within safe parameters
