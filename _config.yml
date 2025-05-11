@@ -9,7 +9,9 @@ last_name: Ozdemir
 email: mertcanozdemir@yahoo.com
 description: # the ">" symbol means to ignore newlines until "footer_text:"
 
-footer_text:
+footer_text: >
+  Powered by <a href="https://jekyllrb.com/" target="_blank">Jekyll</a>
+  Hosted by <a href="https://pages.github.com/" target="_blank">GitHub Pages</a>.
 keywords: # add your own keywords or leave empty
 lang: en # the language of your site (for example: en, fr, cn, ru, etc.)
 icon: 🐱 # the emoji used as the favicon (alternatively, provide image name in /assets/img/)
@@ -37,7 +39,7 @@ repo_trophies:
 # will use title and url fields
 # Take a look to https://github.com/jekyll/jekyll-feed for more customization
 
-rss_icon: false
+rss_icon: true
 
 # -----------------------------------------------------------------------------
 # Layout
@@ -47,7 +49,7 @@ navbar_fixed: true
 footer_fixed: true
 
 # Dimensions
-max_width: 1000px
+max_width: 800px
 
 # TODO: add layout settings (single page vs. multi-page)
 
@@ -64,7 +66,7 @@ og_image: # The site-wide (default for all links) Open Graph preview image
 # Social integration
 # -----------------------------------------------------------------------------
 
-github_username: mertcanozdemir # your GitHub user name
+github_username: # your GitHub user name
 gitlab_username: # your GitLab user name
 x_username: # your X handle
 mastodon_username: # your mastodon instance+username in the format instance.tld/@username
@@ -121,7 +123,7 @@ bing_site_verification: # out your bing-site-verification ID (Bing Webmaster)
 # Blog
 # -----------------------------------------------------------------------------
 
-blog_name: # blog_name will be displayed in your blog page
+blog_name: Mertcan's Blog # blog_name will be displayed in your blog page
 blog_description: tech and sport blog
 permalink: /blog/:year/:title/
 
@@ -149,15 +151,15 @@ giscus:
   lang: en
 
 # Disqus comments (DEPRECATED)
-disqus_shortname: # put your disqus shortname
+disqus_shortname: al-folio # put your disqus shortname
 # https://help.disqus.com/en/articles/1717111-what-s-a-shortname
 
 # External sources.
 # If you have blog posts published on medium.com or other external sources,
 # you can display them in your blog by adding a link to the RSS feed.
 external_sources:
-  - name:
-    rss_url:
+  - name: medium.com
+    rss_url: https://medium.com/@al-folio/feed
 
 # -----------------------------------------------------------------------------
 # Collections
