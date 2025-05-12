@@ -17,7 +17,8 @@ header_gif:
   file: my_brain.gif
   alt: "my brain in 3d model"
 ---
-Engineer by day. Coder by night. Hockey player on weekends. 
-This site showcases my technical writings, coding projects, and occasional thoughts. 
-Browse my blog, check out my work, or connect. 
+
+Engineer by day. Coder by night. Hockey player on weekends.
+This site showcases my technical writings, coding projects, and occasional thoughts.
+Browse my blog, check out my work, or connect.
 Enjoy your visit!
