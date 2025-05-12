@@ -15,7 +15,7 @@ selected_papers: true # includes a list of papers marked as "selected={true}"
 social: true # includes social icons at the bottom of the page
 ---
 
-![brain animation](mertcanozdemir.github.io/assets/img/mybrain.gif)
+![brain animation](mybrain.gif)
 
 Engineer by day. Coder by night. Hockey player on weekends. 
 
