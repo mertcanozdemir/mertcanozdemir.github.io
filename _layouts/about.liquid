@@ -12,13 +12,15 @@ layout: default
       {% endif %}
     </h1>
     <p class="desc">{{ page.subtitle }}</p>
-    
+
     <!-- Added GIF section -->
     {% if page.header_gif and page.header_gif.enable %}
       <div class="header-animation">
-        <img src="{{ page.header_gif.file | prepend: '/assets/img/' | relative_url }}" 
-             alt="{{ page.header_gif.alt }}" 
-             class="img-fluid z-depth-1">
+        <img
+          src="{{ page.header_gif.file | prepend: '/assets/img/' | relative_url }}"
+          alt="{{ page.header_gif.alt }}"
+          class="img-fluid z-depth-1"
+        >
       </div>
     {% endif %}
   </header>
