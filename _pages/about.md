@@ -17,10 +17,10 @@ social: true # includes social icons at the bottom of the page
 
 ![brain animation](mybrain.gif)
 
-Engineer by day. Coder by night. Hockey player on weekends. 
+Engineer by day. Coder by night. Hockey player on weekends.
 
-This site showcases my technical writings, coding projects, and occasional thoughts. 
+This site showcases my technical writings, coding projects, and occasional thoughts.
 
-Browse my blog, check out my work, or connect. 
+Browse my blog, check out my work, or connect.
 
 Enjoy your visit!
