@@ -6,16 +6,15 @@ subtitle: Biomedical Engineer
 profile:
   align: right
   image: prof_pic.jpg
-  image_circular: true # crops the image to make it circular
+  image_circular: true
   more_info:
-news: true # includes a list of news items
-selected_papers: true # includes a list of papers marked as "selected={true}"
-social: true # includes social icons at the bottom of the page
-# Added GIF configuration
 header_gif:
   enable: true
-  file: my_brain.gif
-  alt: "my brain in 3d model"
+  file: mybrain.gif
+  alt: "Description of your GIF"
+news: true
+selected_papers: true
+social: true
 ---
 
 Engineer by day. Coder by night. Hockey player on weekends.
