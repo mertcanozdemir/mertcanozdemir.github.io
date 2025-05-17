@@ -12,17 +12,6 @@ layout: default
       {% endif %}
     </h1>
     <p class="desc">{{ page.subtitle }}</p>
-
-    <!-- Added GIF section -->
-    {% if page.header_gif and page.header_gif.enable %}
-      <div class="header-animation">
-        <img
-          src="{{ page.header_gif.file | prepend: '/assets/img/' | relative_url }}"
-          alt="{{ page.header_gif.alt }}"
-          class="img-fluid z-depth-1"
-        >
-      </div>
-    {% endif %}
   </header>
 
   <article>
@@ -43,6 +32,23 @@ layout: default
         {% endif %}
         {% if page.profile.more_info %}
           <div class="more-info">{{ page.profile.more_info }}</div>
+        {% endif %}
+      </div>
+    {% endif %}
+
+    <!-- Added GIF section below profile picture with caption and size control -->
+    {% if page.header_gif and page.header_gif.enable %}
+      <div class="gif-container" style="clear: both; margin-top: 20px; margin-bottom: 20px; max-width: {{ page.header_gif.width | default: '100%' }}; margin-left: auto; margin-right: auto;">
+        <img
+          src="{{ page.header_gif.file | prepend: '/assets/img/' | relative_url }}"
+          alt="{{ page.header_gif.alt }}"
+          class="img-fluid z-depth-1"
+          style="width: 100%;"
+        >
+        {% if page.header_gif.caption %}
+          <div class="caption" style="text-align: center; margin-top: 10px; font-style: italic; color: #6c757d;">
+            {{ page.header_gif.caption }}
+          </div>
         {% endif %}
       </div>
     {% endif %}

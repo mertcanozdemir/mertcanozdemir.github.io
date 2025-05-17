@@ -12,12 +12,15 @@ header_gif:
   enable: true
   file: mybrain.gif
   alt: "Description of your GIF"
+  caption: "Visualizing of the my brain model"
+  width: "600px"
 news: true
 selected_papers: true
 social: true
 ---
 
-Engineer by day. Coder by night. Hockey player on weekends.
 This site showcases my technical writings, coding projects, and occasional thoughts.
+
 Browse my blog, check out my work, or connect.
+
 Enjoy your visit!
