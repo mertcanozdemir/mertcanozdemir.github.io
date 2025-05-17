@@ -38,7 +38,10 @@ layout: default
 
     <!-- Added GIF section below profile picture with caption and size control -->
     {% if page.header_gif and page.header_gif.enable %}
-      <div class="gif-container" style="clear: both; margin-top: 20px; margin-bottom: 20px; max-width: {{ page.header_gif.width | default: '100%' }}; margin-left: auto; margin-right: auto;">
+      <div
+        class="gif-container"
+        style="clear: both; margin-top: 20px; margin-bottom: 20px; max-width: {{ page.header_gif.width | default: '100%' }}; margin-left: auto; margin-right: auto;"
+      >
         <img
           src="{{ page.header_gif.file | prepend: '/assets/img/' | relative_url }}"
           alt="{{ page.header_gif.alt }}"
