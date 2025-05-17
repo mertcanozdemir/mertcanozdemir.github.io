@@ -11,11 +11,9 @@ profile:
 header_gif:
   enable: true
   file: mybrain.gif
-  alt: "Description of your GIF"
-  caption: "Visualizing of the my brain model"
-  width: "100px"
-news: true
-selected_papers: true
+  caption: "my brain "
+news: false
+selected_papers: false
 social: true
 ---
 
