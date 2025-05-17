@@ -13,7 +13,7 @@ header_gif:
   file: mybrain.gif
   alt: "Description of your GIF"
   caption: "Visualizing of the my brain model"
-  width: "600px"
+  width: "100px"
 news: true
 selected_papers: true
 social: true
