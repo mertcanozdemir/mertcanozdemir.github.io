@@ -13,6 +13,7 @@ header_gif:
   file: mybrain.gif
   caption: "my brain "
 news: false
+
 selected_papers: false
 social: true
 ---
