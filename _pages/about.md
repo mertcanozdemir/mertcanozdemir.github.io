@@ -11,7 +11,8 @@ profile:
 header_gif:
   enable: true
   file: mybrain.gif
-  caption: "my brain "
+  alt: animated MRI scan of my brain
+  caption: my brain
 news: false
 
 selected_papers: false

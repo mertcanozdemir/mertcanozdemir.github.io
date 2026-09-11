@@ -34,22 +34,16 @@ layout: default
           <div class="more-info">{{ page.profile.more_info }}</div>
         {% endif %}
 
-        <!-- Move GIF inside profile div to place it below profile picture -->
+        <!-- GIF sits inside the profile div so it lands below the profile picture -->
         {% if page.header_gif and page.header_gif.enable %}
-          <div class="gif-container" style="margin-left: 50px; margin-top: 20px; margin-bottom: 20px; width: 100%;">
+          <div class="gif-container">
             <img
               src="{{ page.header_gif.file | prepend: '/assets/img/' | relative_url }}"
               alt="{{ page.header_gif.alt }}"
               class="img-fluid z-depth-1"
-              style="width: 60%;"
             >
             {% if page.header_gif.caption %}
-              <div
-                class="caption"
-                style="margin-left: -120px;text-align: center; margin-top: 10px; font-style: italic; color: #6c757d; font-size: 0.9em;"
-              >
-                {{ page.header_gif.caption }}
-              </div>
+              <div class="caption">{{ page.header_gif.caption }}</div>
             {% endif %}
           </div>
         {% endif %}

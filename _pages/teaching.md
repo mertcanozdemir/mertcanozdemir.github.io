@@ -20,6 +20,10 @@ Undergraduate course covering the theory and practice of medical image analysis:
 - Wavelet transforms
 - Color image processing
 
+### BMM316 — Biomedical Sensors and Transducers
+
+Undergraduate course on the sensors and transducers used in medical devices.
+
 ### Biomedical Instrumentation Laboratory
 
 Coordinated the laboratory covering biosignal acquisition and processing with

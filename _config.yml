@@ -7,13 +7,11 @@ first_name: Mertcan
 middle_name:
 last_name: Ozdemir
 email: mertcanozdemir@yahoo.com
-description: > # the ">" symbol means to ignore newlines until "footer_text:"
+description: > # the ">" symbol means to ignore newlines until the next key
   Personal site of Mertcan Özdemir, PhD — biomedical engineer working on medical
   image processing and deep learning for MRI.
 
-footer_text: >
-  Powered by <a href="https://jekyllrb.com/" target="_blank">Jekyll</a>
-  Hosted by <a href="https://pages.github.com/" target="_blank">GitHub Pages</a>.
+footer_text: # extra text shown after the copyright line
 keywords: biomedical engineering, medical image processing, deep learning, MRI, diffusion models, cardiac MRI
 lang: en # the language of your site (for example: en, fr, cn, ru, etc.)
 icon: 🐱 # the emoji used as the favicon (alternatively, provide image name in /assets/img/)
@@ -48,7 +46,7 @@ rss_icon: true
 # -----------------------------------------------------------------------------
 
 navbar_fixed: true
-footer_fixed: true
+footer_fixed: false
 
 # Dimensions
 max_width: 800px
