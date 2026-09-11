@@ -8,18 +8,10 @@ date: 2025-04-09
 featured: true
 
 authors:
-  - name: Richard Ernst
-    url: "https://en.wikipedia.org/wiki/Richard_R._Ernst"
+  - name: Mertcan Özdemir
+    url: "https://mertcanozdemir.com"
     affiliations:
-      name: ETH Zurich
-  - name: Paul Lauterbur
-    url: "https://en.wikipedia.org/wiki/Paul_Lauterbur"
-    affiliations:
-      name: University of Illinois
-  - name: Peter Mansfield
-    url: "https://en.wikipedia.org/wiki/Peter_Mansfield"
-    affiliations:
-      name: University of Nottingham
+      name: TOBB University of Economics and Technology
 
 bibliography: 2025-04-09-spinecho.bib
 
@@ -34,29 +26,15 @@ toc:
   - name: Future Directions
 
 _styles: >
-  .fake-img {
-    background: #bbb;
-    border: 1px solid rgba(0, 0, 0, 0.1);
-    box-shadow: 0 0px 4px rgba(0, 0, 0, 0.1);
-    margin-bottom: 12px;
-  }
-  .fake-img p {
-    font-family: monospace;
-    color: white;
-    text-align: left;
-    margin: 12px 0;
-    text-align: center;
-    font-size: 16px;
-  }
   .mri-diagram {
-    border: 1px solid #e0e0e0;
+    border: 1px solid var(--global-divider-color);
     border-radius: 5px;
     padding: 10px;
-    background: #f9f9f9;
+    background: var(--global-card-bg-color);
     margin: 20px 0;
   }
   .T2-curve {
-    background: linear-gradient(90deg, rgba(255,255,255,1) 0%, rgba(219,219,219,1) 100%);
+    background: linear-gradient(90deg, var(--global-bg-color) 0%, var(--global-code-bg-color) 100%);
     height: 200px;
     position: relative;
     overflow: hidden;
@@ -90,9 +68,7 @@ Where $M_{xy}$ represents the transverse magnetization at time $t$, $M_0$ is the
 
 After a specific time interval (TE/2), a 180° refocusing pulse is applied. This pulse effectively reverses the phase dispersal caused by field inhomogeneities, leading to the formation of an echo at time TE.
 
-<div class="fake-img l-body">
-  <p>90° pulse → dephasing → 180° pulse → rephasing → echo</p>
-</div>
+<p class="l-body text-center"><em>90° pulse → dephasing → 180° pulse → rephasing → echo</em></p>
 
 The key insight is that while the 180° pulse can reverse dephasing caused by static field inhomogeneities, it cannot reverse the intrinsic T2 decay. This property makes spin echo sequences particularly valuable for obtaining T2-weighted images that accurately reflect tissue properties.
 
@@ -195,10 +171,6 @@ Spin echo sequences form the backbone of clinical MRI protocols across virtually
 
 The versatility of spin echo sequences stems from their robustness to field inhomogeneities and straightforward contrast manipulation. By adjusting TR, TE, and incorporating magnetization preparation modules, these sequences can be tailored to highlight specific pathological processes.
 
-<div class="fake-img l-page-outset">
-  <p>Comparative imaging: T1-weighted vs T2-weighted spin echo in multiple sclerosis</p>
-</div>
-
 ---
 
 ## Advanced Implementation
@@ -250,10 +222,6 @@ Emerging research in spin echo methodology focuses on several promising directio
 2. **Diffusion-Relaxation Correlation**: Advanced models that incorporate both diffusion and relaxation effects to provide deeper tissue microstructural information.
 
 3. **Deep Learning Reconstruction**: Neural network-based approaches for accelerated acquisition and improved image quality in spin echo imaging.
-
-<div class="fake-img l-screen">
-  <p>Future of spin echo: from qualitative to quantitative imaging</p>
-</div>
 
 The fundamental principles of spin echo discovered over 70 years ago continue to evolve, providing an essential foundation for both clinical diagnostics and cutting-edge research in magnetic resonance.
 
