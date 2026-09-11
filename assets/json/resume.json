@@ -243,84 +243,42 @@
     {
       "name": "Programming",
       "level": "Advanced",
-      "keywords": [
-        "Python",
-        "MATLAB",
-        "C",
-        "C++"
-      ]
+      "keywords": ["Python", "MATLAB", "C", "C++"]
     },
     {
       "name": "Deep Learning",
       "level": "Advanced",
-      "keywords": [
-        "PyTorch",
-        "Diffusion Models",
-        "GANs",
-        "Attention Mechanisms"
-      ]
+      "keywords": ["PyTorch", "Diffusion Models", "GANs", "Attention Mechanisms"]
     },
     {
       "name": "MRI & Imaging",
       "level": "Advanced",
-      "keywords": [
-        "DICOM",
-        "pyDicom",
-        "k-space processing",
-        "Cardiac cine MRI",
-        "Image reconstruction"
-      ]
+      "keywords": ["DICOM", "pyDicom", "k-space processing", "Cardiac cine MRI", "Image reconstruction"]
     },
     {
       "name": "Image & Signal Processing",
       "level": "Advanced",
-      "keywords": [
-        "Frequency-domain filtering",
-        "Wavelet transforms",
-        "Radon / inverse Radon transform",
-        "Digital signal processing"
-      ]
+      "keywords": ["Frequency-domain filtering", "Wavelet transforms", "Radon / inverse Radon transform", "Digital signal processing"]
     },
     {
       "name": "Evaluation Metrics",
       "level": "Advanced",
-      "keywords": [
-        "FID",
-        "SSIM",
-        "MS-SSIM",
-        "Clinical validation protocols"
-      ]
+      "keywords": ["FID", "SSIM", "MS-SSIM", "Clinical validation protocols"]
     },
     {
       "name": "Tools & Platforms",
       "level": "Advanced",
-      "keywords": [
-        "Git/GitHub",
-        "LaTeX",
-        "Linux (Arch)",
-        "MATLAB Grader",
-        "SolidWorks",
-        "Simulink"
-      ]
+      "keywords": ["Git/GitHub", "LaTeX", "Linux (Arch)", "MATLAB Grader", "SolidWorks", "Simulink"]
     },
     {
       "name": "Embedded Systems",
       "level": "Intermediate",
-      "keywords": [
-        "STM32",
-        "FreeRTOS",
-        "Medical software (IEC 62304)"
-      ]
+      "keywords": ["STM32", "FreeRTOS", "Medical software (IEC 62304)"]
     },
     {
       "name": "Medical Devices",
       "level": "Advanced",
-      "keywords": [
-        "IEC 60601-1",
-        "IEC 60601-1-2 (EMC)",
-        "System testing",
-        "Project management"
-      ]
+      "keywords": ["IEC 60601-1", "IEC 60601-1-2 (EMC)", "System testing", "Project management"]
     }
   ],
   "languages": [
@@ -340,10 +298,7 @@
   "interests": [
     {
       "name": "Ice Hockey",
-      "keywords": [
-        "National Ice Hockey Team member (Turkey)",
-        "Founder and captain of the TOBB University ice hockey team"
-      ]
+      "keywords": ["National Ice Hockey Team member (Turkey)", "Founder and captain of the TOBB University ice hockey team"]
     }
   ],
   "references": [],
