@@ -103,42 +103,40 @@ returns to; usefulness matters more than presentation.
 Do not deploy after every change. Commit locally, let work accumulate, and push
 when he says so.
 
-## In progress: hockey training section
+## Hockey drills — /drills/
 
-Mertcan wants to add training material from an IIHF development camp — **his own
-notes**, currently on paper, not yet digitised. The goal is interactive drill
-diagrams: a rink with players as circles that move, plus passes, shots and cones.
-A working prototype exists and he approved it.
+Training material from an IIHF development camp, from **Mertcan's own paper
+notes**, which he will supply. The page at `_pages/drills.md` animates each
+drill from `_data/drills.yml` using `assets/js/drills.js`, which draws an IIHF
+rink to scale (60×30 m, centred at 0,0) as inline SVG. Styles live under
+"drill diagrams" in `assets/css/_custom.scss`.
 
-Prototype: `drills-preview.html` (gitignored, standalone, opens in a browser).
-It draws an IIHF rink to scale (60×30 m, centred at 0,0) as inline SVG and
-animates each drill from data:
+**The five drills currently in `_data/drills.yml` are invented placeholders and
+some are not sensible hockey** — `backcheck` ends with a shot on goal from the
+neutral zone, and is flagged in the file. They exist to show the format and
+should all be replaced with real drills, not corrected piecemeal.
 
-```json
-{
-  "actors": [
-    {
-      "id": "F1",
-      "team": "a",
-      "puck": true,
-      "path": [
-        [-20, -6],
-        [-8, -7],
-        [2, -6]
-      ]
-    }
-  ],
-  "events": [{ "t": 0.45, "type": "pass", "from": [2, -6], "to": [4, 5] }],
-  "cones": [
-    [-2, -6],
-    [-2, 6]
-  ]
-}
+Data shape:
+
+```yaml
+- id: two-on-one
+  title: 2-on-1 Rush
+  duration: 6 # seconds the animation runs
+  cones: [[-2, -6], [-2, 6]]
+  actors:
+    - { id: F1, label: F1, team: a, puck: true, path: [[-20, -6], [-8, -7], [2, -6]] }
+    - { id: F2, label: F2, team: a, path: [[-20, 6], [-6, 7], [4, 5]] }
+  events:
+    - { t: 0.45, type: pass, to_actor: F2 }
+    - { t: 0.8, type: shot, to: [25.5, 0] }
 ```
 
-Paths are interpolated with smoothstep; `t` in events is a fraction of the drill.
-Sample data lives in the prototype only — it is invented, and will be replaced
-by real drills.
+Paths are interpolated with smoothstep; `t` in an event is a fraction of the
+drill. **Events carry no coordinates of their own**: they start wherever the
+puck already is, and a pass is aimed at where `to_actor` will be when it lands,
+so the puck meets the receiver and then travels with them. Writing explicit
+`from`/`to` points for passes caused the puck to teleport — one pass was aimed
+9 m from where the receiver actually was. Only shots take a `to`.
 
 Still undecided, to settle once the notes arrive:
 
@@ -150,3 +148,5 @@ Still undecided, to settle once the notes arrive:
 
 An earlier attempt — `_data/training.yml`, a filterable table of sessions with
 sets and reps — was **rejected and deleted**. He wants diagrams, not tables.
+The standalone `drills-preview.html` prototype has been superseded by the page
+and is gone too.

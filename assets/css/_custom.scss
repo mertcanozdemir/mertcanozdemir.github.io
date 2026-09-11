@@ -23,3 +23,98 @@
     color: var(--global-text-color-light);
   }
 }
+
+// Ice hockey drill diagrams (/drills/)
+
+:root {
+  --rink-ice: #f4f8fb;
+  --rink-board: #c8ced4;
+  --rink-red: #d33;
+  --rink-blue: #2d6fd8;
+  --rink-crease: #dceaf7;
+  --rink-team-a: #1f6fd0;
+  --rink-team-b: #d34b1f;
+  --rink-puck: #e8b93a;
+  --rink-puck-edge: #8a6a15;
+  --rink-cone: #e8873a;
+  --rink-cone-edge: #b3641f;
+  --rink-pass: #e8b93a;
+  --rink-shot: #e05555;
+}
+
+html[data-theme="dark"] {
+  --rink-ice: #22282e;
+  --rink-board: #4a545e;
+  --rink-red: #e05555;
+  --rink-blue: #4a8ae8;
+  --rink-crease: #2a3642;
+  --rink-team-a: #4a9aef;
+  --rink-team-b: #ef7a4a;
+}
+
+.drill-intro {
+  color: var(--global-text-color-light);
+  font-size: 0.9rem;
+}
+
+.drill {
+  margin-bottom: 2.5rem;
+
+  h2 {
+    font-size: 1.1rem;
+    margin-bottom: 0.1rem;
+  }
+
+  svg {
+    width: 100%;
+    height: auto;
+    display: block;
+    border-radius: 6px;
+  }
+}
+
+.drill-meta {
+  color: var(--global-text-color-light);
+  font-size: 0.8rem;
+  margin-bottom: 0.5rem;
+}
+
+.drill-notes {
+  color: var(--global-text-color-light);
+  font-size: 0.88rem;
+  font-style: italic;
+  margin-bottom: 0.75rem;
+}
+
+.drill-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 0.6rem;
+  flex-wrap: wrap;
+
+  button {
+    border: 1px solid var(--global-divider-color);
+    background: transparent;
+    color: var(--global-text-color);
+    padding: 5px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 0.85rem;
+
+    &:hover {
+      border-color: var(--global-theme-color);
+    }
+  }
+
+  .drill-play {
+    min-width: 88px;
+  }
+
+  input[type="range"] {
+    flex: 1;
+    min-width: 120px;
+    accent-color: var(--global-theme-color);
+  }
+}

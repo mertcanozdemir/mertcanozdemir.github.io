@@ -1,0 +1,88 @@
+# Ice hockey drill diagrams.
+#
+# Rink coordinates: centre ice is (0,0), x runs ±30 m end to end, y runs ±15 m
+# side to side. Goals sit at x = ±26.
+#
+# Each actor has a `path`: the points it skates through, in order. `events` fire
+# at `t`, a fraction of the way through the drill (0 = start, 1 = end).
+#
+# Events start wherever the puck already is, so they need no origin. A pass names
+# its receiver with `to_actor` and is aimed at wherever that player will be when
+# it arrives; the puck stays with them afterwards. A shot gives a `to` target.
+#
+# The drills below are placeholders, to show the format.
+
+- id: two-on-one
+  title: 2-on-1 Rush
+  category: Attack
+  duration: 6
+  notes: Quick entry over the blue line. The defender takes away the pass lane, so the shot goes far side.
+  cones: [[-2, -6], [-2, 6]]
+  actors:
+    - { id: F1, label: F1, team: a, puck: true, path: [[-20, -6], [-8, -7], [2, -6]] }
+    - { id: F2, label: F2, team: a, path: [[-20, 6], [-6, 7], [4, 5]] }
+    - { id: D1, label: D, team: b, path: [[6, 0], [2, 1], [-1, 0]] }
+    - { id: G, label: G, team: b, path: [[24, 0], [23, 0], [23, -1]] }
+  events:
+    - { t: 0.45, type: pass, to_actor: F2 }
+    - { t: 0.8, type: shot, to: [25.5, 0] }
+
+- id: cone-weave
+  title: Cone Weave & Shot
+  category: Technique
+  duration: 7
+  notes: Controlled weave through the cones, then a shot in motion. Keep the head up between cones.
+  cones: [[-10, 0], [-5, -3], [0, 3], [5, -3], [10, 0]]
+  actors:
+    - id: P1
+      label: P
+      team: a
+      puck: true
+      path: [[-18, 0], [-10, -3], [-5, 2], [0, -2], [5, 2], [10, -2], [16, 0]]
+  events:
+    - { t: 0.85, type: shot, to: [25.5, 0] }
+
+- id: breakout
+  title: Breakout — D to Winger
+  category: Defence
+  duration: 8
+  notes: Retrieval behind the net, outlet to the winger on the wall, centre supports through the middle.
+  cones: []
+  actors:
+    - { id: D1, label: D1, team: a, puck: true, path: [[-24, 2], [-22, -6], [-18, -9]] }
+    - { id: W1, label: W, team: a, path: [[-19, -12], [-12, -12], [-4, -10]] }
+    - { id: C1, label: C, team: a, path: [[-16, 4], [-8, 2], [0, 0]] }
+    - { id: F1, label: F, team: b, path: [[-14, -2], [-18, -4], [-20, -7]] }
+  events:
+    - { t: 0.4, type: pass, to_actor: W1 }
+    - { t: 0.75, type: pass, to_actor: C1 }
+
+- id: cycle-corner
+  title: Corner Cycle
+  category: Attack
+  duration: 7
+  notes: Low cycle in the corner. Support arrives late, puck moves back to the point for the shot.
+  cones: []
+  actors:
+    - { id: F1, label: F1, team: a, puck: true, path: [[22, -10], [18, -12], [14, -9]] }
+    - { id: F2, label: F2, team: a, path: [[14, -12], [18, -10], [21, -6]] }
+    - { id: D1, label: D, team: a, path: [[10, -6], [9, -2], [9, 0]] }
+    - { id: X1, label: X, team: b, path: [[19, -8], [21, -10], [22, -8]] }
+  events:
+    - { t: 0.45, type: pass, to_actor: D1 }
+    - { t: 0.8, type: shot, to: [25.5, 0] }
+
+- id: backcheck
+  title: Backcheck & Gap Control
+  category: Defence
+  duration: 6
+  # PLACEHOLDER, and not a sensible drill: it ends with a shot on goal from the
+  # neutral zone. Replace with a real backcheck from Mertcan's notes.
+  notes: Forward tracks back through the middle while the defender keeps a tight gap through the neutral zone.
+  cones: [[0, -4], [0, 4]]
+  actors:
+    - { id: A1, label: A, team: b, puck: true, path: [[-18, 0], [-8, -2], [2, -3]] }
+    - { id: D1, label: D, team: a, path: [[8, 0], [2, -1], [-3, -3]] }
+    - { id: C1, label: C, team: a, path: [[-14, 8], [-4, 4], [3, 0]] }
+  events:
+    - { t: 0.85, type: shot, to: [-25.5, 0] }
