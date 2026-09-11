@@ -29,6 +29,17 @@ jobs:
               "giscus.repo": "${{ github.repository }}",
               "baseurl": ""
             }
+      - name: Install ImageMagick 🖼️
+        # jekyll-imagemagick shells out to `convert`, which is absent from the
+        # runner image. ImageMagick 7 drops `convert` in favour of `magick`, so
+        # add a shim if only the new binary is present.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y imagemagick
+          if ! command -v convert >/dev/null; then
+            sudo ln -s "$(command -v magick)" /usr/local/bin/convert
+          fi
+          convert --version | head -1
       - name: Install and Build 🔧
         run: |
           pip3 install --upgrade jupyter
