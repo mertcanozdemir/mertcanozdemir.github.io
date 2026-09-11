@@ -22,7 +22,16 @@ Undergraduate course covering the theory and practice of medical image analysis:
 
 ### BMM316 — Biomedical Sensors and Transducers
 
-Undergraduate course on the sensors and transducers used in medical devices.
+Undergraduate course on the sensors and transducers used in medical devices:
+
+- Biosensors: components, classification and performance parameters
+- Electrochemical, optical and mass-based biosensors
+- Bioreceptor elements
+- Biopotential electrodes and measurements
+- Semiconductor devices and optical transducers
+- Physical measurements; transducers for temperature, pressure and flow
+- Multisensor data fusion and ROC curves
+- Wearable sensors and the Internet of Things
 
 ### Biomedical Instrumentation Laboratory
 
