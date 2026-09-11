@@ -21,13 +21,15 @@ CI that must stay green: `Deploy site`, `Prettier code formatter`,
 
 ## Local environment
 
-No Ruby, no Jekyll, no Docker installed on this machine, so **the site cannot be
-built locally** — changes have been verified by deploying and checking the live
-site, or by simulating Liquid against the data files.
+There is no Ruby or Jekyll on this machine, but **Docker is installed and the
+site builds locally**: `docker compose up` in the repository root serves it on
+localhost:8080 with live reload. Prefer this over deploying to check a change.
 
-Mertcan has been advised to install Docker (`sudo pacman -S docker docker-compose`,
-then `docker compose up` → localhost:8080) which uses a prebuilt image and needs
-no Ruby. If it is available, prefer previewing locally over deploying to check.
+The prebuilt image now ships Ruby 4.0, which dropped `ostruct` from the default
+gems. `jekyll-twitter-plugin` required it and crashed the container on startup;
+the plugin was unused and has been removed. If another gem fails the same way,
+adding `gem 'ostruct'` to the Gemfile is the fallback — CI is unaffected either
+way, since it pins Ruby 3.2.2 and Gemfile.lock is untracked.
 
 `node` is available. `js-yaml` (installed into the scratchpad) is useful for
 validating YAML; `npx prettier` works because `node_modules/` is installed.
