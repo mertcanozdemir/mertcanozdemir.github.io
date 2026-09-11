@@ -2,7 +2,7 @@
 layout: page
 title: Endotracheal Tube Cuff Pressure Monitor
 description: Development of a critical medical device to prevent ventilation-related complications
-img: assets/img/medical_device.jpg
+img:
 importance: 1
 category: work
 related_publications: true
@@ -24,6 +24,8 @@ Maintaining proper endotracheal tube cuff pressure is critical in intubated pati
 
 ## Technical Implementation
 
+{% comment %}
+Görseller eklendiğinde bu bloğu yorumdan çıkarın.
 <div class="row">
     <div class="col-sm mt-3 mt-md-0">
         {% include figure.liquid loading="eager" path="assets/img/project_diagram.jpg" title="System architecture" class="img-fluid rounded z-depth-1" %}
@@ -38,6 +40,7 @@ Maintaining proper endotracheal tube cuff pressure is critical in intubated pati
 <div class="caption">
     Left: System architecture diagram. Middle: Graphical user interface for cuff pressure monitoring. Right: Mechanical manifold design for pressure control.
 </div>
+{% endcomment %}
 
 ## My Contributions
 
@@ -49,6 +52,8 @@ As project lead and proposal writer, I was responsible for:
 - Creating a specialized manifold that enables seamless switching between vacuum and pressure on the pump
 - Ensuring ISO 62304 compliance for medical device software
 
+{% comment %}
+Görseller eklendiğinde bu bloğu yorumdan çıkarın.
 <div class="row">
     <div class="col-sm-8 mt-3 mt-md-0">
         {% include figure.liquid path="assets/img/testing_setup.jpg" title="Testing setup" class="img-fluid rounded z-depth-1" %}
@@ -60,6 +65,7 @@ As project lead and proposal writer, I was responsible for:
 <div class="caption">
     Left: Laboratory testing setup for pressure accuracy and response time. Right: Device in simulated clinical environment.
 </div>
+{% endcomment %}
 
 ## Technical Challenges
 

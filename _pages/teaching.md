@@ -2,64 +2,30 @@
 layout: page
 title: teaching
 permalink: /teaching/
-description: Courses given
+description: Courses and laboratories I have taught.
 nav: true
 nav_order: 6
-display_categories: [work, fun]
-horizontal: false
 ---
 
-<!-- pages/projects.md -->
-<div class="BMM316 Biomedical Sensors and Transducers">
-{% if site.enable_project_categories and page.display_categories %}
-  <!-- Display categorized projects -->
-  {% for category in page.display_categories %}
-  <a id="{{ category }}" href=".#{{ category }}">
-    <h2 class="category">{{ category }}</h2>
-  </a>
-  {% assign categorized_projects = site.projects | where: "category", category %}
-  {% assign sorted_projects = categorized_projects | sort: "importance" %}
-  <!-- Generate cards for each project -->
-  {% if page.horizontal %}
-  <div class="container">
-    <div class="row row-cols-2">
-    {% for project in sorted_projects %}
-      {% include projects_horizontal.liquid %}
-    {% endfor %}
-    </div>
-  </div>
-  {% else %}
-  <div class="grid">
-    {% for project in sorted_projects %}
-      {% include projects.liquid %}
-    {% endfor %}
-  </div>
-  {% endif %}
-  {% endfor %}
+## TOBB University of Economics and Technology
 
-{% else %}
+Department of Biomedical Engineering, 2023 – 2025.
 
-<!-- Display projects without categories -->
+### BMM411 — Biomedical Image Processing
 
-{% assign sorted_projects = site.projects | sort: "importance" %}
+Undergraduate course covering the theory and practice of medical image analysis:
 
-  <!-- Generate cards for each project -->
+- Frequency-domain filtering and Wiener filters
+- Radon transform and image reconstruction
+- Wavelet transforms
+- Color image processing
 
-{% if page.horizontal %}
+### Biomedical Instrumentation Laboratory
 
-  <div class="container">
-    <div class="row row-cols-2">
-    {% for project in sorted_projects %}
-      {% include projects_horizontal.liquid %}
-    {% endfor %}
-    </div>
-  </div>
-  {% else %}
-  <div class="grid">
-    {% for project in sorted_projects %}
-      {% include projects.liquid %}
-    {% endfor %}
-  </div>
-  {% endif %}
-{% endif %}
-</div>
+Coordinated the laboratory covering biosignal acquisition and processing with
+MATLAB: ECG, EMG, EEG and EOG.
+
+### Undergraduate thesis supervision
+
+Supervised undergraduate thesis projects in medical image analysis and signal
+processing.
