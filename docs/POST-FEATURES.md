@@ -49,17 +49,27 @@ Kullanılabilir ek alanlar:
 
 ## Görseller
 
+{% raw %}
+
 ```liquid
 {% include figure.liquid loading="eager" path="assets/img/9.jpg" class="img-fluid rounded z-depth-1" %}
 ```
 
+{% endraw %}
+
 Tıklayınca büyüyen görsel için `zoomable=true` ekleyin:
+
+{% raw %}
 
 ```liquid
 {% include figure.liquid loading="eager" path="assets/img/8.jpg" class="img-fluid rounded z-depth-1" zoomable=true %}
 ```
 
+{% endraw %}
+
 Bootstrap ızgarasıyla yan yana:
+
+{% raw %}
 
 ```liquid
 <div class="row mt-3">
@@ -73,6 +83,8 @@ Bootstrap ızgarasıyla yan yana:
 <div class="caption">Görsellerin altına gelen açıklama.</div>
 ```
 
+{% endraw %}
+
 > **Not:** `jekyll-imagemagick` her `.jpg`/`.png` için responsive `.webp` türevleri
 > üretir. `assets/img/` içine koyduğunuz her görsel otomatik işlenir; başka klasöre
 > koyarsanız türev üretilmez ve link denetimi kırık bağlantı bildirir.
@@ -81,11 +93,15 @@ Bootstrap ızgarasıyla yan yana:
 
 ## Video ve ses
 
+{% raw %}
+
 ```liquid
 {% include video.liquid path="assets/video/dosya.mp4" class="img-fluid rounded z-depth-1" controls=true autoplay=true %}
 {% include video.liquid path="https://www.youtube.com/embed/VIDEO_ID" class="img-fluid rounded z-depth-1" %}
 {% include audio.liquid path="assets/audio/parca.mp3" controls=true %}
 ```
+
+{% endraw %}
 
 ---
 
@@ -110,6 +126,8 @@ MathJax 3 kullanılıyor. Alt çizgi içeren ifadelerde kramdown'ın italik yapm
 
 Satır numaralı, vurgulu blok:
 
+{% raw %}
+
 ```markdown
 {% highlight c linenos %}
 int main(void) {
@@ -118,6 +136,8 @@ return 0;
 }
 {% endhighlight %}
 ```
+
+{% endraw %}
 
 Normal markdown kod bloğu da çalışır:
 
@@ -201,7 +221,7 @@ Yazıya özel kaynakça için front matter'a:
 related_publications: true
 ```
 
-Metin içinde atıf: `{% cite ozdemir2019investigating %}` — anahtar
+Metin içinde atıf: {% raw %}`{% cite ozdemir2019investigating %}`{% endraw %} — anahtar
 `_bibliography/papers.bib` dosyasındaki girdiden gelir.
 
 ---
@@ -209,6 +229,8 @@ Metin içinde atıf: `{% cite ozdemir2019investigating %}` — anahtar
 ## Jupyter defteri gömme
 
 Defteri `assets/jupyter/` altına koyun, sonra:
+
+{% raw %}
 
 ```liquid
 {::nomarkdown}
@@ -221,6 +243,8 @@ Defteri `assets/jupyter/` altına koyun, sonra:
 {% endif %}
 {:/nomarkdown}
 ```
+
+{% endraw %}
 
 ---
 
