@@ -2,7 +2,7 @@
 layout: about
 title: about
 permalink: /
-subtitle: Biomedical Engineer
+subtitle: Biomedical Engineer, PhD · Medical Image Processing & Deep Learning for MRI
 profile:
   align: right
   image: prof_pic.jpg

@@ -2,96 +2,120 @@
   type: map
   contents:
     - name: Full Name
-      value: Albert Einstein
-    - name: Date of Birth
-      value: 14th March 1879
+      value: Mertcan Özdemir, PhD
+    - name: Location
+      value: Ankara, Turkey
+    - name: Email
+      value: mertcanozdemir@yahoo.com
     - name: Languages
-      value: English, German
+      value: Turkish (native), English (professional working proficiency)
+
+- title: Research Profile
+  type: list
+  contents:
+    - Recent PhD graduate in Biomedical Engineering with research expertise in deep learning-based cardiac MRI synthesis using diffusion models and attention mechanisms. Experienced in MR image reconstruction pipelines, DICOM data processing, and generative AI for medical imaging. Seeking to expand into ultra-high field MRI acquisition and reconstruction, combining computational skills with hands-on scanner experience.
 
 - title: Education
   type: time_table
   contents:
-    - title: PhD
-      institution: University of Zurich, Zurich, Switzerland
-      year: 1905
+    - title: PhD in Biomedical Engineering
+      institution: TOBB University of Economics and Technology, Ankara
+      year: 2019 - 2025
       description:
-        - Description 1.
-        - Description 2.
-        - title: Description 3.
-          contents:
-            - Sub-description 1.
-            - Sub-description 2.
-    - title: Federal teaching diploma
-      institution: Eidgenössische Technische Hochschule, Zurich, Switzerland
-      year: 1900
+        - "Thesis: Cardiac MRI Image Data Augmentation Using Diffusion Model-Based Asymmetric Attention Mechanisms"
+        - Developed a novel asymmetric attention-enhanced diffusion model for synthesizing realistic cardiac cine MRI sequences from the OCMR dataset.
+        - Achieved FID score of 77.78; radiologists distinguished synthetic from real images with only 60% accuracy in clinical validation.
+        - Extensive experience with k-space data, DICOM pipelines, cardiac cine reconstruction, and evaluation metrics (FID, SSIM, MS-SSIM).
+    - title: MSc in Biomedical Engineering
+      institution: TOBB University of Economics and Technology, Ankara
+      year: 2017 - 2019
       description:
-        - Description 1.
-        - Description 2.
+        - "Thesis: Investigation of Ballistic Gelatin-Based Phantom Properties for Ultrasound Training"
+    - title: BSc in Biomedical Engineering
+      institution: TOBB University of Economics and Technology, Ankara
+      year: 2013 - 2017
 
-- title: Experience
+- title: Research & Teaching Experience
   type: time_table
   contents:
-    - title: Professor of Theoretical Physics
-      institution: Institute for Advanced Study, Princeton University
-      year: 1933 - 1955
+    - title: Teaching and Research Assistant
+      institution: TOBB University, Dept. of Biomedical Engineering
+      year: Nov 2023 - Dec 2025
       description:
-        - Description 1.
-        - Description 2.
-        - title: Description 3.
-          contents:
-            - Sub-description 1.
-            - Sub-description 2.
-    - title: Visiting Professor
-      institution: California Institute of Technology, Pasadena, California, US
-      year: 1933
-      description:
-        - Description 1.
-        - Description 2.
+        - "Taught Biomedical Image Processing (BMM411): frequency-domain filtering, Wiener filters, Radon transform, wavelet transforms, and color image processing."
+        - Supervised undergraduate thesis projects in medical image analysis and signal processing.
+        - "Coordinated Biomedical Instrumentation Laboratory: ECG, EMG, EEG, and EOG signal acquisition and processing with MATLAB."
 
-    - title: Director
-      institution: Kaiser Wilhelm Institute for Physics, Berlin, Germany.
-      year: 1917-1933
-
-    - title: Professor of Theoretical Physics
-      institution: Karl-Ferdinand University, Prague, Czechoslovakia
-      year: 1911 - 1917
-      description:
-
-    - title: Associate Professor of Theoretical Physics
-      institution: University of Zurich, Zurich, Switzerland
-      year: 1909 - 1911
-
-- title: Open Source Projects
+- title: Industry Experience
   type: time_table
   contents:
-    - title: <a href="https://github.com/alshedivat/al-folio">al-folio</a>
-      year: 2015-now
-      description: A beautiful, simple, clean, and responsive Jekyll theme for academics.
+    - title: R&D Engineer (Biomedical)
+      institution: Okuman Medical Systems, Ankara
+      year: Apr 2020 - Nov 2023
+      description:
+        - Led three TÜBİTAK-funded medical device R&D projects (~€500K total budget); managed technical development from concept to prototype.
+        - Developed embedded software architecture compliant with IEC 62304 for patient monitoring devices.
+        - Managed IEC 60601-1 (electrical safety) and IEC 60601-1-2 (EMC) compliance testing and documentation.
 
-- title: Honors and Awards
+- title: Selected Publications & Patents
   type: time_table
   contents:
-    - year: 1921
+    - year: 2025
       items:
-        - Nobel Prize in Physics
-        - Matteucci Medal
-    - year: 2029
+        - "Özdemir, M., Eroğul, O. Cardiac MRI Image Data Augmentation Using Diffusion Model-Based Asymmetric Attention Mechanisms. <em>Diagnostics</em> (Q1 Journal)."
+    - year: 2023
       items:
-        - Max Planck Medal
+        - "International Patent: Thermal Monitoring System (<a href='https://patents.google.com/patent/WO2023163682A1' target='_blank'>WO2023163682A1</a>) — thermal camera integration for neonatal radiant warmers."
 
-- title: Academic Interests
-  type: nested_list
+- title: Technical Skills
+  type: list_groups
   contents:
-    - title: Topic 1.
+    - category: Programming
+      icon: fa-solid fa-code
       items:
-        - Description 1.
-        - Description 2.
-    - title: Topic 2.
+        - name: Python
+        - name: MATLAB
+        - name: C/C++
+    - category: Deep Learning
+      icon: fa-solid fa-brain
       items:
-        - Description 1.
-        - Description 2.
+        - name: PyTorch
+        - name: Diffusion Models
+        - name: GANs
+        - name: Attention Mechanisms
+    - category: MRI & Imaging
+      icon: fa-solid fa-magnet
+      items:
+        - name: DICOM / pyDicom
+        - name: k-space processing
+        - name: Cardiac cine MRI
+        - name: Image reconstruction
+    - category: Image Processing
+      icon: fa-solid fa-wave-square
+      items:
+        - name: Frequency-domain filtering
+        - name: Wavelet transforms
+        - name: Radon / inverse Radon transform
+    - category: Evaluation Metrics
+      icon: fa-solid fa-chart-line
+      items:
+        - name: FID
+        - name: SSIM / MS-SSIM
+        - name: Clinical validation protocols
+    - category: Tools & Platforms
+      icon: fa-solid fa-toolbox
+      items:
+        - name: Git / GitHub
+        - name: LaTeX
+        - name: Linux (Arch)
+        - name: MATLAB Grader
+    - category: Embedded Systems
+      icon: fa-solid fa-microchip
+      items:
+        - name: STM32
+        - name: FreeRTOS
 
 - title: Other Interests
   type: list
   contents:
-    - <u>Hobbies:</u> Hobby 1, Hobby 2, etc.
+    - <u>Sports:</u> National Ice Hockey Team member (Turkey); founded and captained the TOBB University ice hockey team.
