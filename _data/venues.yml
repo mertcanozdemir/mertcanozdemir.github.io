@@ -1,6 +1,15 @@
-"AJP":
-  url: https://aapt.scitation.org/journal/ajp
-  color: "#00369f"
+"Diagnostics":
+  url: https://www.mdpi.com/journal/diagnostics
+  color: "#00846b"
 
-"PhysRev":
-  url: https://journals.aps.org/
+"EuroBiotech":
+  url: https://sciendo.com/journal/EBTJ
+  color: "#0b7285"
+
+"TIPTEKNO":
+  url: https://ieeexplore.ieee.org/xpl/conhome/1002505/all-proceedings
+  color: "#00629b"
+
+"SIU":
+  url: https://ieeexplore.ieee.org/xpl/conhome/1000203/all-proceedings
+  color: "#00629b"
