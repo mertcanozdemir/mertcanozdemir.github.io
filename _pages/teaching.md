@@ -4,7 +4,7 @@ title: teaching
 permalink: /teaching/
 description: Courses and laboratories I have taught.
 nav: true
-nav_order: 6
+nav_order: 3
 ---
 
 ## TOBB University of Economics and Technology

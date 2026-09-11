@@ -3,8 +3,8 @@ layout: page
 title: projects
 permalink: /projects/
 description: Medical device and medical imaging work.
-nav: true
-nav_order: 3
+nav: false
+nav_order: 4
 display_categories: [work]
 horizontal: false
 ---

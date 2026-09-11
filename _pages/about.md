@@ -7,20 +7,24 @@ profile:
   align: right
   image: prof_pic.jpg
   image_circular: true
+  image_alt: portrait of Mertcan Özdemir
   more_info:
 header_gif:
   enable: true
   file: mybrain.gif
   alt: animated MRI scan of my brain
-  caption: my brain
 news: false
 
 selected_papers: true
 social: true
 ---
 
-This site showcases my technical writings, coding projects, and occasional thoughts.
+I am a biomedical engineer working on medical image processing and deep learning for MRI.
 
-Browse my blog, check out my work, or connect.
+I recently completed my PhD at TOBB University of Economics and Technology, where I developed
+diffusion models with asymmetric attention for synthesising cardiac cine MRI. Before that I spent
+three years building medical devices in industry, leading TÜBİTAK-funded R&D projects and taking
+patient monitoring hardware from concept to certification.
 
-Enjoy your visit!
+I am currently looking to extend my research towards ultra-high field MRI acquisition and
+reconstruction.
