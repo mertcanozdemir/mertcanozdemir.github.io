@@ -7,9 +7,14 @@
     <a class="skip" href="#main">Skip to content</a>
     {% include site/nav.liquid %}
 
+    {% comment %}
+      The container is wide so data-heavy pages (recon, drills) can use the room.
+      Prose is held to a readable measure inside it; a page sets `wide: true` to
+      opt out and lay itself out across the full container.
+    {% endcomment %}
     <main id="main" class="wrap">
       {% if page.title and page.url != '/' %}
-        <header class="page-head">
+        <header class="page-head{% unless page.wide %} prose{% endunless %}">
           <h1>{{ page.title }}</h1>
           {% if page.description %}
             <p class="page-desc">{{ page.description }}</p>
@@ -17,7 +22,11 @@
         </header>
       {% endif %}
 
-      {{ content }}
+      {% if page.wide %}
+        {{ content }}
+      {% else %}
+        <div class="prose">{{ content }}</div>
+      {% endif %}
     </main>
 
     {% include site/foot.liquid %}

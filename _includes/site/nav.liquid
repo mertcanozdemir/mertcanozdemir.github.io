@@ -1,10 +1,37 @@
-<nav class="nav" aria-label="Main">
-  <a class="nav-home" href="{{ '/' | relative_url }}">
-    {{- site.first_name }}
-    {{ site.last_name -}}
-  </a>
+{% comment %}
+  The links live in a panel behind a toggle rather than inline. That costs some
+  discoverability with only a handful of pages, but keeps the top edge clear so
+  wide content (the recon browser, drill diagrams) starts at the top of the page.
+{% endcomment %}
 
-  <ul class="nav-links">
+<nav class="nav" aria-label="Main">
+  <button
+    type="button"
+    class="nav-toggle"
+    data-menu-toggle
+    aria-expanded="false"
+    aria-controls="site-menu"
+    aria-label="Open menu"
+  >
+    <span class="nav-bars" aria-hidden="true"><i></i><i></i><i></i></span>
+  </button>
+
+  <button type="button" class="nav-theme" data-theme-toggle>
+    <span data-theme-label></span>
+  </button>
+</nav>
+
+<div class="menu" id="site-menu" data-menu hidden>
+  <ul>
+    <li>
+      <a
+        href="{{ '/' | relative_url }}"
+        {% if page.url == '/' %}
+          aria-current="page"
+        {% endif %}
+        >home</a
+      >
+    </li>
     {% assign sorted = site.pages | sort: 'nav_order' %}
     {% for p in sorted %}
       {% if p.nav and p.autogen == null %}
@@ -21,8 +48,4 @@
       {% endif %}
     {% endfor %}
   </ul>
-
-  <button type="button" class="nav-theme" data-theme-toggle aria-live="polite">
-    <span data-theme-label></span>
-  </button>
-</nav>
+</div>

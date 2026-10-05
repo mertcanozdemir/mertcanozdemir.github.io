@@ -18,8 +18,9 @@
   --global-card-bg-color: #fafafa;
   --global-code-bg-color: #f5f5f5;
 
-  --measure: 42rem; // comfortable line length for prose
-  --gutter: 1.25rem;
+  --wide: 76rem; // page container; data-heavy pages fill it
+  --measure: 42rem; // prose stays readable inside it
+  --gutter: 1.5rem;
 }
 
 html[data-theme="dark"] {
@@ -81,50 +82,50 @@ a {
 }
 
 .wrap {
-  max-width: var(--measure);
+  max-width: var(--wide);
   margin: 0 auto;
   padding: 2rem var(--gutter) 4rem;
+}
+
+// Line length is a readability constraint, not a style choice: prose stays
+// around 45-75 characters a line however wide the container gets.
+.prose {
+  max-width: var(--measure);
 }
 
 // Nav ------------------------------------------------------------------
 
 .nav {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 1rem;
-  flex-wrap: wrap;
-  max-width: var(--measure);
+  max-width: var(--wide);
   margin: 0 auto;
   padding: 1rem var(--gutter);
-  border-bottom: 1px solid var(--global-divider-color);
 }
 
-.nav-home {
-  font-weight: 600;
+.nav-toggle {
+  background: transparent;
+  border: 0;
+  padding: 6px;
+  margin-left: -6px;
+  cursor: pointer;
   color: var(--global-text-color);
-  text-decoration: none;
+  line-height: 0;
 }
 
-.nav-links {
-  display: flex;
-  gap: 0.85rem;
-  flex-wrap: wrap;
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  font-size: 0.9rem;
+.nav-bars {
+  display: inline-block;
+  width: 22px;
 
-  a {
-    color: var(--global-text-color-light);
-    text-decoration: none;
+  i {
+    display: block;
+    height: 2px;
+    border-radius: 2px;
+    background: currentColor;
 
-    &:hover,
-    &[aria-current="page"] {
-      color: var(--global-text-color);
-    }
-
-    &[aria-current="page"] {
-      text-decoration: underline;
+    & + i {
+      margin-top: 5px;
     }
   }
 }
@@ -142,6 +143,37 @@ a {
 
   &:hover {
     color: var(--global-text-color);
+  }
+}
+
+.menu {
+  max-width: var(--wide);
+  margin: 0 auto;
+  padding: 0 var(--gutter) 1rem;
+
+  ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  a {
+    display: inline-block;
+    color: var(--global-text-color);
+    text-decoration: none;
+    font-size: 1.1rem;
+    padding: 2px 0;
+
+    &:hover {
+      color: var(--global-theme-color);
+    }
+
+    &[aria-current="page"] {
+      color: var(--global-text-color-light);
+    }
   }
 }
 
@@ -198,7 +230,7 @@ table {
 }
 
 .foot {
-  max-width: var(--measure);
+  max-width: var(--wide);
   margin: 0 auto;
   padding: 1.5rem var(--gutter) 2.5rem;
   border-top: 1px solid var(--global-divider-color);

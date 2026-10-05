@@ -41,3 +41,36 @@
     });
   })();
 </script>
+
+<script>
+  // Menu panel. Closes on Escape, on outside click, and after following a link.
+  (function () {
+    var btn = document.querySelector('[data-menu-toggle]');
+    var panel = document.querySelector('[data-menu]');
+    if (!btn || !panel) return;
+
+    function set(open) {
+      btn.setAttribute('aria-expanded', String(open));
+      btn.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+      panel.hidden = !open;
+      document.documentElement.classList.toggle('menu-open', open);
+    }
+
+    btn.addEventListener('click', function () {
+      set(btn.getAttribute('aria-expanded') !== 'true');
+    });
+
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && btn.getAttribute('aria-expanded') === 'true') {
+        set(false);
+        btn.focus();
+      }
+    });
+
+    document.addEventListener('click', function (e) {
+      if (btn.getAttribute('aria-expanded') !== 'true') return;
+      if (panel.contains(e.target) || btn.contains(e.target)) return;
+      set(false);
+    });
+  })();
+</script>
