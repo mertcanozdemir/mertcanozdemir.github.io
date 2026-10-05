@@ -339,3 +339,25 @@ table.recon-cell {
     }
   }
 }
+
+.recon-arms {
+  margin-top: 12px;
+  border-top: 1px solid var(--global-divider-color);
+  padding-top: 8px;
+
+  summary {
+    cursor: pointer;
+    font-size: 0.78rem;
+    color: var(--global-text-color-light);
+  }
+
+  table.recon-cell + table.recon-cell {
+    margin-top: 10px;
+  }
+}
+
+.recon-warn {
+  font-size: 0.75rem;
+  color: var(--global-theme-color);
+  margin: 8px 0;
+}

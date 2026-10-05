@@ -29,6 +29,7 @@
   let rows = [],
     papersById = new Map(),
     byCell = new Map(),
+    byPaper = new Map(),
     meta = null;
 
   // A table is {columns, values, data}; a cell is an index into values[column]
@@ -139,23 +140,57 @@
     </li>`;
   }
 
-  // The only valid side-by-side comparison: rows one paper ran together.
-  function cellHTML(row) {
-    const mates = (byCell.get(row.cell) || []).map((i) => rows[i]);
-    const head = [row.dataset, row.anatomy, row.contrast, "R=" + row.R, row.mask_class, row.split].filter(Boolean).map(esc).join(" · ");
-    const body = mates
+  // Rows sharing a `cell` were run side by side in one paper under one protocol
+  // and one experiment arm; only those may be compared. A paper often reports
+  // several arms at the same protocol — different forward models, noise
+  // assumptions or training regimes — and those land in separate cells. They are
+  // shown here too, clearly apart, because otherwise a lone row looks like a
+  // missing comparison rather than a deliberate split.
+
+  const protocolOf = (r) => [r.dataset, r.contrast, r.R, r.mask_class, r.split].join("\u0000");
+
+  function armTable(list, self) {
+    const body = list
       .map((m) => {
-        const me = m === row ? ' class="is-self"' : "";
+        const me = m === self ? ' class="is-self"' : "";
         return `<tr${me}><td>${esc(m.model)}</td><td>${esc(m.role)}</td>
           <td class="n">${num(m.psnr, 2)}</td><td class="n">${num(m.ssim, 4)}</td>
-          <td class="n">${m.params_M !== null ? num(m.params_M, 1) + "M" : "—"}</td></tr>`;
+          <td class="n">${m.params_M !== null ? num(m.params_M, 1) + "M" : "\u2014"}</td></tr>`;
       })
       .join("");
-    return `<p class="recon-cell-head">Measured side by side in this paper — ${head}</p>
-      <table class="recon-cell">
-        <thead><tr><th>model</th><th>role</th><th class="n">PSNR</th><th class="n">SSIM</th><th class="n">params</th></tr></thead>
-        <tbody>${body}</tbody>
-      </table>`;
+    return `<table class="recon-cell">
+      <thead><tr><th>model</th><th>role</th><th class="n">PSNR</th><th class="n">SSIM</th><th class="n">params</th></tr></thead>
+      <tbody>${body}</tbody>
+    </table>`;
+  }
+
+  function cellHTML(row) {
+    const mates = (byCell.get(row.cell) || []).map((i) => rows[i]);
+    const head = [row.dataset, row.anatomy, row.contrast, "R=" + row.R, row.mask_class, row.split].filter(Boolean).map(esc).join(" \u00b7 ");
+
+    const lead =
+      mates.length > 1
+        ? `Measured side by side in this paper \u2014 ${head}`
+        : `Reported on its own in this paper \u2014 ${head}. No model was measured
+           alongside it in this arm, so there is nothing here to compare it with.`;
+
+    // Other arms the same paper reports under the same protocol.
+    const key = protocolOf(row);
+    const siblings = (byPaper.get(row.paper) || [])
+      .filter((c) => c !== row.cell)
+      .map((c) => (byCell.get(c) || []).map((i) => rows[i]))
+      .filter((list) => list.length && protocolOf(list[0]) === key);
+
+    const extra = siblings.length
+      ? `<details class="recon-arms">
+          <summary>${siblings.length} other experiment arm${siblings.length === 1 ? "" : "s"} at this protocol</summary>
+          <p class="recon-warn">Measured separately from the rows above \u2014 a different
+          experiment arm, so the values are not comparable across these tables.</p>
+          ${siblings.map((list) => armTable(list, null)).join("")}
+        </details>`
+      : "";
+
+    return `<p class="recon-cell-head">${lead}</p>${armTable(mates, row)}${extra}`;
   }
 
   function render() {
@@ -206,7 +241,10 @@
       rows.forEach((r, i) => {
         if (!byCell.has(r.cell)) byCell.set(r.cell, []);
         byCell.get(r.cell).push(i);
+        if (!byPaper.has(r.paper)) byPaper.set(r.paper, new Set());
+        byPaper.get(r.paper).add(r.cell);
       });
+      byPaper.forEach((set, k) => byPaper.set(k, [...set]));
 
       const c = meta.counts;
       el.scope.textContent =
