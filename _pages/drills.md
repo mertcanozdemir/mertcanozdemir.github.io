@@ -1,10 +1,10 @@
 ---
-layout: page
+layout: base
 permalink: /drills/
 title: drills
 description: Ice hockey drill diagrams from my own training notes.
 nav: true
-nav_order: 4
+nav_order: 2
 ---
 
 <p class="drill-intro">

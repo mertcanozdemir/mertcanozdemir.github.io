@@ -242,6 +242,44 @@ table {
   }
 }
 
+// About ----------------------------------------------------------------
+
+.portrait img {
+  border-radius: 50%;
+}
+
+.brain img {
+  width: 70%;
+  border-radius: 5px;
+}
+
+// Publications ---------------------------------------------------------
+
+.pub {
+  margin-bottom: 1rem;
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.pub-authors,
+.pub-venue {
+  display: block;
+  color: var(--global-text-color-light);
+  font-size: 0.85rem;
+}
+
+.pub-title {
+  display: block;
+
+  a {
+    text-decoration: none;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+}
+
 // Page-specific styles written for the old theme; they key off the same custom
 // properties, so they carry over untouched.
 @import "custom";

@@ -1,0 +1,56 @@
+{% comment %}
+  Plain bibliography entry: authors, title, venue, year, one link. Replaces
+  al-folio's 297-line template, which spent most of itself on Altmetric,
+  Dimensions and Scholar badges, abbreviation chips and thumbnails that this
+  site does not use. Own-name emphasis is kept — it is the one piece of
+  formatting a publication list actually needs.
+{% endcomment %}
+
+<div class="pub">
+  <span class="pub-authors">
+    {%- for a in entry.author_array -%}
+      {%- assign is_self = false -%}
+      {%- if site.scholar.last_name contains a.last and site.scholar.first_name contains a.first -%}
+        {%- assign is_self = true -%}
+      {%- endif -%}
+      {%- if is_self -%}
+        <strong>
+          {{- a.first }}
+          {{ a.last -}}
+        </strong>
+      {%- else -%}
+        {{ a.first }}
+        {{ a.last }}
+      {%- endif -%}
+      {%- unless forloop.last %}, {% endunless -%}
+    {%- endfor -%}
+  </span>
+
+  {% assign link = false %}
+  {% if entry.doi %}
+    {% assign link = entry.doi | prepend: 'https://doi.org/' %}
+  {% elsif entry.url %}
+    {% assign link = entry.url %}
+  {% endif %}
+
+  <span class="pub-title">
+    {% if link %}
+      <a href="{{ link }}" target="_blank" rel="noopener">{{ entry.title }}</a>
+    {% else %}
+      {{ entry.title }}
+    {% endif %}
+  </span>
+
+  <span class="pub-venue">
+    {%- if entry.journal -%}
+      {{ entry.journal }}
+    {%- elsif entry.booktitle -%}
+      {{ entry.booktitle }}
+    {%- elsif entry.school -%}
+      {{ entry.school }}
+    {%- elsif entry.note -%}
+      {{ entry.note }}
+    {%- endif -%}
+    {%- if entry.year %}, {{ entry.year }}{% endif -%}
+  </span>
+</div>

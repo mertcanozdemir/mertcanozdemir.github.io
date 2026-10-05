@@ -1,10 +1,9 @@
 ---
-layout: page
-permalink: /recon/
-title: recon results
-description: Reported MRI reconstruction results from the literature, with provenance.
-nav: true
-nav_order: 0
+layout: base
+permalink: /
+wide: true
+title: MRI reconstruction results
+description: Reported results from the literature, with provenance.
 ---
 
 <div class="recon" data-src="{{ '/assets/json/mri_recon_data.json' | relative_url }}">
