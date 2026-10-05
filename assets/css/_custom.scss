@@ -118,3 +118,224 @@ html[data-theme="dark"] {
     accent-color: var(--global-theme-color);
   }
 }
+
+// MRI reconstruction results browser (/recon/)
+
+.recon {
+  margin-bottom: 2rem;
+}
+
+.recon-scope {
+  color: var(--global-text-color-light);
+  font-size: 0.85rem;
+}
+
+.recon-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 12px 0;
+  border-top: 1px solid var(--global-divider-color);
+  border-bottom: 1px solid var(--global-divider-color);
+
+  input[type="search"],
+  select {
+    font-family: inherit;
+    font-size: 0.85rem;
+    padding: 5px 9px;
+    border: 1px solid var(--global-divider-color);
+    border-radius: 5px;
+    background: transparent;
+    color: var(--global-text-color);
+  }
+
+  input[type="search"] {
+    flex: 1;
+    min-width: 180px;
+  }
+}
+
+.recon-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+
+  button {
+    font-family: inherit;
+    font-size: 0.78rem;
+    padding: 4px 9px;
+    border: 1px solid var(--global-divider-color);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--global-text-color);
+    cursor: pointer;
+
+    &[aria-pressed="true"] {
+      background: var(--global-theme-color);
+      border-color: var(--global-theme-color);
+      color: #fff;
+    }
+  }
+}
+
+.recon-toggle {
+  font-size: 0.8rem;
+  color: var(--global-text-color-light);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0;
+  white-space: nowrap;
+}
+
+.recon-count {
+  color: var(--global-text-color-light);
+  font-size: 0.8rem;
+  margin: 10px 0;
+}
+
+.recon-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.recon-row {
+  border-bottom: 1px solid var(--global-divider-color);
+  padding: 8px 0;
+}
+
+.recon-row-main {
+  display: grid;
+  grid-template-columns: 3.2rem minmax(7rem, 1.2fr) 5.5rem 2fr auto;
+  gap: 10px;
+  align-items: baseline;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  padding: 2px 0;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.88rem;
+  color: var(--global-text-color);
+
+  &:hover .recon-model {
+    color: var(--global-theme-color);
+  }
+}
+
+.recon-year {
+  color: var(--global-text-color-light);
+  font-variant-numeric: tabular-nums;
+}
+
+.recon-model {
+  font-weight: 600;
+}
+
+.recon-tag {
+  font-size: 0.72rem;
+  color: var(--global-text-color-light);
+  border: 1px solid var(--global-divider-color);
+  border-radius: 4px;
+  padding: 1px 6px;
+  justify-self: start;
+}
+
+.recon-where,
+.recon-vals {
+  color: var(--global-text-color-light);
+  font-size: 0.8rem;
+}
+
+.recon-vals {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.recon-meta {
+  font-size: 0.75rem;
+  color: var(--global-text-color-light);
+  margin-top: 3px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.recon-prov::before {
+  content: "·";
+  margin-right: 10px;
+}
+
+.recon-excluded {
+  color: var(--global-theme-color);
+}
+
+.recon-detail {
+  margin: 10px 0 4px;
+  padding: 10px 12px;
+  background: var(--global-code-bg-color);
+  border-radius: 6px;
+}
+
+.recon-cell-head {
+  font-size: 0.78rem;
+  color: var(--global-text-color-light);
+  margin: 0 0 8px;
+}
+
+table.recon-cell {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+  margin: 0;
+
+  th {
+    text-align: left;
+    font-weight: 600;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--global-text-color-light);
+    padding: 4px 8px;
+    border-bottom: 1px solid var(--global-divider-color);
+  }
+
+  td {
+    padding: 5px 8px;
+    border-bottom: 1px solid var(--global-divider-color);
+  }
+
+  tr:last-child td {
+    border-bottom: 0;
+  }
+
+  .n {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  tr.is-self td {
+    font-weight: 600;
+  }
+}
+
+.recon-extraction {
+  border-left: 3px solid var(--global-theme-color);
+  padding-left: 12px;
+  color: var(--global-text-color-light);
+  font-size: 0.88rem;
+}
+
+@media (max-width: 600px) {
+  .recon-row-main {
+    grid-template-columns: 2.8rem 1fr auto;
+
+    .recon-tag,
+    .recon-where {
+      display: none;
+    }
+  }
+}
