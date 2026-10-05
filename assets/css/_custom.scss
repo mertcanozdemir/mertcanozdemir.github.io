@@ -361,3 +361,77 @@ table.recon-cell {
   color: var(--global-theme-color);
   margin: 8px 0;
 }
+
+.recon-views {
+  display: flex;
+  gap: 0;
+
+  button {
+    font-family: inherit;
+    font-size: 0.8rem;
+    padding: 4px 12px;
+    border: 1px solid var(--global-divider-color);
+    background: transparent;
+    color: var(--global-text-color-light);
+    cursor: pointer;
+
+    &:first-child {
+      border-radius: 5px 0 0 5px;
+    }
+
+    &:last-child {
+      border-radius: 0 5px 5px 0;
+      border-left: 0;
+    }
+
+    &[aria-pressed="true"] {
+      background: var(--global-theme-color);
+      border-color: var(--global-theme-color);
+      color: #fff;
+    }
+  }
+}
+
+.recon-paper-main {
+  display: grid;
+  grid-template-columns: 3.2rem 1fr;
+  gap: 4px 10px;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  padding: 2px 0;
+  cursor: pointer;
+  font-family: inherit;
+  color: var(--global-text-color);
+
+  .recon-year {
+    grid-row: span 2;
+  }
+
+  &:hover .recon-paper-title {
+    color: var(--global-theme-color);
+  }
+}
+
+.recon-paper-title {
+  font-size: 0.92rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.recon-paper-meta {
+  color: var(--global-text-color-light);
+  font-size: 0.78rem;
+}
+
+.recon-arm + .recon-arm {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--global-divider-color);
+}
+
+.recon-lone {
+  color: var(--global-text-color-light);
+  font-style: italic;
+}

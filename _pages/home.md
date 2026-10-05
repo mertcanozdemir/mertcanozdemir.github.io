@@ -10,6 +10,7 @@ description: Reported results from the literature, with provenance.
   <p class="recon-scope" data-scope>Loading…</p>
 
   <div class="recon-controls" hidden data-controls>
+    <div class="recon-views" data-views role="group" aria-label="View"></div>
     <input type="search" data-q placeholder="model, paper title or dataset" aria-label="Search" />
     <select data-f="anatomy" aria-label="Anatomy"></select>
     <select data-f="family" aria-label="Architecture family"></select>
