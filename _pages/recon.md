@@ -47,6 +47,4 @@ and the page. Follow the link and check it. If a value is wrong,
 [report it](https://github.com/mertcanozdemir/mertcanozdemir.github.io/issues/new?title=Data+error)
 with the paper and table, and it will be corrected at source.
 
-<p data-download></p>
-
 <script src="{{ '/assets/js/recon.js' | relative_url }}" defer></script>

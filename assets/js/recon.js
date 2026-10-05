@@ -24,7 +24,6 @@
     results: root.querySelector("[data-results]"),
   };
   const extractionEl = document.querySelector("[data-extraction]");
-  const downloadEl = document.querySelector("[data-download]");
 
   const state = { q: "", anatomy: "", family: "", R: "", inMain: true };
   let rows = [],
@@ -216,11 +215,6 @@
         `${c.papers_in_main.toLocaleString("en")} papers (${c.rows_in_main.toLocaleString("en")} values) in the main analysis.`;
 
       if (extractionEl) extractionEl.textContent = meta.extraction;
-      if (downloadEl)
-        downloadEl.innerHTML = `<a href="${esc(root.dataset.src)}" download>Download the full dataset</a> (JSON, ${(5.5).toFixed(
-          1
-        )} MB) — schema v${esc(meta.versions.schema)}, protocol v${esc(meta.versions.protocol)}.`;
-
       buildControls(d.rows.values || {});
       el.controls.hidden = false;
       render();
