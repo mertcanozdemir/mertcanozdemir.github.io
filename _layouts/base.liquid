@@ -12,7 +12,7 @@
       Prose is held to a readable measure inside it; a page sets `wide: true` to
       opt out and lay itself out across the full container.
     {% endcomment %}
-    <main id="main" class="wrap">
+    <main id="main" class="wrap{% if page.wide %} is-wide{% endif %}">
       {% if page.title %}
         <header class="page-head{% unless page.wide %} prose{% endunless %}">
           <h1>{{ page.title }}</h1>

@@ -87,6 +87,12 @@ a {
   padding: 2rem var(--gutter) 4rem;
 }
 
+// Data pages run edge to edge; there is no reading measure to protect and the
+// tables and diagrams use every pixel they are given.
+.wrap.is-wide {
+  max-width: none;
+}
+
 // Line length is a readability constraint, not a style choice: prose stays
 // around 45-75 characters a line however wide the container gets.
 .prose {
@@ -99,7 +105,6 @@ a {
   display: flex;
   align-items: center;
   gap: 1rem;
-  max-width: var(--wide);
   margin: 0 auto;
   padding: 1rem var(--gutter);
 }
@@ -147,7 +152,6 @@ a {
 }
 
 .menu {
-  max-width: var(--wide);
   margin: 0 auto;
   padding: 0 var(--gutter) 1rem;
 
@@ -230,7 +234,6 @@ table {
 }
 
 .foot {
-  max-width: var(--wide);
   margin: 0 auto;
   padding: 1.5rem var(--gutter) 2.5rem;
   border-top: 1px solid var(--global-divider-color);
@@ -240,17 +243,6 @@ table {
   p {
     margin: 0;
   }
-}
-
-// About ----------------------------------------------------------------
-
-.portrait img {
-  border-radius: 50%;
-}
-
-.brain img {
-  width: 70%;
-  border-radius: 5px;
 }
 
 // Publications ---------------------------------------------------------

@@ -6,10 +6,6 @@ nav: true
 nav_order: 1
 ---
 
-<p class="portrait">
-  <img src="{{ '/assets/img/prof_pic.jpg' | relative_url }}" alt="portrait of Mertcan Özdemir" width="160" height="160" />
-</p>
-
 I am a biomedical engineer working on medical image processing and deep learning for MRI.
 
 I recently completed my PhD at TOBB University of Economics and Technology, where I developed
@@ -19,10 +15,6 @@ patient monitoring hardware from concept to certification.
 
 I am currently looking to extend my research towards ultra-high field MRI acquisition and
 reconstruction.
-
-<p class="brain">
-  <img src="{{ '/assets/img/mybrain.gif' | relative_url }}" alt="animated MRI scan of my brain" />
-</p>
 
 ## Publications
 
