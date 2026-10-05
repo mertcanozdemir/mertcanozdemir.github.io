@@ -1,0 +1,28 @@
+<nav class="nav" aria-label="Main">
+  <a class="nav-home" href="{{ '/' | relative_url }}">
+    {{- site.first_name }}
+    {{ site.last_name -}}
+  </a>
+
+  <ul class="nav-links">
+    {% assign sorted = site.pages | sort: 'nav_order' %}
+    {% for p in sorted %}
+      {% if p.nav and p.autogen == null %}
+        <li>
+          <a
+            href="{{ p.url | relative_url }}"
+            {% if page.url == p.url %}
+              aria-current="page"
+            {% endif %}
+          >
+            {{- p.title -}}
+          </a>
+        </li>
+      {% endif %}
+    {% endfor %}
+  </ul>
+
+  <button type="button" class="nav-theme" data-theme-toggle aria-live="polite">
+    <span data-theme-label></span>
+  </button>
+</nav>

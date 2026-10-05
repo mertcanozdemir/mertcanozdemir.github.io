@@ -1,5 +1,5 @@
 ---
-layout: page
+layout: base
 title: teaching
 permalink: /teaching/
 description: Courses and laboratories I have taught.

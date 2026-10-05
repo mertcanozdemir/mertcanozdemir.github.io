@@ -1,0 +1,59 @@
+{% comment %}
+  New theme chrome. Lives under _includes/site/ so it can be built alongside the
+  al-folio includes and swapped page by page; nothing here reads them.
+{% endcomment %}
+
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+{% assign site_title = site.first_name | append: ' ' | append: site.last_name %}
+{% if page.title and page.url != '/' %}
+  <title>
+    {{ page.title }}
+    ·
+    {{ site_title }}
+  </title>
+{% else %}
+  <title>{{ site_title }}</title>
+{% endif %}
+
+{% assign desc = page.description | default: site.description | strip_newlines | strip %}
+{% if desc != '' %}<meta name="description" content="{{ desc | escape }}" />{% endif %}
+{% if site.keywords %}<meta name="keywords" content="{{ site.keywords | escape }}" />{% endif %}
+
+<link rel="canonical" href="{{ page.url | absolute_url }}" />
+<link rel="alternate" type="application/atom+xml" href="{{ '/feed.xml' | relative_url }}" />
+
+<meta property="og:type" content="website" />
+<meta property="og:title" content="{% if page.title %}{{ page.title }} · {% endif %}{{ site_title }}" />
+<meta property="og:url" content="{{ page.url | absolute_url }}" />
+{% if desc != '' %}<meta property="og:description" content="{{ desc | escape }}" />{% endif %}
+{% if site.og_image %}<meta property="og:image" content="{{ site.og_image | absolute_url }}" />{% endif %}
+
+{% if site.icon %}
+  <link
+    rel="icon"
+    href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>{{ site.icon }}</text></svg>"
+  />
+{% endif %}
+
+<link rel="stylesheet" href="{{ '/assets/css/site.css' | relative_url }}" />
+
+{% comment %}
+  Applied before first paint so the page never flashes the wrong theme.
+  `data-theme` is what the stylesheets key off; `data-theme-setting` remembers
+  whether the choice was explicit or left to the system.
+{% endcomment %}
+<script>
+  (function () {
+    var s;
+    try {
+      s = localStorage.getItem('theme-setting');
+    } catch (e) {}
+    s = s === 'light' || s === 'dark' ? s : 'system';
+    var dark = s === 'dark' || (s === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
+    var r = document.documentElement;
+    r.setAttribute('data-theme-setting', s);
+    r.setAttribute('data-theme', dark ? 'dark' : 'light');
+  })();
+</script>

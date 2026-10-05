@@ -1,0 +1,43 @@
+<footer class="foot">
+  <p>
+    &copy; {{ site.time | date: '%Y' }}
+    {{ site.first_name }}
+    {{ site.last_name }}
+  </p>
+</footer>
+
+<script>
+  // Cycles system -> light -> dark. The pre-paint script in <head> applies the
+  // stored choice; this only has to handle clicks and system changes.
+  (function () {
+    var r = document.documentElement;
+    var btn = document.querySelector('[data-theme-toggle]');
+    var label = document.querySelector('[data-theme-label]');
+    var order = ['system', 'light', 'dark'];
+    var glyph = { system: 'auto', light: 'light', dark: 'dark' };
+    var mq = matchMedia('(prefers-color-scheme: dark)');
+
+    function apply(setting) {
+      var dark = setting === 'dark' || (setting === 'system' && mq.matches);
+      r.setAttribute('data-theme-setting', setting);
+      r.setAttribute('data-theme', dark ? 'dark' : 'light');
+      if (label) label.textContent = glyph[setting];
+      if (btn) btn.setAttribute('aria-label', 'Theme: ' + glyph[setting] + '. Change theme.');
+      try {
+        localStorage.setItem('theme-setting', setting);
+      } catch (e) {}
+    }
+
+    apply(r.getAttribute('data-theme-setting') || 'system');
+
+    if (btn)
+      btn.addEventListener('click', function () {
+        var now = r.getAttribute('data-theme-setting') || 'system';
+        apply(order[(order.indexOf(now) + 1) % order.length]);
+      });
+
+    mq.addEventListener('change', function () {
+      if ((r.getAttribute('data-theme-setting') || 'system') === 'system') apply('system');
+    });
+  })();
+</script>
