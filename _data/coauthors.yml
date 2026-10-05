@@ -1,8 +1,0 @@
-# Maps a coauthor's last name (lowercase, accents transliterated: Eroğul -> erogul)
-# to one or more profile links, used by _layouts/bib.liquid to link their name in
-# the publication list. Add entries as you collect verified profile URLs, e.g.:
-#
-# "erogul":
-#   - firstname: ["Osman", "O."]
-#     url: https://scholar.google.com/citations?user=...
-{}
