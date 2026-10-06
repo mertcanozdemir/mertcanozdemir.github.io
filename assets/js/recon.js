@@ -1,7 +1,7 @@
 // MRI reconstruction results browser.
 //
-// Renders the generated dataset (assets/json/mri_recon_data.json) two ways, and
-// hands a third view, the evidence graph, to recon-graph.js.
+// Renders the generated dataset (assets/json/mri_recon_data.json) two ways. The
+// evidence graph has its own page, /graph/.
 // Papers is the default, because that is the unit people look for and because a
 // value-per-row list repeats the same baselines hundreds of times — zero-filled
 // alone appears once per cell per paper. Results lists every reported value, for
@@ -21,7 +21,6 @@
     scope: root.querySelector("[data-scope]"),
     filters: root.querySelector("[data-filters]"),
     list: root.querySelector("[data-list]"),
-    graph: root.querySelector("[data-graph]"),
     controls: root.querySelector("[data-controls]"),
     q: root.querySelector("[data-q]"),
     chips: root.querySelector("[data-chips]"),
@@ -32,43 +31,18 @@
   };
   const extractionEl = document.querySelector("[data-extraction]");
 
-  const VIEWS = ["graph", "papers", "results"];
+  // The graph used to be a view here; send old links on to its page.
+  if (location.hash === "#graph") location.replace(root.dataset.graph);
+
+  const VIEWS = ["papers", "results"];
   const fromHash = location.hash.slice(1);
-  // The graph is the default: it is the overview, the lists are for looking
-  // things up. #papers and #results open those directly.
-  const state = { view: VIEWS.includes(fromHash) ? fromHash : "graph", q: "", anatomy: "", family: "", R: "", inMain: true };
+  const state = { view: VIEWS.includes(fromHash) ? fromHash : "papers", q: "", anatomy: "", family: "", R: "", inMain: true };
   let dataReady = false;
 
-  // The graph is a separate script with its own data and d3, fetched the
-  // first time the view is opened.
-  const D3 = "https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js";
-  const LAZY = {
-    graph: { el: el.graph, shown: () => window.reconGraphShown },
-  };
-  const loading = new Set();
-  const loadScript = (src) =>
-    new Promise((ok, fail) => {
-      const s = document.createElement("script");
-      s.src = src;
-      s.onload = ok;
-      s.onerror = fail;
-      document.head.appendChild(s);
-    });
-  let d3Ready = null;
+  // The filters stay hidden until the dataset has filled them.
   function showView() {
-    const lazy = LAZY[state.view];
-    el.filters.hidden = !!lazy || !dataReady;
-    el.list.hidden = !!lazy;
-    for (const [k, v] of Object.entries(LAZY)) v.el.hidden = k !== state.view;
-    if (!lazy) return false;
-    const shown = lazy.shown();
-    if (shown) shown();
-    else if (!loading.has(state.view)) {
-      loading.add(state.view);
-      d3Ready = d3Ready || (window.d3 ? Promise.resolve() : loadScript(D3));
-      d3Ready.then(() => loadScript(lazy.el.dataset.script)).catch((err) => console.error("recon: view failed to load", err));
-    }
-    return true;
+    el.filters.hidden = !dataReady;
+    return false;
   }
 
   let rows = [],
@@ -228,7 +202,8 @@
   let current = [];
 
   function render() {
-    if (showView() || !dataReady) return;
+    showView();
+    if (!dataReady) return;
     const papersMode = state.view === "papers";
     current = papersMode ? paperHits() : rows.map((_, i) => i).filter((i) => rowMatches(rows[i]));
 
@@ -314,8 +289,8 @@
 
   // --- views -------------------------------------------------------------
 
-  // Built before the dataset arrives, so the graph can open without waiting
-  // for it.
+  // Built straight away; the controls they sit with appear once the dataset
+  // has loaded.
   el.views.innerHTML = VIEWS.map((v) => `<button type="button" data-v="${v}" aria-pressed="${v === state.view}">${v}</button>`).join("");
   el.views.addEventListener("click", (e) => {
     const b = e.target.closest("button[data-v]");
@@ -323,7 +298,7 @@
     state.view = b.dataset.v;
     el.views.querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
     try {
-      history.replaceState(null, "", state.view === "graph" ? location.pathname : "#" + state.view);
+      history.replaceState(null, "", state.view === "papers" ? location.pathname : "#" + state.view);
     } catch (err) {}
     render();
   });

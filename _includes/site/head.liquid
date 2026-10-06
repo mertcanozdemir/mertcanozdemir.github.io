@@ -36,7 +36,13 @@
   />
 {% endif %}
 
-<link rel="stylesheet" href="{{ '/assets/css/site.css' | relative_url }}" />
+{% comment %} A page can bring its own stylesheet and fonts (the graph page does). {% endcomment %}
+{% if page.fonts %}
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="{{ page.fonts }}" />
+{% endif %}
+<link rel="stylesheet" href="{{ page.stylesheet | default: '/assets/css/site.css' | relative_url }}" />
 
 {% comment %}
   Applied before first paint so the page never flashes the wrong theme.

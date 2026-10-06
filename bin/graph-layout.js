@@ -1,4 +1,4 @@
-// Lays out the evidence graph ahead of time, so the home page does not spend
+// Lays out the evidence graph ahead of time, so /graph/ does not spend
 // a second or more in a force simulation before it can draw anything.
 //
 // Reads assets/json/mri_recon_graph.json and appends [x, y] to every node of

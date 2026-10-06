@@ -6,8 +6,8 @@
 // within-condition differences only (condition effects plus method effects, on
 // the largest connected part of the graph), so methods never compared directly
 // still land on one scale through the methods they share. The data is
-// generated in the umram project; this file only draws it. Loaded on demand by
-// recon.js when the graph view is first opened, after d3.
+// generated in the umram project; this file only draws it. Used by /graph/,
+// which loads d3 first.
 
 (function () {
   const root = document.querySelector("[data-graph]");
@@ -498,10 +498,6 @@
       draw();
     }).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
   }
-
-  // recon.js unhides the container before loading this file, so the canvas
-  // has a size by the time the first frame is drawn.
-  window.reconGraphShown = () => resize();
 
   readTokens();
   $("[data-panel]").innerHTML = '<p class="rg-note">Loading the graph…</p>';
