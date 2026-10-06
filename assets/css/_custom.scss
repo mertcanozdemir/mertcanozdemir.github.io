@@ -557,6 +557,7 @@ table.recon-cell {
 // Evidence graph — the home page, drawn by recon-graph.js on a canvas that
 // reads these colours. Family colours match the umram figures.
 .recon-graph {
+  --rg-edge: #4a5568;
   --rg-surface: #f3f4f7;
   --rg-grid: #ffffff;
   --rg-ink: var(--global-text-color);
@@ -572,6 +573,7 @@ table.recon-cell {
 }
 
 html[data-theme="dark"] .recon-graph {
+  --rg-edge: #c3cad6;
   --rg-surface: #1f222c;
   --rg-grid: #2c303c;
   --rg-muted: #868d9c;
@@ -638,9 +640,11 @@ html[data-theme="dark"] .recon-graph {
   }
 }
 
+// The network is about as tall as it is wide, so the canvas is too (6:5,
+// leaving room for labels) instead of a wide strip with empty sides.
 .rg-explorer {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 300px;
+  grid-template-columns: minmax(0, 54rem) 300px;
   gap: 14px;
 
   @media (max-width: 56rem) {
@@ -662,7 +666,8 @@ html[data-theme="dark"] .recon-graph {
   canvas {
     display: block;
     width: 100%;
-    height: clamp(380px, 66vh, 760px);
+    aspect-ratio: 6 / 5;
+    max-height: 80vh;
     touch-action: none;
   }
 }

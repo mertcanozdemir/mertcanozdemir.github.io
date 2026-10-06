@@ -15,6 +15,7 @@
   root.dataset.ready = "1";
 
   const FAM = ["CNN", "GAN", "Transformer", "Diffusion", "SSM", "Other"];
+  const EDGE_ALPHA = 0.16; // edges' opacity in a full graph; sparser graphs get more
   const UNIT = { psnr: "dB", ssim: "logit" };
   const $ = (s) => root.querySelector(s);
   const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -31,7 +32,7 @@
   let T = {};
   function readTokens() {
     const cs = getComputedStyle(root);
-    for (const k of ["surface", "grid", "ink", "ink2", "muted", ...FAM.map((f) => "f-" + f)]) T[k] = cs.getPropertyValue("--rg-" + k).trim();
+    for (const k of ["surface", "grid", "ink", "ink2", "muted", "edge", ...FAM.map((f) => "f-" + f)]) T[k] = cs.getPropertyValue("--rg-" + k).trim();
     T.font = getComputedStyle(document.body).fontFamily;
   }
 
@@ -187,9 +188,11 @@
     const focus = ex.sel || ex.hover;
     const nb = focus ? new Set(G.adj.get(focus.i).map(([m]) => m.i)) : null;
 
-    ctx.strokeStyle = T.ink;
-    ctx.lineWidth = 0.6;
-    ctx.globalAlpha = focus ? 0.04 : G.edges.length > 2500 ? 0.06 : 0.1;
+    // Edges in their own colour and strong enough to read against the canvas,
+    // fading back when a method is in focus.
+    ctx.strokeStyle = T.edge;
+    ctx.lineWidth = 0.7;
+    ctx.globalAlpha = focus ? 0.05 : G.edges.length > 2500 ? EDGE_ALPHA : EDGE_ALPHA * 1.5;
     ctx.beginPath();
     for (const e of G.edges) {
       if (!vis(e.a) || !vis(e.b)) continue;
@@ -198,6 +201,7 @@
     }
     ctx.stroke();
     if (focus) {
+      ctx.strokeStyle = T.ink;
       ctx.globalAlpha = 0.6;
       for (const [m, e] of G.adj.get(focus.i)) {
         if (!vis(m)) continue;
