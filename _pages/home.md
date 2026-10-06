@@ -2,7 +2,10 @@
 layout: base
 permalink: /
 wide: true
-title: MRI reconstruction results
+title: How MRI reconstruction methods compare
+# The counts are the PSNR all-years graph's largest component (802 methods, 322
+# studies, from umram 542a2dca); update them when mri_recon_graph.json changes.
+description: About 800 reconstruction methods from 322 studies, linked whenever a paper measured two of them side by side. Select a method to see where it stands against U-Net and what it has been compared with.
 ---
 
 <div
