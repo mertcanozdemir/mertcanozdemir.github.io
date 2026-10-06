@@ -419,14 +419,14 @@
 
   function wire() {
     d3.select(cv).call(zoom).on("dblclick.zoom", null);
-    // Reset goes back to how the page opens: whole graph, every family, the
-    // reference method selected.
+    // Reset goes back to how the page opens: whole graph, every family, nothing
+    // selected.
     $("[data-reset]").onclick = () => {
       ex.hidden.clear();
       $("[data-legend]")
         .querySelectorAll("button")
         .forEach((b) => b.setAttribute("aria-pressed", "true"));
-      select(G.ref);
+      select(null);
       $("[data-find]").value = "";
       d3.select(cv)
         .transition()
@@ -520,7 +520,6 @@
       fillWin();
       resize();
       refresh(false);
-      select(G.ref); // open on the reference method, U-Net
     })
     .catch((err) => {
       $("[data-panel]").innerHTML = '<p class="rg-note">Could not load the graph.</p>';
