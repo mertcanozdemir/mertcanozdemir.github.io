@@ -375,12 +375,6 @@
         <dt>Matched conditions</dt><dd>${int(dg.n_cond)}</dd>
         <dt>Measurements</dt><dd>${int(dg.n_obs)}</dd>
       </dl>
-      <h4>Model fit</h4>
-      <div class="rg-big"><strong>${dg.r2_within.toFixed(2)}</strong><span>within-condition R²</span></div>
-      <dl class="rg-kv">
-        <dt>Raw R²</dt><dd>${dg.r2_raw.toFixed(2)}</dd>
-        <dt>Residual SD</dt><dd>${fmt(dg.resid_sd, d)} ${u}</dd>
-      </dl>
       <h4>Connectedness</h4>
       <dl class="rg-kv">
         <dt>Methods in largest component</dt><dd>${Math.round((100 * dg.n_meth) / dg.n_meth_all)}%</dd>
