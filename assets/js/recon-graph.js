@@ -37,7 +37,10 @@
   }
 
   let D, MET;
-  const ex = { metric: "psnr", win: "all", minStud: 1, hidden: new Set(), sel: null, hover: null };
+  // How the page opens. "Other" (classical and miscellaneous methods) starts
+  // switched off; reset view comes back to all of this, with nothing selected.
+  const DEFAULTS = { metric: "psnr", win: "all", minStud: 1, hidden: ["Other"] };
+  const ex = { ...DEFAULTS, hidden: new Set(DEFAULTS.hidden), sel: null, hover: null };
   const cv = $("canvas"),
     stage = $("[data-stage]"),
     tip = $("[data-tip]");
@@ -259,7 +262,7 @@
       if (!n) continue;
       const x = SX(n) + rad(n) + 5,
         y = SY(n);
-      const t = n === G.ref ? n.m.name + " · reference" : n.m.name;
+      const t = n.m.name; // the reference is marked by its ring, not its label
       ctx.lineWidth = 3.5;
       ctx.strokeStyle = T.surface;
       ctx.strokeText(t, x, y);
@@ -405,6 +408,12 @@
     s.innerHTML = keys.map((k) => `<option value="${k}" ${k === ex.win ? "selected" : ""}>${winLabel(k)}</option>`).join("");
   }
 
+  function paintLegend() {
+    $("[data-legend]")
+      .querySelectorAll("button")
+      .forEach((b) => b.setAttribute("aria-pressed", String(!ex.hidden.has(b.dataset.f))));
+  }
+
   function segWire(sel, key, after) {
     const el = $(sel);
     el.querySelectorAll("button").forEach(
@@ -419,15 +428,24 @@
 
   function wire() {
     d3.select(cv).call(zoom).on("dblclick.zoom", null);
-    // Reset goes back to how the page opens: whole graph, every family, nothing
-    // selected.
+    // Reset undoes everything: selection, search, zoom, and every control back
+    // to how the page opens.
     $("[data-reset]").onclick = () => {
-      ex.hidden.clear();
-      $("[data-legend]")
+      const rebuild = ex.metric !== DEFAULTS.metric || ex.win !== DEFAULTS.win;
+      ex.metric = DEFAULTS.metric;
+      ex.win = DEFAULTS.win;
+      ex.minStud = DEFAULTS.minStud;
+      ex.hidden = new Set(DEFAULTS.hidden);
+      $("[data-metric]")
         .querySelectorAll("button")
-        .forEach((b) => b.setAttribute("aria-pressed", "true"));
-      select(null);
+        .forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === ex.metric)));
+      $("[data-min]").value = String(ex.minStud);
+      fillWin();
+      paintLegend();
       $("[data-find]").value = "";
+      ex.sel = null;
+      if (rebuild) refresh(false);
+      else select(null);
       d3.select(cv)
         .transition()
         .duration(reduceMotion ? 0 : 400)
@@ -481,13 +499,17 @@
     $("[data-find]").addEventListener("change", (e) => {
       const q = e.target.value.trim().toLowerCase();
       if (!q) return;
-      const n =
-        G.nodes.find((n) => n.m.name.toLowerCase() === q) || G.nodes.filter((n) => n.m.name.toLowerCase().includes(q)).sort((a, b) => b.ns - a.ns)[0];
+      // Several papers have their own "U-Net": among equal names, the reference
+      // first, then the most studied.
+      const rank = (a, b) => (b === G.ref) - (a === G.ref) || b.ns - a.ns;
+      const exact = G.nodes.filter((n) => n.m.name.toLowerCase() === q).sort(rank);
+      const n = exact[0] || G.nodes.filter((n) => n.m.name.toLowerCase().includes(q)).sort(rank)[0];
       if (n) select(n);
     });
     const legend = $("[data-legend]");
     legend.innerHTML = FAM.map(
-      (f) => `<button type="button" class="rg-chip" aria-pressed="true" data-f="${f}"><i style="background:var(--rg-f-${f})"></i>${f}</button>`
+      (f) =>
+        `<button type="button" class="rg-chip" aria-pressed="${!ex.hidden.has(f)}" data-f="${f}"><i style="background:var(--rg-f-${f})"></i>${f}</button>`
     ).join("");
     legend.querySelectorAll("button").forEach(
       (b) =>
@@ -515,11 +537,13 @@
     })
     .then((d) => {
       D = d;
-      MET = d.methods;
+      // The reference is shown as plain "U-Net"; the data calls it "U-Net (fastMRI)".
+      MET = d.methods.map((m) => (m.name === "U-Net (fastMRI)" ? { ...m, name: "U-Net" } : m));
       wire();
       fillWin();
       resize();
       refresh(false);
+      select(G.ref); // open with the reference method, U-Net, selected
     })
     .catch((err) => {
       $("[data-panel]").innerHTML = '<p class="rg-note">Could not load the graph.</p>';
