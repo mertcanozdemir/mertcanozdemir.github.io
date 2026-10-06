@@ -114,22 +114,19 @@ biomedical engineer. I work on…") went too far and was reverted.
 Do not deploy after every change. Commit locally, let work accumulate, and push
 when he says so.
 
-## Home — MRI reconstruction results (/), and the evidence graph (/graph/)
+## Home — the evidence graph (/)
 
-`_pages/home.md` with `assets/js/recon.js`: a browser over results reported in
-the MRI reconstruction literature, from Mertcan's UMRAM project
-(`~/Documents/umram-project2-path1`). Two views, papers (default) and results
-(`#results`), under a link card to the evidence graph. Nothing else on the
-page — he asked for the reading notes to go. Old `/#graph` links forward to
-`/graph/`.
+`_pages/home.md` is the evidence graph from Mertcan's UMRAM project
+(`~/Documents/umram-project2-path1`), inside the site's normal layout: title,
+one-line description, then the graph — network layout only, drawn by
+`assets/js/recon-graph.js` with d3 from cdnjs. A standalone page in the umram
+preview's own look was tried at /graph/ and dropped in favour of this;
+`_pages/graph-redirect.html` sends that address home.
 
-`_pages/graph.html` is the evidence graph on its own page, meant to be the link
-shared with others and cited in the paper. It uses `_layouts/standalone.liquid`
-(no menu or prose column) and its own stylesheet, `assets/css/graph.scss`, in
-the look of the umram evidence-graph preview (IBM Plex, Source Serif 4, its
-own light and dark palettes). `head.liquid` takes `stylesheet` and `fonts` from
-front matter for this. Network layout only — the preview's timeline was
-dropped on request. Drawn by `assets/js/recon-graph.js` with d3 from cdnjs.
+The papers/results browser (`_pages/results.md`, `assets/js/recon.js`) is
+**hidden, not deleted**: `published: false`, and its dataset and script are in
+`exclude` in `_config.yml`. Mertcan wants it back later — the front matter of
+`results.md` says how.
 
 - `assets/json/mri_recon_data.json` is copied from the umram project's
   `rapor/site/mri_recon_data.json` and regenerated there with

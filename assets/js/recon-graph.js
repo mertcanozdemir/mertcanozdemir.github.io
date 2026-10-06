@@ -6,8 +6,8 @@
 // within-condition differences only (condition effects plus method effects, on
 // the largest connected part of the graph), so methods never compared directly
 // still land on one scale through the methods they share. The data is
-// generated in the umram project; this file only draws it. Used by /graph/,
-// which loads d3 first.
+// generated in the umram project; this file only draws it. Used by the home
+// page, which loads d3 first.
 
 (function () {
   const root = document.querySelector("[data-graph]");

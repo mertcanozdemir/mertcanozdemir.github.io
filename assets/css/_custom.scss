@@ -554,31 +554,326 @@ table.recon-cell {
   }
 }
 
-// Link from / to the evidence graph's own page (/graph/).
-.recon-graph-link {
+// Evidence graph — the home page, drawn by recon-graph.js on a canvas that
+// reads these colours. Family colours match the umram figures.
+.recon-graph {
+  --rg-surface: #f3f4f7;
+  --rg-grid: #ffffff;
+  --rg-ink: var(--global-text-color);
+  --rg-ink2: var(--global-text-color-light);
+  --rg-muted: #8a909c;
+  --rg-f-CNN: #dd8452;
+  --rg-f-GAN: #937860;
+  --rg-f-Transformer: #4c72b0;
+  --rg-f-Diffusion: #55a868;
+  --rg-f-SSM: #b04a8c;
+  --rg-f-Other: #b0b0b8;
+  padding-top: 12px;
+}
+
+html[data-theme="dark"] .recon-graph {
+  --rg-surface: #1f222c;
+  --rg-grid: #2c303c;
+  --rg-muted: #868d9c;
+  --rg-f-CNN: #e8955f;
+  --rg-f-GAN: #b39880;
+  --rg-f-Transformer: #6e93d6;
+  --rg-f-Diffusion: #6cc283;
+  --rg-f-SSM: #d06aae;
+  --rg-f-Other: #8a8a94;
+}
+
+.rg-controls {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0.25rem 0.75rem;
-  margin: -0.5rem 0 1.25rem;
-  padding: 0.7rem 1rem;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 12px;
+
+  input[type="search"],
+  select {
+    font-family: inherit;
+    font-size: 0.85rem;
+    padding: 5px 9px;
+    border: 1px solid var(--global-divider-color);
+    border-radius: 5px;
+    background: transparent;
+    color: var(--global-text-color);
+  }
+
+  input[type="search"] {
+    min-width: 180px;
+  }
+}
+
+.rg-seg {
+  display: flex;
+
+  button {
+    font-family: inherit;
+    font-size: 0.8rem;
+    padding: 4px 12px;
+    border: 1px solid var(--global-divider-color);
+    background: transparent;
+    color: var(--global-text-color-light);
+    cursor: pointer;
+
+    &:first-child {
+      border-radius: 5px 0 0 5px;
+    }
+
+    & + button {
+      border-left: 0;
+    }
+
+    &:last-child {
+      border-radius: 0 5px 5px 0;
+    }
+
+    &[aria-pressed="true"] {
+      background: var(--global-theme-color);
+      border-color: var(--global-theme-color);
+      color: #fff;
+    }
+  }
+}
+
+.rg-explorer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 14px;
+
+  @media (max-width: 56rem) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.rg-main {
+  min-width: 0;
+}
+
+.rg-stage {
+  position: relative;
   border: 1px solid var(--global-divider-color);
   border-radius: 8px;
+  overflow: hidden;
+  background: var(--rg-surface);
+
+  canvas {
+    display: block;
+    width: 100%;
+    height: clamp(380px, 66vh, 760px);
+    touch-action: none;
+  }
+}
+
+.rg-reset {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  font-family: inherit;
+  font-size: 0.75rem;
+  padding: 4px 9px;
+  border: 1px solid var(--global-divider-color);
+  border-radius: 5px;
+  background: var(--global-bg-color);
+  color: var(--global-text-color-light);
+  cursor: pointer;
+}
+
+.rg-tip {
+  position: absolute;
+  z-index: 2;
+  max-width: 260px;
+  pointer-events: none;
+  padding: 7px 9px;
+  border: 1px solid var(--global-divider-color);
+  border-radius: 6px;
+  background: var(--global-bg-color);
   color: var(--global-text-color);
-  text-decoration: none;
+  font-size: 0.75rem;
+  line-height: 1.35;
+  box-shadow: 0 4px 14px rgb(0 0 0 / 0.12);
+}
+
+.rg-num {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.rg-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  margin-right: 6px;
+}
+
+.rg-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.rg-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: inherit;
+  font-size: 0.75rem;
+  padding: 4px 10px;
+  border: 1px solid var(--global-divider-color);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--global-text-color);
+  cursor: pointer;
+
+  i {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+  }
+
+  &[aria-pressed="false"] {
+    color: var(--global-text-color-light);
+
+    i {
+      opacity: 0.25;
+    }
+  }
+}
+
+.rg-hint,
+.rg-note {
+  color: var(--global-text-color-light);
+  font-size: 0.78rem;
+  margin: 8px 0 0;
+}
+
+.rg-panel {
+  align-self: start;
+  min-width: 0;
+  padding: 14px 16px;
+  border: 1px solid var(--global-divider-color);
+  border-radius: 8px;
+  font-size: 0.85rem;
+
+  h3 {
+    font-size: 1.05rem;
+    margin: 0 0 2px;
+  }
+
+  h4 {
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--global-text-color-light);
+    margin: 16px 0 6px;
+  }
+}
+
+.rg-sub {
+  color: var(--global-text-color-light);
+  font-size: 0.8rem;
+  margin: 0;
+}
+
+.rg-kv {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 12px;
+  margin: 0;
+
+  dt {
+    color: var(--global-text-color-light);
+  }
+
+  dd {
+    margin: 0;
+    text-align: right;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.rg-big {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 6px 0;
 
   strong {
-    color: var(--global-theme-color);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 1.8rem;
+    font-weight: 500;
+    line-height: 1;
   }
 
   span {
     color: var(--global-text-color-light);
-    font-size: 0.9rem;
+    font-size: 0.78rem;
+  }
+}
+
+.rg-links {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+
+  button {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    width: 100%;
+    padding: 3px 4px;
+    border: 0;
+    border-radius: 4px;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+
+    &:hover {
+      background: var(--global-card-bg-color);
+    }
   }
 
-  &:hover {
-    border-color: var(--global-theme-color);
+  .rg-num {
+    color: var(--global-text-color-light);
   }
+}
+
+.rg-path {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+  font-size: 0.8rem;
+
+  button {
+    padding: 2px 6px;
+    border: 1px solid var(--global-divider-color);
+    border-radius: 4px;
+    background: none;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+  }
+}
+
+.rg-close {
+  float: right;
+  font-family: inherit;
+  font-size: 0.75rem;
+  padding: 4px 8px;
+  border: 1px solid var(--global-divider-color);
+  border-radius: 5px;
+  background: transparent;
+  color: var(--global-text-color-light);
+  cursor: pointer;
 }
 
 .recon-paper-main {
