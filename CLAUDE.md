@@ -120,8 +120,10 @@ when he says so.
 (`~/Documents/umram-project2-path1`), inside the site's normal layout: title,
 one-line description, then the graph — network layout only, drawn by
 `assets/js/recon-graph.js` with d3 from cdnjs. The reference method, U-Net, sits
-in the middle of the view — `bin/graph-layout.js` pins it to the centre of the
-layout — but nothing is selected when the page opens or after "reset view". A standalone page in the umram
+in the middle of the view (`bin/graph-layout.js` pins it to the centre of the
+layout). The page opens with U-Net selected and the Other family switched off;
+"reset view" clears the selection, search and zoom and shows every family,
+Other included. A standalone page in the umram
 preview's own look was tried at /graph/ and dropped in favour of this;
 `_pages/graph-redirect.html` sends that address home.
 

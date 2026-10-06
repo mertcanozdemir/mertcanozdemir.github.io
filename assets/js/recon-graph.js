@@ -38,7 +38,7 @@
 
   let D, MET;
   // How the page opens. "Other" (classical and miscellaneous methods) starts
-  // switched off; reset view comes back to all of this, with nothing selected.
+  // switched off; reset view brings it back with every other family.
   const DEFAULTS = { metric: "psnr", win: "all", minStud: 1, hidden: ["Other"] };
   const ex = { ...DEFAULTS, hidden: new Set(DEFAULTS.hidden), sel: null, hover: null };
   const cv = $("canvas"),
@@ -428,14 +428,14 @@
 
   function wire() {
     d3.select(cv).call(zoom).on("dblclick.zoom", null);
-    // Reset undoes everything: selection, search, zoom, and every control back
-    // to how the page opens.
+    // Reset undoes everything: selection, search and zoom cleared, every family
+    // shown (Other included), and the other controls back to how the page opens.
     $("[data-reset]").onclick = () => {
       const rebuild = ex.metric !== DEFAULTS.metric || ex.win !== DEFAULTS.win;
       ex.metric = DEFAULTS.metric;
       ex.win = DEFAULTS.win;
       ex.minStud = DEFAULTS.minStud;
-      ex.hidden = new Set(DEFAULTS.hidden);
+      ex.hidden = new Set();
       $("[data-metric]")
         .querySelectorAll("button")
         .forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === ex.metric)));
