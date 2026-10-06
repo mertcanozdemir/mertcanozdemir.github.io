@@ -118,7 +118,8 @@ when he says so.
 
 `_pages/home.md` is the evidence graph from Mertcan's UMRAM project
 (`~/Documents/umram-project2-path1`), inside the site's normal layout: title,
-one-line description, then the graph — network layout only, drawn by
+a short list of how to use it (no counts, on request), then the graph —
+network layout only, drawn by
 `assets/js/recon-graph.js` with d3 from cdnjs. The reference method, U-Net, sits
 in the middle of the view (`bin/graph-layout.js` pins it to the centre of the
 layout). The page opens with U-Net selected and the Other family switched off;

@@ -391,14 +391,10 @@
       <p class="rg-note">Counts before the slash are in the largest connected component, where the model is fitted; after it, all methods that share at least one condition.</p>`;
   }
 
-  const HINT =
-    "Methods pulled together by the conditions they were measured in side by side; size follows the number of studies. Scroll to zoom, drag to pan, select a method for its relative effectiveness θ and links.";
-
   function refresh(animate = true) {
     buildGraph();
     renderPanel();
     settle(animate);
-    $("[data-hint]").textContent = HINT;
   }
 
   function fillWin() {
