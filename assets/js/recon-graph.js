@@ -262,7 +262,7 @@
       if (!n) continue;
       const x = SX(n) + rad(n) + 5,
         y = SY(n);
-      const t = n.m.name; // the reference is marked by its ring, not its label
+      const t = n === G.ref ? n.m.name + " · reference" : n.m.name;
       ctx.lineWidth = 3.5;
       ctx.strokeStyle = T.surface;
       ctx.strokeText(t, x, y);
