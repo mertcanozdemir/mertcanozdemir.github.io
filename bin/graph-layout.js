@@ -8,7 +8,8 @@
 // The forces match runForce() in assets/js/recon-graph.js. "all" is laid out
 // from scratch, then each window starts from the positions methods already
 // have, so switching windows on the page moves methods instead of scattering
-// them. A fixed seed keeps the layout the same from run to run.
+// them. The reference method (U-Net) is pinned to the centre, where the page
+// also centres the view. A fixed seed keeps the layout the same from run to run.
 const fs = require("fs"),
   path = require("path");
 const d3 = require("d3-force");
@@ -39,6 +40,8 @@ for (const [metric, windows] of Object.entries(D.networks)) {
       return { i, ns, dg, x: c ? c[0] : (random() - 0.5) * 400, y: c ? c[1] : (random() - 0.5) * 400 };
     });
     const ix = new Map(sn.map((s) => [s.i, s]));
+    const ref = ix.get(g.ref);
+    if (ref) [ref.x, ref.y, ref.fx, ref.fy] = [0, 0, 0, 0];
     const links = g.edges.map(([a, b, c]) => ({ source: ix.get(a), target: ix.get(b), c }));
     const fresh = sn.filter((s) => !cache.has(s.i)).length > sn.length / 2;
     const sim = d3

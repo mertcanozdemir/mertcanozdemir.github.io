@@ -91,6 +91,8 @@
       return { n, x: c ? c[0] : (Math.random() - 0.5) * 400, y: c ? c[1] : (Math.random() - 0.5) * 400 };
     });
     const ix = new Map(sn.map((s) => [s.n.i, s]));
+    const pin = ix.get(G.ref && G.ref.i);
+    if (pin) [pin.x, pin.y, pin.fx, pin.fy] = [0, 0, 0, 0]; // the reference stays in the middle
     const links = G.edges.map((e) => ({ source: ix.get(e.a.i), target: ix.get(e.b.i), c: e.c }));
     const fresh = sn.filter((s) => !simCache.has(s.n.i)).length > sn.length / 2;
     const sim = d3
@@ -119,17 +121,18 @@
     });
   }
 
+  // Fit the graph to the canvas around the reference method, which sits in the
+  // middle of the view.
   function targets() {
     if (!G.forced) runForce();
-    const [x0, x1] = d3.extent(G.nodes, (n) => n.sx),
-      [y0, y1] = d3.extent(G.nodes, (n) => n.sy);
+    const c = G.ref || { sx: 0, sy: 0 };
+    const rx = d3.max(G.nodes, (n) => Math.abs(n.sx - c.sx)) || 1,
+      ry = d3.max(G.nodes, (n) => Math.abs(n.sy - c.sy)) || 1;
     const pad = 26,
-      k = Math.min((W - 2 * pad) / (x1 - x0 || 1), (H - 2 * pad) / (y1 - y0 || 1));
-    const cx = (x0 + x1) / 2,
-      cy = (y0 + y1) / 2;
+      k = Math.min((W / 2 - pad) / rx, (H / 2 - pad) / ry);
     G.nodes.forEach((n) => {
-      n.gx = W / 2 + (n.sx - cx) * k;
-      n.gy = H / 2 + (n.sy - cy) * k;
+      n.gx = W / 2 + (n.sx - c.sx) * k;
+      n.gy = H / 2 + (n.sy - c.sy) * k;
     });
   }
 
@@ -416,14 +419,14 @@
 
   function wire() {
     d3.select(cv).call(zoom).on("dblclick.zoom", null);
-    // Reset clears the selection and the family filter as well as the zoom,
-    // back to the whole graph.
+    // Reset goes back to how the page opens: whole graph, every family, the
+    // reference method selected.
     $("[data-reset]").onclick = () => {
       ex.hidden.clear();
       $("[data-legend]")
         .querySelectorAll("button")
         .forEach((b) => b.setAttribute("aria-pressed", "true"));
-      select(null);
+      select(G.ref);
       $("[data-find]").value = "";
       d3.select(cv)
         .transition()
@@ -517,6 +520,7 @@
       fillWin();
       resize();
       refresh(false);
+      select(G.ref); // open on the reference method, U-Net
     })
     .catch((err) => {
       $("[data-panel]").innerHTML = '<p class="rg-note">Could not load the graph.</p>';
