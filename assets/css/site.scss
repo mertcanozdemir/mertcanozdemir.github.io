@@ -40,6 +40,10 @@ html[data-theme="dark"] {
 }
 
 html {
+  scroll-padding-top: 4.5rem; // anchors land below the sticky buttons
+}
+
+html {
   -webkit-text-size-adjust: 100%;
 }
 
@@ -101,6 +105,47 @@ a {
 
 // Nav ------------------------------------------------------------------
 
+// Only the two buttons follow the page down: the header itself is invisible
+// and lets clicks through. Once the page has scrolled (foot.liquid sets
+// is-stuck) they fade back so they do not sit on top of the content, and come
+// back on hover or focus.
+.site-head {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  pointer-events: none;
+
+  .nav-toggle,
+  .nav-theme,
+  .menu {
+    pointer-events: auto;
+  }
+
+  .nav-toggle,
+  .nav-theme {
+    transition: opacity 0.15s;
+  }
+
+  &.is-stuck .nav-toggle,
+  &.is-stuck .nav-theme {
+    opacity: 0.45;
+    background: var(--global-bg-color);
+
+    &:hover,
+    &:focus-visible {
+      opacity: 1;
+    }
+  }
+
+  &.is-stuck .nav-toggle {
+    border-radius: 6px;
+  }
+}
+
+html.menu-open .site-head .nav-toggle {
+  opacity: 1;
+}
+
 .nav {
   display: flex;
   align-items: center;
@@ -151,9 +196,17 @@ a {
   }
 }
 
+// A small panel under the menu button rather than a strip across the page.
 .menu {
-  margin: 0 auto;
-  padding: 0 var(--gutter) 1rem;
+  position: absolute;
+  left: 1.125rem; // the gutter less the button padding; no var() in calc(): the minifier mangles it
+  top: calc(100% - 0.5rem);
+  min-width: 11rem;
+  padding: 0.6rem 1rem 0.75rem;
+  background: var(--global-bg-color);
+  border: 1px solid var(--global-divider-color);
+  border-radius: 8px;
+  box-shadow: 0 8px 20px rgb(0 0 0 / 0.08);
 
   ul {
     list-style: none;

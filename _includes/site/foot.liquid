@@ -74,3 +74,16 @@
     });
   })();
 </script>
+
+<script>
+  // Fades the sticky buttons once the page has scrolled beneath them.
+  (function () {
+    var head = document.querySelector('[data-site-head]');
+    if (!head) return;
+    function update() {
+      head.classList.toggle('is-stuck', window.scrollY > 0);
+    }
+    window.addEventListener('scroll', update, { passive: true });
+    update();
+  })();
+</script>

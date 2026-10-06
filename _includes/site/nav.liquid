@@ -2,50 +2,54 @@
   The links live in a panel behind a toggle rather than inline. That costs some
   discoverability with only a handful of pages, but keeps the top edge clear so
   wide content (the recon browser, drill diagrams) starts at the top of the page.
+  The two buttons stay at the top while the page scrolls (only they are visible;
+  the header itself is transparent), and the panel drops down from the button.
 {% endcomment %}
 
-<nav class="nav" aria-label="Main">
-  <button
-    type="button"
-    class="nav-toggle"
-    data-menu-toggle
-    aria-expanded="false"
-    aria-controls="site-menu"
-    aria-label="Open menu"
-  >
-    <span class="nav-bars" aria-hidden="true"><i></i><i></i><i></i></span>
-  </button>
+<header class="site-head" data-site-head>
+  <nav class="nav" aria-label="Main">
+    <button
+      type="button"
+      class="nav-toggle"
+      data-menu-toggle
+      aria-expanded="false"
+      aria-controls="site-menu"
+      aria-label="Open menu"
+    >
+      <span class="nav-bars" aria-hidden="true"><i></i><i></i><i></i></span>
+    </button>
 
-  <button type="button" class="nav-theme" data-theme-toggle>
-    <span data-theme-label></span>
-  </button>
-</nav>
+    <button type="button" class="nav-theme" data-theme-toggle>
+      <span data-theme-label></span>
+    </button>
+  </nav>
 
-<div class="menu" id="site-menu" data-menu hidden>
-  <ul>
-    <li>
-      <a
-        href="{{ '/' | relative_url }}"
-        {% if page.url == '/' %}
-          aria-current="page"
+  <div class="menu" id="site-menu" data-menu hidden>
+    <ul>
+      <li>
+        <a
+          href="{{ '/' | relative_url }}"
+          {% if page.url == '/' %}
+            aria-current="page"
+          {% endif %}
+          >home</a
+        >
+      </li>
+      {% assign sorted = site.pages | sort: 'nav_order' %}
+      {% for p in sorted %}
+        {% if p.nav and p.autogen == null %}
+          <li>
+            <a
+              href="{{ p.url | relative_url }}"
+              {% if page.url == p.url %}
+                aria-current="page"
+              {% endif %}
+            >
+              {{- p.title -}}
+            </a>
+          </li>
         {% endif %}
-        >home</a
-      >
-    </li>
-    {% assign sorted = site.pages | sort: 'nav_order' %}
-    {% for p in sorted %}
-      {% if p.nav and p.autogen == null %}
-        <li>
-          <a
-            href="{{ p.url | relative_url }}"
-            {% if page.url == p.url %}
-              aria-current="page"
-            {% endif %}
-          >
-            {{- p.title -}}
-          </a>
-        </li>
-      {% endif %}
-    {% endfor %}
-  </ul>
-</div>
+      {% endfor %}
+    </ul>
+  </div>
+</header>
