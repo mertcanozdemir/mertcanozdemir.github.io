@@ -114,34 +114,40 @@ biomedical engineer. I work on…") went too far and was reverted.
 Do not deploy after every change. Commit locally, let work accumulate, and push
 when he says so.
 
-## Home — MRI reconstruction results (/)
+## Home — MRI reconstruction results (/), and the evidence graph (/graph/)
 
 `_pages/home.md` with `assets/js/recon.js`: a browser over results reported in
 the MRI reconstruction literature, from Mertcan's UMRAM project
-(`~/Documents/umram-project2-path1`). Three views and nothing else on the page
-— he asked for the reading notes below them to go: graph (the default),
-papers and results (`#papers`, `#results` open those directly). A fit view with
-the evidence-graph preview's diagnostic charts was built and then removed.
+(`~/Documents/umram-project2-path1`). Two views, papers (default) and results
+(`#results`), under a link card to the evidence graph. Nothing else on the
+page — he asked for the reading notes to go. Old `/#graph` links forward to
+`/graph/`.
 
-- `assets/json/mri_recon_data.json` is copied from that project's
+`_pages/graph.html` is the evidence graph on its own page, meant to be the link
+shared with others and cited in the paper. It uses `_layouts/standalone.liquid`
+(no menu or prose column) and its own stylesheet, `assets/css/graph.scss`, in
+the look of the umram evidence-graph preview (IBM Plex, Source Serif 4, its
+own light and dark palettes). `head.liquid` takes `stylesheet` and `fonts` from
+front matter for this. Network layout only — the preview's timeline was
+dropped on request. Drawn by `assets/js/recon-graph.js` with d3 from cdnjs.
+
+- `assets/json/mri_recon_data.json` is copied from the umram project's
   `rapor/site/mri_recon_data.json` and regenerated there with
   `scripts/site_verisi.py`. Never hand-edit it.
-- `assets/json/mri_recon_graph.json` feeds the graph view
-  (`assets/js/recon-graph.js`, plus d3 from cdnjs, both loaded only when the
-  view opens). It is the `methods` and `networks` of the evidence-graph preview
-  data with the per-measurement `fit` arrays dropped, plus a network layout:
-  **run `node bin/graph-layout.js` after replacing the file**, which appends
-  precomputed [x, y] to every node (the force simulation takes over a second in
-  the browser). The page shows the network layout only; the preview's timeline
-  layout was dropped on request.
+- `assets/json/mri_recon_graph.json` is the evidence-graph preview data's
+  `methods` and `networks`, with the per-measurement `fit` arrays dropped, plus a
+  network layout: **run `node bin/graph-layout.js` after replacing the file**,
+  which appends precomputed [x, y] to every node (the force simulation takes
+  over a second in the browser).
 - That preview data comes from `veri_uret.py`, written in another Claude
   session's scratchpad rather than the umram repo — move it into the umram repo
   before relying on regenerating it. The two data files can come from different
   umram commits (`meta.source.commit` vs `generated`).
-- θ in the graph is fitted to within-cell differences only, so it respects the
-  rule that reported values are only comparable within a cell (one paper, one
-  protocol). The preview treated these as the paper's results: unpublished, so
-  check with Mertcan before pushing.
+- θ is fitted to within-cell differences only, so the graph respects the rule
+  that reported values are only comparable within a cell (one paper, one
+  protocol). The plan: publish the graph now, and release the extracted data and
+  analysis code with the paper (on acceptance, or just before submission). The
+  page says so; nothing else from the paper goes on the site before then.
 
 ## Hockey drills — /drills/
 
