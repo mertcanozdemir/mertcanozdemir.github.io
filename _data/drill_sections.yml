@@ -1,0 +1,10 @@
+# Sections of the drills page, in order. Each drill in drills.yml names one with
+# `section`; a section with no drills is not shown. The first five follow the
+# drill chapters of the IIHF Level I manual (21.2–21.6), the last its team
+# tactics chapter (20).
+- { id: skating, title: Skating }
+- { id: passing, title: Dribbling and passing }
+- { id: checking, title: Checking }
+- { id: goalkeeping, title: Goalkeeping }
+- { id: evaluation, title: Competitive evaluation }
+- { id: tactics, title: Team tactics }

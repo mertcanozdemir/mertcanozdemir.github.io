@@ -29,11 +29,13 @@
 :root {
   --rink-ice: #f4f8fb;
   --rink-board: #c8ced4;
+  --rink-bench: #e9edf1;
   --rink-red: #d33;
   --rink-blue: #2d6fd8;
   --rink-crease: #dceaf7;
   --rink-team-a: #1f6fd0;
   --rink-team-b: #d34b1f;
+  --rink-team-n: #7a838c; // passers and coaches
   --rink-puck: #e8b93a;
   --rink-puck-edge: #8a6a15;
   --rink-cone: #e8873a;
@@ -45,45 +47,149 @@
 html[data-theme="dark"] {
   --rink-ice: #22282e;
   --rink-board: #4a545e;
+  --rink-bench: #2a3138;
   --rink-red: #e05555;
   --rink-blue: #4a8ae8;
   --rink-crease: #2a3642;
   --rink-team-a: #4a9aef;
   --rink-team-b: #ef7a4a;
+  --rink-team-n: #6c757e;
+}
+
+// Key to the diagrams, above the drills: a small sample of each mark.
+.drill-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1.25rem;
+  list-style: none;
+  margin: 0 0 0.4rem;
+  padding: 0;
+  color: var(--global-text-color-light);
+  font-size: 0.85rem;
+
+  li {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  svg {
+    height: 1.05em;
+    width: auto;
+    overflow: visible;
+  }
 }
 
 .drill-intro {
+  max-width: var(--measure);
   color: var(--global-text-color-light);
   font-size: 0.9rem;
 }
 
+// Laid out like the IIHF coaching pad: the rink with a narrow column beside it
+// for the steps, so the step being played stays in view. One drill a row on a
+// laptop, two on a wide screen; on a phone the column drops under the rink.
 .drill {
   margin-bottom: 2.5rem;
-
-  h2 {
-    font-size: 1.1rem;
-    margin-bottom: 0.1rem;
-  }
+  border-top: 1px solid var(--global-divider-color);
+  padding-top: 1.5rem;
 
   svg {
     width: 100%;
     height: auto;
     display: block;
-    border-radius: 6px;
+  }
+}
+
+.drill-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 0.75rem;
+  margin-bottom: 0.6rem;
+
+  h3 {
+    font-size: 1.05rem;
+    margin: 0;
+  }
+}
+
+// Section index at the top of the page, and the sections themselves.
+.drill-sections {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.25rem;
+  margin: 1rem 0 0.5rem;
+  font-size: 0.9rem;
+}
+
+.drill-section {
+  scroll-margin-top: 1rem;
+
+  > h2 {
+    font-size: 1.35rem;
+    margin: 2.5rem 0 1rem;
   }
 }
 
 .drill-meta {
   color: var(--global-text-color-light);
   font-size: 0.8rem;
-  margin-bottom: 0.5rem;
+  margin: 0;
 }
 
 .drill-notes {
   color: var(--global-text-color-light);
-  font-size: 0.88rem;
-  font-style: italic;
-  margin-bottom: 0.75rem;
+  font-size: 0.8rem;
+  margin: 0.9rem 0 0;
+}
+
+@media (min-width: 52rem) {
+  .drill {
+    display: grid;
+    grid-template-columns: minmax(0, 46rem) minmax(12rem, 16rem);
+    grid-template-areas:
+      "head head"
+      "stage side";
+    column-gap: 2rem;
+    justify-content: start;
+  }
+
+  .drill-head {
+    grid-area: head;
+  }
+
+  .drill-stage {
+    grid-area: stage;
+  }
+
+  .drill-side {
+    grid-area: side;
+    align-self: start;
+    padding-top: 0.5rem;
+  }
+
+  .drill-steps {
+    margin-top: 0;
+  }
+}
+
+@media (min-width: 90rem) {
+  .drills {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 3rem;
+    align-items: start;
+  }
+
+  .drill {
+    grid-template-columns: minmax(0, 1fr) 11rem;
+    column-gap: 1.25rem;
+  }
+
+  .drill-steps {
+    font-size: 0.85rem;
+  }
 }
 
 .drill-controls {
@@ -116,6 +222,49 @@ html[data-theme="dark"] {
     flex: 1;
     min-width: 120px;
     accent-color: var(--global-theme-color);
+  }
+}
+
+.drill-steps {
+  margin: 0.9rem 0 0;
+  padding-left: 1.4rem;
+  font-size: 0.9rem;
+
+  li {
+    margin: 0.15rem 0;
+    color: var(--global-text-color-light);
+  }
+
+  // Block, so a step that wraps keeps its number on the first line.
+  button {
+    display: block;
+    width: 100%;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    padding: 2px 6px;
+    margin-left: -6px;
+    border-radius: 4px;
+    cursor: pointer;
+
+    &:hover {
+      color: var(--global-text-color);
+    }
+  }
+
+  li[aria-current] {
+    color: var(--global-text-color);
+
+    &::marker {
+      color: var(--global-theme-color);
+      font-weight: 600;
+    }
+
+    button {
+      background: var(--global-card-bg-color);
+    }
   }
 }
 

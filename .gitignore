@@ -11,3 +11,7 @@ node_modules/
 vendor
 
 .vscode/
+
+# Diagrams cropped from the IIHF Level I coach manual, for reference only.
+# Kept out of the public repository: they are the IIHF's, not ours.
+docs/iihf-drills/
