@@ -6,3 +6,4 @@ lighthouse_results/**
 _posts/2015-10-20-math.md
 assets/js/distillpub/**
 assets/json/mri_recon_data.json
+assets/json/mri_recon_graph.json
