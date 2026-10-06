@@ -6,9 +6,10 @@ Working notes for this repository. Read this before making changes.
 
 Mertcan Özdemir's personal site at **mertcanozdemir.com**, built on the
 [al-folio](https://github.com/alshedivat/al-folio) Jekyll theme. Mertcan is a
-biomedical engineer (PhD, 2025) working on medical image processing and deep
-learning for MRI — diffusion models for cardiac cine MRI synthesis. He also
-played ice hockey for the Turkish national team.
+biomedical engineer (PhD, 2025, on diffusion models for cardiac cine MRI
+synthesis), now a researcher at UMRAM, Bilkent University, working on fast MRI
+reconstruction. He also played ice hockey for the Turkish national team, and
+programs microcontrollers for hobby electronics projects.
 
 ## How it deploys
 
@@ -31,8 +32,8 @@ the plugin was unused and has been removed. If another gem fails the same way,
 adding `gem 'ostruct'` to the Gemfile is the fallback — CI is unaffected either
 way, since it pins Ruby 3.2.2 and Gemfile.lock is untracked.
 
-`node` is available. `js-yaml` (installed into the scratchpad) is useful for
-validating YAML; `npx prettier` works because `node_modules/` is installed.
+`node` is available, and `node_modules/` holds prettier and js-yaml (both
+pinned in `package.json`).
 
 ## Prettier
 
@@ -41,6 +42,12 @@ prettier @shopify/prettier-plugin-liquid`, which **ignores package-lock.json and
 installs the latest**. Local and CI once disagreed for exactly this reason, so
 `package.json` now pins prettier and the plugin exactly. Keep them pinned, and
 run `npx prettier . --check` before committing.
+
+## CSS minifier trap
+
+jekyll-minifier mangles `var()` inside `calc()` — `calc(var(--gutter) - 6px)`
+is served as `calc(var( -  - gutter) - 6px)`, which browsers drop. Use a plain
+value there, or compute the whole thing in a custom property.
 
 ## Two traps that have already caused bugs
 
@@ -100,45 +107,141 @@ flagged rather than left in ("cringe" was his word — the GIF caption "my brain
 was removed for this reason). He does not want a CV-shaped site that nobody
 returns to; usefulness matters more than presentation.
 
+Site copy should be short and plain but still read as normal prose. The about
+page was cut from four paragraphs to two; a further telegraphic pass ("I'm a
+biomedical engineer. I work on…") went too far and was reverted.
+
 Do not deploy after every change. Commit locally, let work accumulate, and push
 when he says so.
 
+## Home — MRI reconstruction results (/)
+
+`_pages/home.md` with `assets/js/recon.js`: a browser over results reported in
+the MRI reconstruction literature, from Mertcan's UMRAM project
+(`~/Documents/umram-project2-path1`). Three views and nothing else on the page
+— he asked for the reading notes below them to go: graph (the default),
+papers and results (`#papers`, `#results` open those directly). A fit view with
+the evidence-graph preview's diagnostic charts was built and then removed.
+
+- `assets/json/mri_recon_data.json` is copied from that project's
+  `rapor/site/mri_recon_data.json` and regenerated there with
+  `scripts/site_verisi.py`. Never hand-edit it.
+- `assets/json/mri_recon_graph.json` feeds the graph view
+  (`assets/js/recon-graph.js`, plus d3 from cdnjs, both loaded only when the
+  view opens). It is the `methods` and `networks` of the evidence-graph preview
+  data with the per-measurement `fit` arrays dropped, plus a network layout:
+  **run `node bin/graph-layout.js` after replacing the file**, which appends
+  precomputed [x, y] to every node (the force simulation takes over a second in
+  the browser). The page shows the network layout only; the preview's timeline
+  layout was dropped on request.
+- That preview data comes from `veri_uret.py`, written in another Claude
+  session's scratchpad rather than the umram repo — move it into the umram repo
+  before relying on regenerating it. The two data files can come from different
+  umram commits (`meta.source.commit` vs `generated`).
+- θ in the graph is fitted to within-cell differences only, so it respects the
+  rule that reported values are only comparable within a cell (one paper, one
+  protocol). The preview treated these as the paper's results: unpublished, so
+  check with Mertcan before pushing.
+
 ## Hockey drills — /drills/
 
-Training material from an IIHF development camp, from **Mertcan's own paper
-notes**, which he will supply. The page at `_pages/drills.md` animates each
-drill from `_data/drills.yml` using `assets/js/drills.js`, which draws an IIHF
-rink to scale (60×30 m, centred at 0,0) as inline SVG. Styles live under
-"drill diagrams" in `assets/css/_custom.scss`.
+The page at `_pages/drills.md` animates each drill from `_data/drills.yml` using
+`assets/js/drills.js`, which draws an IIHF rink to scale (60×30 m, centred at
+0,0) as inline SVG. Styles live under "drill diagrams" in
+`assets/css/_custom.scss`. The layout follows the IIHF coaching pad (a copy is
+in `docs/iihf-drills/`, gitignored): each drill is the rink with a narrow steps
+column beside it, two drills a row from 90rem, one below, stacked on a phone.
+Text is kept short on purpose — the animation carries the explanation. Three
+drills a row was tried and rejected as too small; full-width rinks as too big.
 
-**The five drills currently in `_data/drills.yml` are invented placeholders and
-some are not sensible hockey** — `backcheck` ends with a shot on goal from the
-neutral zone, and is flagged in the file. They exist to show the format and
-should all be replaced with real drills, not corrected piecemeal.
+The 52 drills are **real, redrawn from the IIHF Coach Development Program
+Level I Tactical manual** — every drill in its chapter 21 except free play with
+no fixed pattern (Chaos Drill, Monkey Drill, 5 x One-on-One, Team Shadowing,
+Introduction to Body Contact, Three-on-One In Circle), plus the 2-on-1 give and
+go from chapter 20. Each has a `source` with the manual's page. Mertcan asked
+for the manual **not** to be linked or cited on the site, and later for the
+"IIHF" mentions to go too: the drills page has no description, the about page
+says "animated practice drills", and visible text never says "the manual".
+The diagrams themselves are cropped into `docs/iihf-drills/<section>/`
+(gitignored, the IIHF's material). The original plan was drills from his own
+paper notes from an IIHF development camp; those may still come and would sit
+alongside these.
 
-Data shape:
+**Run `node bin/check-drills.js` after touching any drill** (it exits non-zero
+on problems). It loads the real engine and flags passes thrown before the last
+one landed, opponents on a pass or shot line (a shot ending at a goalie counts
+as a save), overlapping players, speeds over 9 m/s, anyone leaving the rounded
+rink, and steps out of order. Every problem it catches has turned up in a real
+drill at least once — the 2-on-1 first had the defender inside the carrier's
+circle and the shot clipping the goalie.
+
+Data shape (see the header of `_data/drills.yml` for the full rules):
 
 ```yaml
-- id: two-on-one
-  title: 2-on-1 Rush
-  duration: 6 # seconds the animation runs
-  cones: [[-2, -6], [-2, 6]]
+- id: give-and-go-pylons
+  title: Give and Go Pylons
+  category: Puck handling and shooting
+  source: { page: "21.11", pdf: 42 }
+  duration: 11 # seconds the animation runs
+  cones: [[-5.6, 9.2], [-8.3, 7.2], [-10.7, 4.3]]
   actors:
-    - { id: F1, label: F1, team: a, puck: true, path: [[-20, -6], [-8, -7], [2, -6]] }
-    - { id: F2, label: F2, team: a, path: [[-20, 6], [-6, 7], [4, 5]] }
+    - id: P
+      label: P
+      team: n # a blue, b orange (opposition), n grey (passers)
+      path: [[-18.5, 8.5]] # one point: stands still
+    - id: P1
+      label: "1"
+      team: a
+      puck: true
+      path:
+        - [-23, 13]
+        - [-15, 13, 0.22] # third value pins the time
+        - [-17, 1.5, 0.86]
   events:
-    - { t: 0.45, type: pass, to_actor: F2 }
-    - { t: 0.8, type: shot, to: [25.5, 0] }
+    - { t: 0.05, type: pass, to_actor: P }
+    - { t: 0.15, type: pass, to_actor: P1 }
+    - { t: 0.86, type: shot, to: [-26, -0.4] }
+  steps:
+    - { t: 0, text: "1 passes to P and skates up the boards." }
 ```
 
-Paths are interpolated with smoothstep; `t` in an event is a fraction of the
-drill. **Events carry no coordinates of their own**: they start wherever the
-puck already is, and a pass is aimed at where `to_actor` will be when it lands,
-so the puck meets the receiver and then travels with them. Writing explicit
-`from`/`to` points for passes caused the puck to teleport — one pass was aimed
-9 m from where the receiver actually was. Only shots take a `to`.
+Paths are Catmull-Rom curves through their points. Points without a time are
+spread by distance between the pinned ones, so a player skates at an even
+speed; pin a time wherever timing matters. Keep one point per line under
+`path:` — as an inline list prettier explodes it into a much worse layout.
 
-Still undecided, to settle once the notes arrive:
+`steps` is the written description: a numbered list under the diagram, where
+the step the animation is in is highlighted and selecting one seeks to its `t`.
+**Quote the text** — it sits in a flow mapping, so an unquoted comma splits it.
+
+`t` in an event is a fraction of the drill. **Passes carry no start point**:
+they leave from whoever has the puck, and a pass to `to_actor` is aimed at
+where that player will be when it lands (flight time grows with distance), so
+the puck meets the receiver and then travels with them. Writing explicit
+`from`/`to` points for passes caused the puck to teleport — one pass was aimed
+9 m from where the receiver actually was.
+
+Several pucks are supported: every actor with `puck: true` starts with one, and
+`pucks: [[x, y]]` puts loose ones on the ice. With more than one puck, each
+event names its carrier with `by`. A pass with a point `to` (a dump-in, a chip
+into space) leaves the puck loose there, as does a shot; `pickup` hands `by`
+the nearest loose puck. `nets: [[x, y, angle]]` draws extra goals. All of this
+lives in `simulate()` in `assets/js/drills.js`, which also collects data
+mistakes as warnings (printed to the browser console).
+
+The page is grouped by the manual's own sections, listed in
+`_data/drill_sections.yml` (skating, passing, checking, goalkeeping, evaluation,
+team tactics); a section with no drills is hidden. The markup lives in
+`_includes/drills/sections.liquid` because prettier flattens HTML nested in the
+Markdown page. A grouping by practice phase was discussed and set aside — warm-up,
+focus, "ara taktikler" (team tactics: breakouts, zone entries, defensive
+systems), "last process" (cool-down), pre-season — partly because Level I has
+almost nothing for team tactics or cool-down.
+
+Paths are sampled by arc length, so a player's speed is even between pinned
+times; before that, unevenly spaced points made players spike past 15 m/s.
+
+Still undecided, to settle if his own notes arrive:
 
 - Whether Claude transcribes the paper diagrams into coordinates, or builds a
   click-on-the-rink editor so Mertcan can add drills himself.
