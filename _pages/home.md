@@ -3,7 +3,6 @@ layout: base
 permalink: /
 wide: true
 title: MRI reconstruction results
-description: From my work at UMRAM — PSNR and SSIM values reported in the MRI reconstruction literature, each traced to its source.
 ---
 
 <div
