@@ -4,36 +4,46 @@ permalink: /about/
 title: about
 nav: true
 nav_order: 1
+wide: true
 ---
 
-I am a biomedical engineer working on medical image processing and deep learning for MRI.
+<div class="about">
 
-I recently completed my PhD at TOBB University of Economics and Technology, where I developed
-diffusion models with asymmetric attention for synthesising cardiac cine MRI. Before that I spent
-three years building medical devices in industry, leading TÜBİTAK-funded R&D projects and taking
-patient monitoring hardware from concept to certification.
+<div class="about-bio" markdown="1">
 
-I am currently looking to extend my research towards ultra-high field MRI acquisition and
-reconstruction.
+I am a biomedical engineer working on fast MRI reconstruction, as a researcher at UMRAM, Bilkent
+University. I did my PhD at TOBB University of Economics and Technology on diffusion models for
+cardiac cine MRI, after three years of building medical devices in industry.
+
+I played ice hockey for the Turkish national team; the [drills]({{ '/drills/' | relative_url }}) page
+has animated practice drills. I also build small electronics projects with microcontrollers, and
+a page about them is on its way.
+
+</div>
+
+<div class="about-pubs" markdown="1">
 
 ## Publications
 
 {% bibliography %}
 
+</div>
+
+<div class="about-teaching" markdown="1">
+
 ## Teaching
 
-TOBB University of Economics and Technology, Department of Biomedical Engineering, 2023 – 2025.
+TOBB University of Economics and Technology, Biomedical Engineering, 2023 – present.
 
-**BMM411 — Biomedical Image Processing.** Frequency-domain filtering and Wiener filters, Radon
-transform and image reconstruction, wavelet transforms, colour image processing.
+- BMM411 Biomedical Image Processing
+- BMM316 Biomedical Sensors and Transducers
+- Biomedical Instrumentation Laboratory
 
-**BMM316 — Biomedical Sensors and Transducers.** Biosensors and their performance parameters,
-electrochemical, optical and mass-based biosensors, bioreceptor elements, biopotential electrodes,
-semiconductor and optical transducers, transducers for temperature, pressure and flow, multisensor
-data fusion and ROC curves, wearable sensors.
+I also supervised undergraduate theses.
 
-**Biomedical Instrumentation Laboratory.** ECG, EMG, EEG and EOG acquisition and processing with
-MATLAB. I also supervised undergraduate theses in medical image analysis and signal processing.
+</div>
+
+<div class="about-links" markdown="1">
 
 ## Elsewhere
 
@@ -42,3 +52,7 @@ MATLAB. I also supervised undergraduate theses in medical image analysis and sig
 [GitHub](https://github.com/mertcanozdemir) ·
 [LinkedIn](https://www.linkedin.com/in/mertcanozdemir) ·
 <a href="mailto:mertcanozdemir@yahoo.com">mertcanozdemir@yahoo.com</a>
+
+</div>
+
+</div>
