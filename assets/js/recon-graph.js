@@ -423,7 +423,8 @@
       }</p>
       <h4>Graph</h4>
       <dl class="rg-kv">
-        <dt>Studies</dt><dd>${int(dg.n_stud)} / ${int(dg.n_stud_all)}</dd>
+        <dt>Studies of Fig. 2</dt><dd>${int(dg.n_fig2)}${dg.n_fig2 === dg.n_fig2_all ? "" : " / " + int(dg.n_fig2_all)}</dd>
+        <dt>Studies with comparisons</dt><dd>${int(dg.n_stud)} / ${int(dg.n_stud_all)}</dd>
         <dt>Methods</dt><dd>${int(dg.n_meth)} / ${int(dg.n_meth_all)}</dd>
         <dt>Compared pairs</dt><dd>${int(dg.n_pairs)}</dd>
         <dt>Matched conditions</dt><dd>${int(dg.n_cond)}</dd>
@@ -436,7 +437,7 @@
         <dt>Independent loops</dt><dd>${int(dg.loops)}</dd>
         <dt>Mean degree</dt><dd>${dg.mean_deg.toFixed(1)}</dd>
       </dl>
-      <p class="rg-note">Counts before the slash are in the largest connected component, where the model is fitted; after it, all methods that share at least one condition.</p>`;
+      <p class="rg-note">Studies of Fig. 2 are those of the paper's Fig. 2 (its Table 1) with a proposed method in this graph, for the window's publication year; a few of them contribute no side-by-side comparison of their own. Other counts before the slash are in the largest connected component, where the model is fitted; after it, all methods that share at least one condition.</p>`;
   }
 
   function refresh(animate = true) {
