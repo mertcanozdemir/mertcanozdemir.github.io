@@ -86,12 +86,31 @@
 
   // Network layout. Positions normally come with the data, laid out ahead of
   // time by bin/graph-layout.js, because the force simulation takes over a
-  // second for the full graph. This runs only if they are missing.
+  // second for the full graph. This runs only if they are missing, with the
+  // same rule: every method on the circle of radius rk·√SE around U-Net.
+  function onCircles(sn) {
+    for (const s of sn) {
+      if (s.fx !== undefined) continue;
+      const d = Math.hypot(s.x, s.y) || 1;
+      s.x *= s.r / d;
+      s.y *= s.r / d;
+      const vr = (s.vx * s.x + s.vy * s.y) / (s.r || 1);
+      s.vx -= (vr * s.x) / (s.r || 1);
+      s.vy -= (vr * s.y) / (s.r || 1);
+    }
+  }
+
   function runForce() {
     G.forced = true;
+    if (!G.g.rk) G.g.rk = 300 / Math.sqrt(d3.max(G.nodes, (n) => n.se) || 1);
     const sn = G.nodes.map((n) => {
       const c = simCache.get(n.i);
-      return { n, x: c ? c[0] : (Math.random() - 0.5) * 400, y: c ? c[1] : (Math.random() - 0.5) * 400 };
+      return {
+        n,
+        r: G.g.rk * Math.sqrt(n.se),
+        x: c ? c[0] : (Math.random() - 0.5) * 400,
+        y: c ? c[1] : (Math.random() - 0.5) * 400,
+      };
     });
     const ix = new Map(sn.map((s) => [s.n.i, s]));
     const pin = ix.get(G.ref && G.ref.i);
@@ -105,18 +124,20 @@
         d3
           .forceLink(links)
           .distance((l) => 10 + 22 / Math.sqrt(l.c))
-          .strength((l) => Math.min(1, 0.25 + 0.08 * l.c) / Math.min(l.source.n.dg, l.target.n.dg))
+          .strength((l) => (0.3 * Math.min(1, 0.25 + 0.08 * l.c)) / Math.min(l.source.n.dg, l.target.n.dg))
       )
-      .force("charge", d3.forceManyBody().strength(-16).distanceMax(320))
+      .force("charge", d3.forceManyBody().strength(-8).distanceMax(160))
       .force(
         "collide",
-        d3.forceCollide((s) => rad(s.n) + 1)
+        d3.forceCollide((s) => rad(s.n) + 0.5)
       )
-      .force("x", d3.forceX(0).strength(0.035))
-      .force("y", d3.forceY(0).strength(0.035))
       .alpha(fresh ? 1 : 0.45)
       .stop();
-    for (let k = 0; k < (fresh ? 320 : 160); k++) sim.tick();
+    onCircles(sn);
+    for (let k = 0; k < (fresh ? 400 : 200); k++) {
+      sim.tick();
+      onCircles(sn);
+    }
     sn.forEach((s) => {
       simCache.set(s.n.i, [s.x, s.y]);
       s.n.sx = s.x;
@@ -133,6 +154,7 @@
       ry = d3.max(G.nodes, (n) => Math.abs(n.sy - c.sy)) || 1;
     const pad = 26,
       k = Math.min((W / 2 - pad) / rx, (H / 2 - pad) / ry);
+    G.k = k;
     G.nodes.forEach((n) => {
       n.gx = W / 2 + (n.sx - c.sx) * k;
       n.gy = H / 2 + (n.sy - c.sy) * k;
@@ -193,6 +215,38 @@
     ctx.fillRect(0, 0, W, H);
     const focus = ex.sel || ex.hover;
     const nb = focus ? new Set(G.adj.get(focus.i).map(([m]) => m.i)) : null;
+
+    // Circles of equal standard error around the reference. Every method sits
+    // at rk·√SE from it, so the circles read as how firmly the evidence ties a
+    // method to U-Net (bin/graph-layout.js).
+    if (G.ref && G.g.rk && G.k) {
+      const top = d3.max(G.nodes, (n) => n.se) || 0;
+      const e10 = 10 ** Math.floor(Math.log10(top / 4)),
+        f = top / 4 / e10;
+      const step = (f < 1.5 ? 1 : f < 3.5 ? 2 : f < 7.5 ? 5 : 10) * e10;
+      const unit = ex.metric === "psnr" ? "dB" : "logit";
+      ctx.lineWidth = 1.2;
+      ctx.strokeStyle = T.grid;
+      ctx.font = "11px " + T.font;
+      ctx.textBaseline = "bottom";
+      ctx.lineJoin = "round";
+      for (let v = step; v <= top + 1e-9; v += step) {
+        const r = zt.k * G.k * G.g.rk * Math.sqrt(v);
+        ctx.beginPath();
+        ctx.arc(SX(G.ref), SY(G.ref), r, 0, 2 * Math.PI);
+        ctx.stroke();
+        const t = `SE ${+v.toFixed(3)} ${unit}`,
+          x = SX(G.ref) + r * Math.SQRT1_2 + 3,
+          y = SY(G.ref) - r * Math.SQRT1_2 - 2;
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = T.surface;
+        ctx.strokeText(t, x, y);
+        ctx.fillStyle = T.muted;
+        ctx.fillText(t, x, y);
+        ctx.lineWidth = 1.2;
+        ctx.strokeStyle = T.grid;
+      }
+    }
 
     // Edges in their own colour and strong enough to read against the canvas,
     // fading back when a method is in focus.
@@ -341,7 +395,7 @@
       p.innerHTML = `
         <button type="button" class="rg-close" data-close>Back to graph</button>
         <h3>${esc(n.m.name)}</h3>
-        <p class="rg-sub">${dot(n.m.family)}${n.m.family} · ${n.m.proposed ? "first proposed" : "first evaluated"} in ${Math.floor(n.m.year)}</p>
+        <p class="rg-sub">${dot(n.m.family)}${n.m.family} · ${n.m.proposed ? "proposed in a study of Fig. 2" : "comparator only"} · since ${Math.floor(n.m.year)}</p>
         <div class="rg-big"><strong>${fmt(n.th, d)}</strong><span>${u} vs ${esc(MET[g.ref].name)}<br>95% ± ${fmt(1.96 * n.se, d)}</span></div>
         <dl class="rg-kv"><dt>Studies in this graph</dt><dd>${n.ns}</dd><dt>Conditions</dt><dd>${n.nc}</dd><dt>Directly compared methods</dt><dd>${n.dg}</dd></dl>
         ${
@@ -457,7 +511,7 @@
       }
       const u = UNIT[ex.metric],
         d = ex.metric === "psnr" ? 2 : 3;
-      tip.innerHTML = `<b>${esc(n.m.name)}</b><br>${dot(n.m.family)}${n.m.family} · ${n.m.proposed ? "proposed" : "first evaluated"} ${Math.floor(n.m.year)}<br>θ <span class="rg-num">${fmt(n.th, d)} ± ${fmt(1.96 * n.se, d)}</span> ${u}<br><span class="rg-num">${n.ns}</span> studies · <span class="rg-num">${n.nc}</span> conditions · <span class="rg-num">${n.dg}</span> neighbours`;
+      tip.innerHTML = `<b>${esc(n.m.name)}</b><br>${dot(n.m.family)}${n.m.family} · ${n.m.proposed ? "proposed" : "comparator"} · since ${Math.floor(n.m.year)}<br>θ <span class="rg-num">${fmt(n.th, d)} ± ${fmt(1.96 * n.se, d)}</span> ${u}<br><span class="rg-num">${n.ns}</span> studies · <span class="rg-num">${n.nc}</span> conditions · <span class="rg-num">${n.dg}</span> neighbours`;
       tip.hidden = false;
       const tw = tip.offsetWidth,
         th = tip.offsetHeight;

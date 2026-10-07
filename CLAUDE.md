@@ -122,7 +122,10 @@ a short list of how to use it (no counts, on request), then the graph —
 network layout only, drawn by
 `assets/js/recon-graph.js` with d3 from cdnjs. The reference method, U-Net, sits
 in the middle of the view (`bin/graph-layout.js` pins it to the centre of the
-layout). The page opens with U-Net selected and the Other family switched off;
+layout). The layout is radial: every other method sits on the circle of radius
+rk·√SE, SE being the standard error of its θ against U-Net (SE²/σ² is the
+effective resistance between the two in the comparison graph), and the page
+draws circles of equal SE; the square root keeps the hubs off U-Net. The page opens with U-Net selected and the Other family switched off;
 "reset view" clears the selection, search and zoom and shows every family,
 Other included. A standalone page in the umram
 preview's own look was tried at /graph/ and dropped in favour of this;
@@ -136,15 +139,21 @@ The papers/results browser (`_pages/results.md`, `assets/js/recon.js`) is
 - `assets/json/mri_recon_data.json` is copied from the umram project's
   `rapor/site/mri_recon_data.json` and regenerated there with
   `scripts/site_verisi.py`. Never hand-edit it.
-- `assets/json/mri_recon_graph.json` is the evidence-graph preview data's
-  `methods` and `networks`, with the per-measurement `fit` arrays dropped, plus a
-  network layout: **run `node bin/graph-layout.js` after replacing the file**,
-  which appends precomputed [x, y] to every node (the force simulation takes
-  over a second in the browser).
-- That preview data comes from `veri_uret.py`, written in another Claude
-  session's scratchpad rather than the umram repo — move it into the umram repo
-  before relying on regenerating it. The two data files can come from different
-  umram commits (`meta.source.commit` vs `generated`).
+- `assets/json/mri_recon_graph.json` is written by the umram project's
+  `scripts/site_graf_verisi.py` (to `rapor/site/mri_recon_graph.json`; copy it
+  here). Its universe is the paper's Fig. 2 only: the studies of
+  `temporal_trajectory*.json` at the analysed acceleration factors (the user's
+  choice, 2026-10-07; a full-corpus view with a toggle was built and dropped),
+  so its counts need not match the paper's own network counts. Display names come from
+  `configs/site_gosterim_adlari.json` (English, hand-curated), then the paper's
+  figure names, then the name as written in the paper with LaTeX and
+  "ours/proposed" tags stripped; identities that would share a name get the
+  first author and year. `python3 scripts/site_graf_verisi.py --denetle` lists
+  names that still look wrong. After replacing the file, **run
+  `node bin/graph-layout.js`**, which appends the radial layout ([x, y] per
+  node and `rk` per network); the force simulation takes over a second in the
+  browser. A method's `year` is the first year it appears in the corpus, which
+  the page shows as "in the literature since".
 - θ is fitted to within-cell differences only, so the graph respects the rule
   that reported values are only comparable within a cell (one paper, one
   protocol). The plan: publish the graph now, and release the extracted data and
