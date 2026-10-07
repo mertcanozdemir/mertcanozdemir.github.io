@@ -235,7 +235,7 @@
         ctx.beginPath();
         ctx.arc(SX(G.ref), SY(G.ref), r, 0, 2 * Math.PI);
         ctx.stroke();
-        const t = `SE ${+v.toFixed(3)} ${unit}`,
+        const t = `±${+v.toFixed(3)} ${unit}`,
           x = SX(G.ref) + r * Math.SQRT1_2 + 3,
           y = SY(G.ref) - r * Math.SQRT1_2 - 2;
         ctx.lineWidth = 3;
