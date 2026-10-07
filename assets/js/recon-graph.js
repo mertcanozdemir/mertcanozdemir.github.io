@@ -39,7 +39,7 @@
   let D, MET;
   // How the page opens. "Other" (classical and miscellaneous methods) starts
   // switched off; reset view brings it back with every other family.
-  const DEFAULTS = { metric: "psnr", win: "all", minStud: 1, hidden: ["Other"] };
+  const DEFAULTS = { metric: "psnr", win: "all", minStud: 1, hidden: ["Other"], proposedOnly: false };
   const ex = { ...DEFAULTS, hidden: new Set(DEFAULTS.hidden), sel: null, hover: null };
   const cv = $("canvas"),
     stage = $("[data-stage]"),
@@ -52,7 +52,7 @@
     tween = null;
   const simCache = new Map();
   const rad = (n) => 1.8 + 1.5 * Math.sqrt(n.ns);
-  const vis = (n) => n === ex.sel || n === G.ref || (!ex.hidden.has(n.m.family) && n.ns >= ex.minStud);
+  const vis = (n) => n === ex.sel || n === G.ref || (!ex.hidden.has(n.m.family) && n.ns >= ex.minStud && (!ex.proposedOnly || n.m.proposed));
   const winKeys = (m) => [
     "all",
     ...Object.keys(D.networks[m])
@@ -480,6 +480,8 @@
       ex.win = DEFAULTS.win;
       ex.minStud = DEFAULTS.minStud;
       ex.hidden = new Set();
+      ex.proposedOnly = DEFAULTS.proposedOnly;
+      $("[data-proposed]").setAttribute("aria-pressed", String(ex.proposedOnly));
       $("[data-metric]")
         .querySelectorAll("button")
         .forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === ex.metric)));
@@ -538,6 +540,11 @@
     };
     $("[data-min]").onchange = (e) => {
       ex.minStud = +e.target.value;
+      draw();
+    };
+    $("[data-proposed]").onclick = (e) => {
+      ex.proposedOnly = !ex.proposedOnly;
+      e.currentTarget.setAttribute("aria-pressed", String(ex.proposedOnly));
       draw();
     };
     $("[data-find]").addEventListener("change", (e) => {
