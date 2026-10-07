@@ -667,7 +667,9 @@ html[data-theme="dark"] .recon-graph {
     display: block;
     width: 100%;
     aspect-ratio: 6 / 5;
-    max-height: 80vh;
+    // Fit the window under the title, intro, controls and family key, so the
+    // whole graph shows without scrolling.
+    max-height: max(360px, calc(100vh - 330px));
     touch-action: none;
   }
 }
@@ -749,17 +751,12 @@ html[data-theme="dark"] .recon-graph {
   }
 }
 
-// How to use the graph, above it on the home page.
+// One line on how to read the graph, above it on the home page.
 .rg-howto {
   max-width: var(--measure);
-  margin: -1rem 0 1.25rem;
-  padding-left: 1.1rem;
+  margin: -1rem 0 0.75rem;
   color: var(--global-text-color-light);
   font-size: 0.88rem;
-
-  li + li {
-    margin-top: 0.15rem;
-  }
 }
 
 .rg-note {

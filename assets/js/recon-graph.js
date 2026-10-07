@@ -388,7 +388,7 @@
     if (n) {
       const nbs = G.adj
         .get(n.i)
-        .slice()
+        .filter(([m]) => vis(m))
         .sort((a, b) => b[1].c - a[1].c)
         .slice(0, 10);
       const path = n === G.ref ? null : bfs(n, G.ref);
@@ -540,11 +540,13 @@
     };
     $("[data-min]").onchange = (e) => {
       ex.minStud = +e.target.value;
+      renderPanel();
       draw();
     };
     $("[data-proposed]").onclick = (e) => {
       ex.proposedOnly = !ex.proposedOnly;
       e.currentTarget.setAttribute("aria-pressed", String(ex.proposedOnly));
+      renderPanel();
       draw();
     };
     $("[data-find]").addEventListener("change", (e) => {
@@ -569,6 +571,7 @@
             on = ex.hidden.has(f);
           on ? ex.hidden.delete(f) : ex.hidden.add(f);
           b.setAttribute("aria-pressed", String(on));
+          renderPanel();
           draw();
         })
     );
