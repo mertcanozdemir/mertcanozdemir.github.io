@@ -8,6 +8,14 @@
 // still land on one scale through the methods they share. The data is
 // generated in the umram project; this file only draws it. Used by the home
 // page, which loads d3 first.
+//
+// The 3D view tilts the same layout and lifts each method to its θ, so height
+// reads as the difference from U-Net while the distance from U-Net's axis
+// still reads as the standard error. The years view is the paper's Fig. 2
+// itself, one point per study and the mean trend with its 95% band, read from
+// assets/json/mri_recon_fig2.json (bin/fig2-data.js), with the network fading
+// out behind it. All are drawn on the same 2D canvas through a small
+// projection, so every interaction works the same in each view.
 
 (function () {
   const root = document.querySelector("[data-graph]");
@@ -17,6 +25,7 @@
   const FAM = ["CNN", "GAN", "Transformer", "Diffusion", "SSM", "Other"];
   const EDGE_ALPHA = 0.16; // edges' opacity in a full graph; sparser graphs get more
   const UNIT = { psnr: "dB", ssim: "logit" };
+  const unit = () => UNIT[ex.metric];
   const $ = (s) => root.querySelector(s);
   const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
@@ -36,14 +45,15 @@
     T.font = getComputedStyle(document.body).fontFamily;
   }
 
-  let D, MET;
+  let D, MET, F; // F: Fig. 2, by metric
   // How the page opens. "Other" (classical and miscellaneous methods) starts
   // switched off; reset view brings it back with every other family.
-  const DEFAULTS = { metric: "psnr", win: "all", minStud: 1, hidden: ["Other"], proposedOnly: false };
+  const DEFAULTS = { metric: "psnr", win: "all", minStud: 1, hidden: ["Other"], proposedOnly: false, view: "2d" };
   const ex = { ...DEFAULTS, hidden: new Set(DEFAULTS.hidden), sel: null, hover: null };
   const cv = $("canvas"),
     stage = $("[data-stage]"),
-    tip = $("[data-tip]");
+    tip = $("[data-tip]"),
+    straightBtn = $("[data-straighten]");
   let W = 800,
     H = 500,
     dpr = 1,
@@ -51,6 +61,20 @@
     zt = d3.zoomIdentity,
     tween = null;
   const simCache = new Map();
+  // The camera. 2D is the network seen from straight above with every method
+  // on the ground. Tilting it away is 3D: the view turns by yaw, leans back,
+  // and the methods rise to their θ, fully once the tilt reaches LIFT. A drag
+  // carries the view from one to the other.
+  // g fades the network out and Fig. 2 in, for the years view.
+  const FLAT = { yaw: 0, tilt: 0, g: 0 },
+    TILTED = { yaw: 0, tilt: 1.15, g: 0 },
+    YEARS = { yaw: 0, tilt: Math.PI / 2, g: 1 }, // square from the side, as Fig. 2
+    LIFT = 0.4,
+    SNAP = 0.25; // let go below this tilt (about 14°) and the view settles
+  const cam = { ...FLAT };
+  let PJ = null,
+    camTween = null,
+    marks = []; // the years view's hollow marks as last drawn: [x, y, method]
   const rad = (n) => 1.8 + 1.5 * Math.sqrt(n.ns);
   const vis = (n) => n === ex.sel || n === G.ref || (!ex.hidden.has(n.m.family) && n.ns >= ex.minStud && (!ex.proposedOnly || n.m.proposed));
   const winKeys = (m) => [
@@ -159,6 +183,11 @@
       n.gx = W / 2 + (n.sx - c.sx) * k;
       n.gy = H / 2 + (n.sy - c.sy) * k;
     });
+    // In 3D the 98th percentile of |θ| rises to half the graph's radius, so a
+    // few extreme methods do not flatten the rest.
+    G.R = d3.max(G.nodes, (n) => Math.hypot(n.gx - W / 2, n.gy - H / 2)) || 1;
+    G.q = d3.quantile(G.nodes, 0.98, (n) => Math.abs(n.th)) || 1;
+    G.zs = (0.5 * G.R) / G.q;
   }
 
   function settle(animate) {
@@ -193,6 +222,12 @@
     H = r.height;
     cv.width = Math.round(W * dpr);
     cv.height = Math.round(H * dpr);
+    // A phone has no years view (its button is hidden there), so a window
+    // narrowed to one falls back to 3D.
+    if (ex.view === "years" && !$('[data-v="years"]').offsetParent) {
+      setView("3d");
+      turnTo(TILTED);
+    }
     if (G) {
       targets();
       G.nodes.forEach((n) => {
@@ -203,8 +238,107 @@
     }
   }
 
-  const SX = (n) => zt.applyX(n.wx),
-    SY = (n) => zt.applyY(n.wy);
+  // A point on the canvas before zoom: X, Y on the ground in pixels from the
+  // reference, th its height in units of θ; w is its depth towards the viewer.
+  // The projection is parallel, so upright lines stay upright.
+  function P(X, Y, th) {
+    const Z = th * PJ.zs,
+      x = X * PJ.cy - Y * PJ.sy,
+      y = X * PJ.sy + Y * PJ.cy;
+    return { x: W / 2 + x, y: H / 2 + PJ.oy + y * PJ.ct - Z * PJ.st, w: y * PJ.st + Z * PJ.ct };
+  }
+  const S = (p) => [zt.applyX(p.x), zt.applyY(p.y)];
+
+  // Each frame: the projection, the θ range the axis spans (the methods
+  // shown, or Fig. 2's in the years view, which as a chart is centred on the
+  // canvas rather than on U-Net's level), and where every method lands.
+  function project() {
+    const t = Math.min(1, cam.tilt / LIFT),
+      h = t * t * (3 - 2 * t),
+      g = F ? cam.g * h : 0;
+    PJ = { cy: Math.cos(cam.yaw), sy: Math.sin(cam.yaw), ct: Math.cos(cam.tilt), st: Math.sin(cam.tilt), h, g, zs: h * G.zs, oy: 0 };
+    const [a, b] = d3.extent(G.nodes.filter(vis), (n) => n.th),
+      [fa, fb] = g ? F[ex.metric].range : [a, b];
+    PJ.lo = a + g * (fa - a);
+    PJ.hi = b + g * (fb - b);
+    PJ.oy = (g * (PJ.lo + PJ.hi) * PJ.zs * PJ.st) / 2;
+    for (const n of G.nodes) {
+      n.X = n.wx - W / 2;
+      n.Y = n.wy - H / 2;
+      const p = P(n.X, n.Y, n.th);
+      n.px = p.x;
+      n.py = p.y;
+      n.pw = p.w;
+    }
+  }
+
+  // Fig. 2's year axis across the years view: its first to its last year.
+  const yearX = (y) => {
+    const [y0, y1] = F[ex.metric].years;
+    return 0.95 * G.R * ((2 * (y - y0)) / (y1 - y0) - 1);
+  };
+
+  const SX = (n) => zt.applyX(n.px),
+    SY = (n) => zt.applyY(n.py);
+
+  function setView(v) {
+    if (v === ex.view) return;
+    const was = ex.view;
+    ex.view = v;
+    $("[data-view]")
+      .querySelectorAll("button")
+      .forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === v)));
+    // Years is Fig. 2 as the paper draws it: the controls show its setting
+    // (proposed methods of every family, in any number of studies, all years)
+    // and are locked while it is open, then put back as they were. The
+    // network steps aside; a selected method stays selected.
+    const win = ex.win;
+    if (v === "years") {
+      ex.keep = { proposedOnly: ex.proposedOnly, minStud: ex.minStud, win: ex.win, hidden: ex.hidden };
+      Object.assign(ex, { proposedOnly: true, minStud: 1, win: "all", hidden: new Set(), hover: null });
+      if (ex.sel === G.ref) ex.sel = null; // U-Net's level is the dashed line, and its fan would cover the figure
+    } else if (was === "years") Object.assign(ex, ex.keep);
+    syncControls();
+    if (ex.win !== win) refresh();
+    const hint = $("[data-hint]");
+    hint.hidden = v === "2d";
+    hint.textContent =
+      v === "years"
+        ? "One point per study: its proposed method against U-Net. Hover or click one to see what it was compared with."
+        : "Height: difference from U-Net. Drag to turn.";
+    renderPanel();
+  }
+
+  // Puts the controls in step with ex, locking those the years view holds.
+  function syncControls() {
+    const lock = ex.view === "years";
+    $("[data-proposed]").setAttribute("aria-pressed", String(ex.proposedOnly));
+    $("[data-min]").value = String(ex.minStud);
+    $("[data-win]").value = ex.win;
+    paintLegend();
+    root.querySelectorAll("[data-proposed], [data-min], [data-win], [data-legend] button").forEach((el) => (el.disabled = lock));
+  }
+
+  function stopCam() {
+    if (camTween) camTween.stop();
+    camTween = null;
+  }
+
+  function turnTo(c) {
+    stopCam();
+    const a = { ...cam, yaw: Math.atan2(Math.sin(cam.yaw), Math.cos(cam.yaw)) }; // back the short way round
+    if (reduceMotion) {
+      Object.assign(cam, c);
+      draw();
+      return;
+    }
+    camTween = d3.timer((el) => {
+      const u = d3.easeCubicInOut(Math.min(1, el / 900));
+      for (const k in c) cam[k] = a[k] + (c[k] - a[k]) * u;
+      if (u >= 1) stopCam();
+      draw();
+    });
+  }
 
   function draw() {
     if (!G || root.hidden) return;
@@ -213,31 +347,60 @@
     ctx.globalAlpha = 1;
     ctx.fillStyle = T.surface;
     ctx.fillRect(0, 0, W, H);
-    const focus = ex.sel || ex.hover;
+    project();
+    // "straighten axes" is offered while the 3D view is turned off them.
+    const off = ex.view === "3d" && !camTween && Math.abs(Math.atan2(Math.sin(cam.yaw), Math.cos(cam.yaw))) > 0.03;
+    if (straightBtn.hidden === off) straightBtn.hidden = !off;
+    const { lo, hi } = PJ,
+      fig = PJ.g > 0.01 ? F[ex.metric] : null,
+      along = (t, v) => S(P(yearX(t), 0, v)),
+      net = 1 - PJ.g; // the network's share of the picture
+    const focus = PJ.g < 0.5 ? ex.sel || ex.hover : null;
     const nb = focus ? new Set(G.adj.get(focus.i).map(([m]) => m.i)) : null;
+    // In the years view a study stands for its proposed methods: the method
+    // selected, or those of the study under the pointer. Its links run to the
+    // studies whose methods they were compared with.
+    const fm = fig && PJ.g > 0.5 ? (ex.sel ? [ex.sel] : ex.study ? ex.study[3].map((i) => G.byI.get(i)).filter(Boolean) : []) : [],
+      fmi = new Set(fm.map((n) => n.i)),
+      fnb = new Map(); // compared method → most conditions shared with the focus
+    for (const n of fm) for (const [m, e] of G.adj.get(n.i)) if (!fmi.has(m.i)) fnb.set(m.i, Math.max(fnb.get(m.i) || 0, e.c));
+    const role = (pt) => (pt[3].some((i) => fmi.has(i)) ? 2 : pt[3].some((i) => fnb.has(i)) ? 1 : 0); // focus, compared, other
+    // Where a method stands: its study's point, or, for one no study in Fig. 2
+    // proposed (the focus too, when it is such a method), a hollow mark at its
+    // first year and all-years θ.
+    const hollow = (i) => !fig.byMethod.has(i) && G.byI.has(i),
+      at = (i) => (hollow(i) ? [along(MET[i].year + 0.5, G.byI.get(i).th)] : (fig.byMethod.get(i) || []).map((pt) => along(pt[0], pt[1])));
+    marks = [];
 
-    // Circles of equal standard error around the reference. Every method sits
-    // at rk·√SE from it, so the circles read as how firmly the evidence ties a
-    // method to U-Net (bin/graph-layout.js).
-    if (G.ref && G.g.rk && G.k) {
+    // Circles of equal standard error around the reference, on the ground.
+    // Every method sits at rk·√SE from it, so the circles read as how firmly
+    // the evidence ties a method to U-Net (bin/graph-layout.js).
+    ctx.globalAlpha = 1 - PJ.g;
+    if (G.ref && G.g.rk && G.k && PJ.g < 0.99) {
       const top = d3.max(G.nodes, (n) => n.se) || 0;
       const e10 = 10 ** Math.floor(Math.log10(top / 4)),
         f = top / 4 / e10;
       const step = (f < 1.5 ? 1 : f < 3.5 ? 2 : f < 7.5 ? 5 : 10) * e10;
-      const unit = ex.metric === "psnr" ? "dB" : "logit";
       ctx.lineWidth = 1.2;
       ctx.strokeStyle = T.grid;
       ctx.font = "11px " + T.font;
       ctx.textBaseline = "bottom";
       ctx.lineJoin = "round";
       for (let v = step; v <= top + 1e-9; v += step) {
-        const r = zt.k * G.k * G.g.rk * Math.sqrt(v);
+        const r = G.k * G.g.rk * Math.sqrt(v);
         ctx.beginPath();
-        ctx.arc(SX(G.ref), SY(G.ref), r, 0, 2 * Math.PI);
+        for (let a = 0; a <= 96; a++) ctx.lineTo(...S(P(r * Math.cos((a * Math.PI) / 48), r * Math.sin((a * Math.PI) / 48), 0)));
         ctx.stroke();
-        const t = `±${+v.toFixed(3)} ${unit}`,
-          x = SX(G.ref) + r * Math.SQRT1_2 + 3,
-          y = SY(G.ref) - r * Math.SQRT1_2 - 2;
+        // Labelled at the upper right when flat and at the front right in 3D,
+        // below the methods, which mostly stand above U-Net.
+        const a = (Math.PI / 4) * (2 * PJ.h - 1),
+          rx = r * Math.cos(a),
+          ry = r * Math.sin(a);
+        const [px, py] = S(P(rx * PJ.cy + ry * PJ.sy, ry * PJ.cy - rx * PJ.sy, 0));
+        ctx.textBaseline = PJ.h > 0.5 ? "top" : "bottom";
+        const t = `±${+v.toFixed(3)} ${unit()}`,
+          x = px + 3,
+          y = py + (PJ.h > 0.5 ? 2 : -2);
         ctx.lineWidth = 3;
         ctx.strokeStyle = T.surface;
         ctx.strokeText(t, x, y);
@@ -248,40 +411,207 @@
       }
     }
 
+    // The years view's frame, as a chart: U-Net's level dashed at 0, and the
+    // years along the bottom, where the θ axis meets them.
+    if (fig) {
+      const [y0, y1] = fig.years,
+        A = 0.95 * G.R,
+        X = yearX,
+        x0 = -A - 22;
+      ctx.globalAlpha = PJ.g;
+      ctx.strokeStyle = T.muted;
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.moveTo(...S(P(x0, 0, 0)));
+      ctx.lineTo(...S(P(A, 0, 0)));
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(...S(P(x0, 0, lo)));
+      ctx.lineTo(...S(P(A, 0, lo)));
+      for (let y = y0; y <= y1; y++) {
+        const [x, yy] = S(P(X(y), 0, lo));
+        ctx.moveTo(x, yy);
+        ctx.lineTo(x, yy + 4);
+      }
+      ctx.stroke();
+      ctx.font = "11px " + T.font;
+      ctx.fillStyle = T.muted;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "top";
+      for (let y = y0; y < y1; y++) {
+        const [x, yy] = S(P(X(y + 0.5), 0, lo));
+        ctx.fillText(String(y), x, yy + 7);
+      }
+      ctx.textAlign = "start";
+    }
+    ctx.globalAlpha = 1;
+
+    // The θ axis, standing on the ground at the left edge of the graph as seen
+    // from the camera (in the years view, left of the first year), and as long
+    // as the methods shown reach.
+    if (PJ.h > 0.01 && G.R) {
+      const R = G.R + 16,
+        X = -R * PJ.cy + PJ.g * (-0.95 * G.R - 22 + R * PJ.cy),
+        Y = R * PJ.sy * (1 - PJ.g),
+        ticks = d3.ticks(lo, hi, 8),
+        at = (v) => S(P(X, Y, v));
+      ctx.globalAlpha = PJ.h;
+      ctx.strokeStyle = T.muted;
+      ctx.fillStyle = T.muted;
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(...at(lo));
+      ctx.lineTo(...at(hi));
+      for (const v of ticks) {
+        const [x, y] = at(v);
+        ctx.moveTo(x - 4, y);
+        ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+      ctx.font = "11px " + T.font;
+      ctx.textAlign = "right";
+      ctx.textBaseline = "middle";
+      for (const v of ticks) {
+        const [x, y] = at(v);
+        ctx.fillText(v ? `${v > 0 ? "+" : "−"}${+Math.abs(v).toFixed(3)}` : "0", x - 7, y);
+      }
+      ctx.textAlign = "start";
+      // The unit once, beside the top of the axis, so the labels stay narrow
+      // enough for a phone.
+      const [x, y] = at(hi);
+      ctx.fillText(unit(), x + 5, y + 4);
+      ctx.globalAlpha = 1;
+    }
+
+    // Fig. 2's 95% band, under its points.
+    if (fig) {
+      const { grid, lo: blo, hi: bhi } = fig.mean;
+      ctx.globalAlpha = 0.15 * PJ.g;
+      ctx.fillStyle = T.ink;
+      ctx.beginPath();
+      grid.forEach((t, k) => ctx.lineTo(...along(t, bhi[k])));
+      for (let k = grid.length - 1; k >= 0; k--) ctx.lineTo(...along(grid[k], blo[k]));
+      ctx.fill();
+    }
+
     // Edges in their own colour and strong enough to read against the canvas,
-    // fading back when a method is in focus.
+    // fading back when a method is in focus. In 3D only the focus's edges are
+    // drawn: the rest crossing at every height would hide the heights.
     ctx.strokeStyle = T.edge;
     ctx.lineWidth = 0.7;
-    ctx.globalAlpha = focus ? 0.05 : G.edges.length > 2500 ? EDGE_ALPHA : EDGE_ALPHA * 1.5;
-    ctx.beginPath();
-    for (const e of G.edges) {
-      if (!vis(e.a) || !vis(e.b)) continue;
-      ctx.moveTo(SX(e.a), SY(e.a));
-      ctx.lineTo(SX(e.b), SY(e.b));
+    ctx.globalAlpha = (focus ? 0.05 : G.edges.length > 2500 ? EDGE_ALPHA : EDGE_ALPHA * 1.5) * (1 - PJ.h) * net;
+    if (PJ.h < 0.99) {
+      ctx.beginPath();
+      for (const e of G.edges) {
+        if (!vis(e.a) || !vis(e.b)) continue;
+        ctx.moveTo(SX(e.a), SY(e.a));
+        ctx.lineTo(SX(e.b), SY(e.b));
+      }
+      ctx.stroke();
     }
-    ctx.stroke();
     if (focus) {
+      // In 3D a hub's edges fan out at every height, so the more methods it
+      // was compared with, the fainter they are.
+      const hub = Math.min(1, Math.sqrt(80 / G.adj.get(focus.i).length));
       ctx.strokeStyle = T.ink;
-      ctx.globalAlpha = 0.6;
+      ctx.globalAlpha = 0.6 * (1 - PJ.h + PJ.h * hub);
       for (const [m, e] of G.adj.get(focus.i)) {
         if (!vis(m)) continue;
-        ctx.lineWidth = 0.7 + 0.5 * Math.sqrt(e.c);
+        ctx.lineWidth = 0.7 + 0.5 * Math.sqrt(e.c) * (1 - 0.6 * PJ.h);
         ctx.beginPath();
         ctx.moveTo(SX(focus), SY(focus));
         ctx.lineTo(SX(m), SY(m));
         ctx.stroke();
       }
+      // In 3D, a dashed line down to where the focus stands on the ground, and
+      // its 95% interval on θ.
+      if (PJ.h > 0.01 && focus !== G.ref) {
+        const { X, Y, th, se } = focus,
+          [x0, y0] = S(P(X, Y, th - 1.96 * se)),
+          [x1, y1] = S(P(X, Y, th + 1.96 * se));
+        ctx.globalAlpha = PJ.h * net;
+        ctx.lineWidth = 1;
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath();
+        ctx.moveTo(SX(focus), SY(focus));
+        ctx.lineTo(...S(P(X, Y, 0)));
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(x0, y0);
+        ctx.lineTo(x1, y1);
+        ctx.moveTo(x0 - 4, y0);
+        ctx.lineTo(x0 + 4, y0);
+        ctx.moveTo(x1 - 4, y1);
+        ctx.lineTo(x1 + 4, y1);
+        ctx.stroke();
+      }
     }
-    for (const n of G.nodes) {
-      if (!vis(n)) continue;
-      const dim = focus && n !== focus && !nb.has(n.i);
-      ctx.globalAlpha = dim ? 0.16 : 0.95;
+    // Far to near, so nearer methods cover farther ones; flat, smallest first.
+    // In 3D the farther ones also fade a little.
+    for (const n of net > 0.01 ? G.nodes.filter(vis).sort((a, b) => a.pw - b.pw) : []) {
+      const dim = focus && n !== focus && !nb.has(n.i),
+        far = Math.min(1, Math.max(0, (G.R - n.pw) / (2 * G.R)));
+      ctx.globalAlpha = (dim ? 0.16 : 0.95) * (1 - 0.45 * PJ.h * far) * net;
       ctx.beginPath();
       ctx.arc(SX(n), SY(n), rad(n), 0, 2 * Math.PI);
       ctx.fillStyle = T["f-" + n.m.family];
       ctx.fill();
       ctx.lineWidth = 1;
       ctx.strokeStyle = T.surface;
+      ctx.stroke();
+    }
+    // Fig. 2's studies, the focus's links among them, and the mean trend.
+    if (fig) {
+      if (fm.length) {
+        const hub = Math.min(1, Math.sqrt(80 / d3.sum(fm, (n) => G.adj.get(n.i).length)));
+        ctx.globalAlpha = 0.6 * PJ.g * hub;
+        ctx.strokeStyle = T.ink;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        for (const n of fm)
+          for (const a of at(n.i))
+            for (const i of fnb.keys())
+              for (const b of at(i)) {
+                ctx.moveTo(...a);
+                ctx.lineTo(...b);
+              }
+        ctx.stroke();
+        ctx.globalAlpha = 0.9 * PJ.g;
+        ctx.lineWidth = 1.5;
+        for (const i of [...fnb.keys(), ...fmi])
+          if (hollow(i)) {
+            const [x, y] = at(i)[0];
+            marks.push([x, y, i]);
+            ctx.beginPath();
+            ctx.arc(x, y, 3.5, 0, 2 * Math.PI);
+            ctx.fillStyle = T.surface;
+            ctx.fill();
+            ctx.strokeStyle = T["f-" + MET[i].family];
+            ctx.stroke();
+          }
+      }
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = T.surface;
+      for (const pt of fm.length ? [...fig.points].sort((a, b) => role(a) - role(b)) : fig.points) {
+        const r = fm.length ? role(pt) : 1;
+        ctx.globalAlpha = (r ? 0.9 : 0.16) * PJ.g;
+        ctx.beginPath();
+        ctx.arc(...along(pt[0], pt[1]), r === 2 || pt === ex.study ? 5 : 3.2, 0, 2 * Math.PI);
+        ctx.fillStyle = T["f-" + pt[2]];
+        ctx.fill();
+        ctx.stroke();
+      }
+      const { grid, fit } = fig.mean;
+      ctx.globalAlpha = 0.9 * PJ.g;
+      ctx.strokeStyle = T.ink;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      grid.forEach((t, k) => ctx.lineTo(...along(t, fit[k])));
       ctx.stroke();
     }
     ctx.globalAlpha = 1;
@@ -292,16 +622,25 @@
       ctx.strokeStyle = T.ink;
       ctx.stroke();
     };
-    if (G.ref) ring(G.ref, 1.4);
+    if (G.ref && net > 0.5) ring(G.ref, 1.4);
     if (focus) ring(focus, 2);
+    for (const n of fm)
+      for (const a of at(n.i)) {
+        ctx.beginPath();
+        ctx.arc(...a, 7.5, 0, 2 * Math.PI);
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = T.ink;
+        ctx.stroke();
+      }
 
-    // Labels: the reference, the most studied methods, or the focus and its
-    // strongest links.
-    const lab = new Set([G.ref]);
+    // Labels: the focus and the reference, then the most studied methods or the
+    // focus's strongest links. Each takes the first free spot beside its method
+    // (right, left, above, below); one with none is left out rather than
+    // drawn over another. In the years view they go with the network.
+    const lab = new Set(focus ? [focus, G.ref] : [G.ref]);
     const ranked = G.nodes.filter(vis).sort((a, b) => b.ns - a.ns);
     if (!focus) ranked.slice(0, 9).forEach((n) => lab.add(n));
     else {
-      lab.add(focus);
       G.adj
         .get(focus.i)
         .filter(([m]) => vis(m))
@@ -309,20 +648,51 @@
         .slice(0, 8)
         .forEach(([m]) => lab.add(m));
     }
+    if (net < 0.5) lab.clear();
     ctx.font = "500 11.5px " + T.font;
     ctx.textBaseline = "middle";
     ctx.lineJoin = "round";
-    for (const n of lab) {
-      if (!n) continue;
-      const x = SX(n) + rad(n) + 5,
-        y = SY(n);
-      const t = n === G.ref ? n.m.name + " · reference" : n.m.name;
+    const taken = [];
+    const free = (b) => b.x0 > 0 && b.x1 < W && b.y0 > 0 && b.y1 < H && taken.every((o) => b.x1 < o.x0 || b.x0 > o.x1 || b.y1 < o.y0 || b.y0 > o.y1);
+    // Fig. 2's slope, at the end of its line.
+    if (fig && PJ.g > 0.5) {
+      const { grid, fit, slope } = fig.mean,
+        [x, y] = along(grid[grid.length - 1], fit[fit.length - 1]),
+        t = `${slope < 0 ? "−" : "+"}${fmt(Math.abs(slope))} ${unit()}/year`;
+      taken.push({ x0: x + 5, x1: x + ctx.measureText(t).width + 9, y0: y - 8, y1: y + 8 });
       ctx.lineWidth = 3.5;
       ctx.strokeStyle = T.surface;
-      ctx.strokeText(t, x, y);
+      ctx.strokeText(t, x + 7, y);
       ctx.fillStyle = T.ink;
-      ctx.fillText(t, x, y);
+      ctx.fillText(t, x + 7, y);
     }
+    const put = (t, x, y, r, must) => {
+      const tw = ctx.measureText(t).width;
+      const spots = [
+        [x + r + 5, y],
+        [x - r - 5 - tw, y],
+        [x - tw / 2, y - r - 10],
+        [x - tw / 2, y + r + 10],
+      ].map(([lx, ly]) => ({ lx, ly, x0: lx - 2, x1: lx + tw + 2, y0: ly - 8, y1: ly + 8 }));
+      const at = spots.find(free) || (must ? spots[0] : null);
+      if (!at) return;
+      taken.push(at);
+      ctx.lineWidth = 3.5;
+      ctx.strokeStyle = T.surface;
+      ctx.strokeText(t, at.lx, at.ly);
+      ctx.fillStyle = T.ink;
+      ctx.fillText(t, at.lx, at.ly);
+    };
+    for (const n of lab) if (n) put(n === G.ref ? n.m.name + " · reference" : n.m.name, SX(n), SY(n), rad(n), n === focus || n === G.ref);
+    // In the years view: the focus's study, then its strongest comparisons.
+    for (const n of fm) for (const a of at(n.i)) put(n.m.name, ...a, 5, true);
+    [...fnb]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8)
+      .forEach(([i]) => {
+        const a = at(i)[0];
+        if (a) put(MET[i].name, ...a, 4, false);
+      });
   }
 
   // --- interaction ---------------------------------------------------------
@@ -330,6 +700,7 @@
   function pick(mx, my) {
     let best = null,
       bd = Infinity;
+    if (PJ && PJ.g > 0.5) return null; // the network has stepped aside
     for (const n of G.nodes) {
       if (!vis(n)) continue;
       const dx = SX(n) - mx,
@@ -344,9 +715,35 @@
     return best;
   }
 
+  // The Fig. 2 study under the pointer, in the years view.
+  function pickStudy(mx, my) {
+    if (!PJ || PJ.g < 0.5) return null;
+    let best = null,
+      bd = 7 * 7;
+    for (const pt of F[ex.metric].points) {
+      const [x, y] = S(P(yearX(pt[0]), 0, pt[1])),
+        d = (x - mx) ** 2 + (y - my) ** 2;
+      if (d < bd) [bd, best] = [d, pt];
+    }
+    return best;
+  }
+
+  // The hollow mark under the pointer, in the years view: a method.
+  function pickMark(mx, my) {
+    let best = null,
+      bd = 7 * 7;
+    for (const [x, y, i] of marks) {
+      const d = (x - mx) ** 2 + (y - my) ** 2;
+      if (d < bd) [bd, best] = [d, G.byI.get(i)];
+    }
+    return best;
+  }
+
+  // Drags are handled in wire(), so the zoom keeps the wheel and the pinch.
   const zoom = d3
     .zoom()
     .scaleExtent([0.5, 14])
+    .filter((e) => e.type === "wheel" || e.touches?.length > 1)
     .on("zoom", (e) => {
       zt = e.transform;
       draw();
@@ -388,7 +785,7 @@
     if (n) {
       const nbs = G.adj
         .get(n.i)
-        .filter(([m]) => vis(m))
+        .filter(([m]) => ex.view === "years" || vis(m)) // the years view links every comparison, so it lists them all
         .sort((a, b) => b[1].c - a[1].c)
         .slice(0, 10);
       const path = n === G.ref ? null : bfs(n, G.ref);
@@ -397,6 +794,16 @@
         <h3>${esc(n.m.name)}</h3>
         <p class="rg-sub">${dot(n.m.family)}${n.m.family} · ${n.m.proposed ? "proposed in a study of Fig. 2" : "comparator only"} · since ${Math.floor(n.m.year)}</p>
         <div class="rg-big"><strong>${fmt(n.th, d)}</strong><span>${u} vs ${esc(MET[g.ref].name)}<br>95% ± ${fmt(1.96 * n.se, d)}</span></div>
+        ${
+          ex.view === "years" && F && F[ex.metric].byMethod.get(n.i)
+            ? `<p class="rg-note">In Fig. 2: ${F[ex.metric].byMethod
+                .get(n.i)
+                .map((pt) => fmt(pt[1], d))
+                .join(
+                  ", "
+                )} ${u}, fitted on the three years around its study. Above: all years in one graph. Hollow marks: compared methods no study in Fig. 2 proposed, at their first year and all-years θ.</p>`
+            : ""
+        }
         <dl class="rg-kv"><dt>Studies in this graph</dt><dd>${n.ns}</dd><dt>Conditions</dt><dd>${n.nc}</dd><dt>Directly compared methods</dt><dd>${n.dg}</dd></dl>
         ${
           path
@@ -414,6 +821,23 @@
           .join("")}</ul>`;
       p.querySelector("[data-close]").onclick = () => select(null);
       p.querySelectorAll("[data-i]").forEach((b) => (b.onclick = () => select(G.byI.get(+b.dataset.i))));
+      return;
+    }
+    if (ex.view === "years" && F) {
+      const { mean, studies, left_out: out, refitted } = F[ex.metric],
+        sg = (v) => (v < 0 ? "−" : "+") + fmt(Math.abs(v)); // two decimals, as the paper prints them
+      p.innerHTML = `
+        <h3>Over the years</h3>
+        <p class="rg-sub">${ex.metric.toUpperCase()} · Fig. 2 of the paper: one point per study, its proposed method against ${esc(MET[g.ref].name)}</p>
+        <dl class="rg-kv">
+          <dt>Studies</dt><dd>${int(studies)}</dd>
+          <dt>Mean trend</dt><dd>${sg(mean.slope)} ${u}/year</dd>
+          <dt>95% interval</dt><dd>${sg(mean.ci95[0])} to ${sg(mean.ci95[1])}</dd>
+        </dl>
+        <p class="rg-note">Each point is fitted on the three years around its study. The band comes from resampling the studies.</p>
+        <p class="rg-note">Every method is drawn once, at its first study: ${out} studies whose proposed methods were all there before them are not drawn${
+          refitted ? `, and ${refitted} drawn without such methods` : ""
+        }. The trend and its numbers are the paper's.</p>`;
       return;
     }
     p.innerHTML = `
@@ -481,6 +905,8 @@
       ex.minStud = DEFAULTS.minStud;
       ex.hidden = new Set();
       ex.proposedOnly = DEFAULTS.proposedOnly;
+      if (ex.view === "years")
+        [ex.keep, ex.proposedOnly] = [{ proposedOnly: ex.proposedOnly, minStud: ex.minStud, win: ex.win, hidden: ex.hidden }, true];
       $("[data-proposed]").setAttribute("aria-pressed", String(ex.proposedOnly));
       $("[data-metric]")
         .querySelectorAll("button")
@@ -492,28 +918,108 @@
       ex.sel = null;
       if (rebuild) refresh(false);
       else select(null);
+      syncControls();
+      if (ex.view !== "2d") turnTo(ex.view === "years" ? YEARS : TILTED);
       d3.select(cv)
         .transition()
         .duration(reduceMotion ? 0 : 400)
         .call(zoom.transform, d3.zoomIdentity);
     };
+    // Dragging. In 2D a drag pans, except one that sets off downwards, which
+    // tilts the graph into 3D. In 3D a drag turns it (down leans it back, up
+    // brings it towards the top view), and letting go near the top view
+    // settles it into 2D. Shift-drag pans in both; a second finger hands over
+    // to the zoom's pinch.
+    let drag = null,
+      dragged = false;
+    cv.addEventListener("pointerdown", (e) => {
+      dragged = false;
+      drag = null;
+      if (e.button || !e.isPrimary) return;
+      drag = {
+        x: e.clientX,
+        y: e.clientY,
+        lx: e.clientX,
+        ly: e.clientY,
+        yaw: cam.yaw,
+        tilt: cam.tilt,
+        zt,
+        from: ex.view,
+        shift: e.shiftKey,
+        mode: null,
+      };
+      cv.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    // Let go near the top view: a drag that tilted out of 2D carries on into
+    // 3D, any other goes back to 2D.
+    const release = () => {
+      if (drag && drag.mode === "turn" && cam.tilt < SNAP) {
+        if (drag.from === "2d" && cam.tilt > 0.02) turnTo({ yaw: cam.yaw, tilt: TILTED.tilt });
+        else {
+          setView("2d");
+          turnTo(FLAT);
+        }
+      }
+      drag = null;
+      cv.style.cursor = "";
+    };
+    cv.addEventListener("pointerup", release);
+    cv.addEventListener("pointercancel", release);
     cv.addEventListener("pointermove", (e) => {
+      if (drag) {
+        const dx = e.clientX - drag.x,
+          dy = e.clientY - drag.y;
+        if (!drag.mode) {
+          if (Math.hypot(dx, dy) < 6) return;
+          drag.mode = !drag.shift && ex.view === "3d" ? "turn" : "pan";
+          stopCam();
+          dragged = true;
+          ex.hover = null;
+          tip.hidden = true;
+          cv.style.cursor = "grabbing";
+        }
+        // A 2D drag that turns out to head down (within 45° of straight down)
+        // in its first 40 px tilts after all, from where it began, so a
+        // sideways wobble at the start does not make it a pan.
+        if (drag.mode === "pan" && !drag.shift && drag.from === "2d" && dy >= 10 && dy > Math.abs(dx) && Math.hypot(dx, dy) < 40) {
+          d3.select(cv).call(zoom.transform, drag.zt);
+          drag.mode = "turn";
+          setView("3d");
+        }
+        if (drag.mode === "pan") d3.select(cv).call(zoom.translateBy, (e.clientX - drag.lx) / zt.k, (e.clientY - drag.ly) / zt.k);
+        else {
+          cam.yaw = drag.yaw - dx * 0.008;
+          cam.tilt = Math.max(0, Math.min(1.5, drag.tilt + dy * 0.008));
+          draw();
+        }
+        drag.lx = e.clientX;
+        drag.ly = e.clientY;
+        return;
+      }
+      if (e.buttons) return; // a pinch, or a button other than the first
       const r = cv.getBoundingClientRect(),
         mx = e.clientX - r.left,
         my = e.clientY - r.top;
-      const n = pick(mx, my);
-      if (n !== ex.hover) {
+      const pt = pickStudy(mx, my),
+        n = pick(mx, my) || (pt ? null : pickMark(mx, my));
+      if (n !== ex.hover || pt !== ex.study) {
         ex.hover = n;
+        ex.study = pt;
         draw();
       }
-      cv.style.cursor = n ? "pointer" : "grab";
-      if (!n) {
+      cv.style.cursor = n || pt ? "pointer" : "grab";
+      if (!n && !pt) {
         tip.hidden = true;
         return;
       }
       const u = UNIT[ex.metric],
         d = ex.metric === "psnr" ? 2 : 3;
-      tip.innerHTML = `<b>${esc(n.m.name)}</b><br>${dot(n.m.family)}${n.m.family} · ${n.m.proposed ? "proposed" : "comparator"} · since ${Math.floor(n.m.year)}<br>θ <span class="rg-num">${fmt(n.th, d)} ± ${fmt(1.96 * n.se, d)}</span> ${u}<br><span class="rg-num">${n.ns}</span> studies · <span class="rg-num">${n.nc}</span> conditions · <span class="rg-num">${n.dg}</span> neighbours`;
+      tip.innerHTML = n
+        ? `<b>${esc(n.m.name)}</b><br>${dot(n.m.family)}${n.m.family} · ${n.m.proposed ? "proposed" : "comparator"} · since ${Math.floor(n.m.year)}<br>θ <span class="rg-num">${fmt(n.th, d)} ± ${fmt(1.96 * n.se, d)}</span> ${u}<br><span class="rg-num">${n.ns}</span> studies · <span class="rg-num">${n.nc}</span> conditions · <span class="rg-num">${n.dg}</span> neighbours${
+            PJ.g > 0.5 ? "<br>No study of its own in Fig. 2; θ from all years" : ""
+          }`
+        : `<b>${pt[3].length ? esc(pt[3].map((i) => MET[i].name).join(", ")) : "A study"}</b><br>${dot(pt[2])}${pt[2]} · ${Math.floor(pt[0])}<br>θ <span class="rg-num">${fmt(pt[1], d)}</span> ${u} vs ${esc(MET[G.g.ref].name)} in Fig. 2`;
       tip.hidden = false;
       const tw = tip.offsetWidth,
         th = tip.offsetHeight;
@@ -521,15 +1027,30 @@
       tip.style.top = (my + 14 + th > H ? my - th - 10 : my + 14) + "px";
     });
     cv.addEventListener("pointerleave", () => {
-      ex.hover = null;
+      ex.hover = ex.study = null;
       tip.hidden = true;
       draw();
     });
     cv.addEventListener("click", (e) => {
-      const r = cv.getBoundingClientRect();
-      select(pick(e.clientX - r.left, e.clientY - r.top));
+      if (dragged) return;
+      const r = cv.getBoundingClientRect(),
+        [mx, my] = [e.clientX - r.left, e.clientY - r.top],
+        pt = pickStudy(mx, my);
+      // In the years view a study selects its (first) proposed method, a hollow
+      // mark its method.
+      select(pt ? G.byI.get(pt[3][0]) || null : pick(mx, my) || pickMark(mx, my));
     });
 
+    straightBtn.onclick = () => turnTo({ yaw: 0 });
+    $("[data-view]")
+      .querySelectorAll("button")
+      .forEach(
+        (b) =>
+          (b.onclick = () => {
+            setView(b.dataset.v);
+            turnTo({ "2d": FLAT, "3d": TILTED, years: YEARS }[b.dataset.v]);
+          })
+      );
     segWire("[data-metric]", "metric", () => {
       fillWin();
       refresh();
@@ -599,7 +1120,27 @@
       refresh(false);
       select(G.ref); // open with the reference method, U-Net, selected
     })
+    .then(() => (root.dataset.fig2 ? fetch(root.dataset.fig2) : Promise.reject(new Error("no Fig. 2"))))
+    .then((r) => {
+      if (!r.ok) throw new Error(r.status);
+      return r.json();
+    })
+    .then((f) => {
+      // Fig. 2 for the years view, with the ranges its axes span.
+      for (const k of ["psnr", "ssim"]) {
+        const { points, mean } = f[k];
+        f[k].range = [d3.min([...points.map((p) => p[1]), ...mean.lo]), d3.max([...points.map((p) => p[1]), ...mean.hi])];
+        f[k].years = [Math.floor(d3.min(points, (p) => p[0])), Math.ceil(d3.max(points, (p) => p[0]))];
+        f[k].byMethod = new Map();
+        for (const p of points) for (const i of p[3]) (f[k].byMethod.get(i) || f[k].byMethod.set(i, []).get(i)).push(p);
+      }
+      F = f;
+    })
     .catch((err) => {
+      if (D) {
+        $('[data-v="years"]')?.remove(); // no Fig. 2, no years view
+        return;
+      }
       $("[data-panel]").innerHTML = '<p class="rg-note">Could not load the graph.</p>';
       console.error("recon-graph: data failed to load", err);
     });

@@ -34,7 +34,13 @@ title: How MRI reconstruction methods compare
     <div class="rg-main">
       <div class="rg-stage" data-stage>
         <canvas aria-label="Evidence graph of reconstruction methods"></canvas>
+        <div class="rg-seg rg-view" data-view role="group" aria-label="View">
+          <button type="button" aria-pressed="true" data-v="2d">2D</button>
+          <button type="button" aria-pressed="false" data-v="3d">3D</button>
+        </div>
         <button type="button" class="rg-reset" data-reset>reset view</button>
+        <button type="button" class="rg-straighten" data-straighten hidden>straighten axes</button>
+        <p class="rg-hint" data-hint hidden>Height: difference from U-Net. Drag to turn.</p>
         <div class="rg-tip" data-tip hidden></div>
       </div>
       <div class="rg-legend" data-legend role="group" aria-label="Model families"></div>

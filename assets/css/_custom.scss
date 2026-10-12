@@ -559,10 +559,10 @@ table.recon-cell {
 .recon-graph {
   --rg-edge: #4a5568;
   --rg-surface: #f3f4f7;
-  --rg-grid: #ffffff;
+  --rg-grid: #b9bfc9;
   --rg-ink: var(--global-text-color);
   --rg-ink2: var(--global-text-color-light);
-  --rg-muted: #8a909c;
+  --rg-muted: #636a76;
   --rg-f-CNN: #dd8452;
   --rg-f-GAN: #937860;
   --rg-f-Transformer: #4c72b0;
@@ -575,8 +575,8 @@ table.recon-cell {
 html[data-theme="dark"] .recon-graph {
   --rg-edge: #c3cad6;
   --rg-surface: #1f222c;
-  --rg-grid: #2c303c;
-  --rg-muted: #868d9c;
+  --rg-grid: #4a5061;
+  --rg-muted: #a0a7b5;
   --rg-f-CNN: #e8955f;
   --rg-f-GAN: #b39880;
   --rg-f-Transformer: #6e93d6;
@@ -601,6 +601,11 @@ html[data-theme="dark"] .recon-graph {
     border-radius: 5px;
     background: transparent;
     color: var(--global-text-color);
+
+    &:disabled {
+      cursor: default;
+      opacity: 0.6;
+    }
   }
 
   input[type="search"] {
@@ -636,6 +641,11 @@ html[data-theme="dark"] .recon-graph {
       background: var(--global-theme-color);
       border-color: var(--global-theme-color);
       color: #fff;
+    }
+
+    &:disabled {
+      cursor: default;
+      opacity: 0.6;
     }
   }
 }
@@ -674,10 +684,10 @@ html[data-theme="dark"] .recon-graph {
   }
 }
 
-.rg-reset {
+.rg-reset,
+.rg-straighten {
   position: absolute;
   right: 10px;
-  top: 10px;
   font-family: inherit;
   font-size: 0.75rem;
   padding: 4px 9px;
@@ -686,6 +696,48 @@ html[data-theme="dark"] .recon-graph {
   background: var(--global-bg-color);
   color: var(--global-text-color-light);
   cursor: pointer;
+}
+
+.rg-reset {
+  top: 10px;
+}
+
+.rg-straighten {
+  bottom: 10px;
+}
+
+.rg-view {
+  position: absolute;
+  left: 10px;
+  top: 10px;
+
+  button {
+    font-size: 0.75rem;
+    padding: 4px 9px;
+    background: var(--global-bg-color);
+  }
+}
+
+// A phone gets no years view: it is too small for it.
+@media (max-width: 36rem) {
+  .rg-view button[data-v="years"] {
+    display: none;
+  }
+
+  .rg-view button[data-v="3d"] {
+    border-radius: 0 5px 5px 0;
+  }
+}
+
+.rg-hint {
+  position: absolute;
+  left: 10px;
+  bottom: 8px;
+  max-width: calc(100% - 150px);
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--global-text-color-light);
+  pointer-events: none;
 }
 
 .rg-tip {
@@ -748,6 +800,11 @@ html[data-theme="dark"] .recon-graph {
     i {
       opacity: 0.25;
     }
+  }
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.6;
   }
 }
 

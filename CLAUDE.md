@@ -118,9 +118,9 @@ when he says so.
 
 `_pages/home.md` is the evidence graph from Mertcan's UMRAM project
 (`~/Documents/umram-project2-path1`), inside the site's normal layout: title,
-a short list of how to use it (no counts, on request), then the graph —
-network layout only, drawn by
-`assets/js/recon-graph.js` with d3 from cdnjs. The reference method, U-Net, sits
+a short list of how to use it (no counts, on request), then the graph, drawn
+by `assets/js/recon-graph.js` with d3 from cdnjs on one canvas through a small
+parallel projection (no WebGL). The reference method, U-Net, sits
 in the middle of the view (`bin/graph-layout.js` pins it to the centre of the
 layout). The layout is radial: every other method sits on the circle of radius
 rk·√SE, SE being the standard error of its θ against U-Net (SE²/σ² is the
@@ -130,6 +130,31 @@ draws circles of equal SE; the square root keeps the hubs off U-Net. The page op
 Other included. A standalone page in the umram
 preview's own look was tried at /graph/ and dropped in favour of this;
 `_pages/graph-redirect.html` sends that address home.
+
+The graph has two views, switched top left. **2D** is the network from above.
+**3D** tilts it and lifts each method to its θ: height is the difference from
+U-Net, distance from U-Net's axis is still the SE. A drag that sets off
+downwards in 2D tilts into 3D, and letting go near the top view (under about
+14°) settles back into 2D; in 3D a drag turns the view, with the tilt held
+between the top and the side (full rotation was tried and rejected),
+shift-drag pans, and "straighten axes" (bottom right, shown only while the view
+is turned) brings it back square. 3D leaves out the background edges, which
+crossing at every height hid the heights; the selected method's edges stay,
+fainter for hubs, U-Net's included (asked for). Labels never overlap: each
+takes the first free spot beside its method or is left out. The SE circles and
+the θ axis use `--rg-grid` and `--rg-muted`, darkened for contrast on request.
+
+**Years**, a third view showing the paper's Fig. 2, lives on the local branch
+`years` and **must not be pushed before the paper** (Mertcan's choice,
+2026-10-12). On master its code is dormant: without the button and `data-fig2`
+in `home.md` the page never loads it. The branch adds those,
+`assets/json/mri_recon_fig2.json` and `bin/fig2-data.py`, which writes the file
+from the umram project in about ten minutes. Its points are Fig. 2's studies,
+linked to their methods so they can be hovered and clicked, each method drawn
+once at its first study: a study whose proposed methods were all in the corpus
+before it (a mask or training-data contribution on top of E2E-VarNet, say) is
+left out, a few are refitted without such methods; the trend and its numbers
+stay the paper's. To publish it, merge `years` into master.
 
 The papers/results browser (`_pages/results.md`, `assets/js/recon.js`) is
 **hidden, not deleted**: `published: false`, and its dataset and script are in
