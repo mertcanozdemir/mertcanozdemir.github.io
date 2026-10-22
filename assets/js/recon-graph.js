@@ -789,11 +789,12 @@
         .sort((a, b) => b[1].c - a[1].c)
         .slice(0, 10);
       const path = n === G.ref ? null : bfs(n, G.ref);
+      const ln = n.m.paper || n.m.reported; // its own paper, or else the study that reported it
       p.innerHTML = `
         <button type="button" class="rg-close" data-close>Back to graph</button>
         <h3>${esc(n.m.name)}</h3>
         <p class="rg-sub">${dot(n.m.family)}${n.m.family} · ${n.m.proposed ? "proposed in a study of Fig. 2" : "comparator only"} · since ${Math.floor(n.m.year)}</p>
-        ${n.m.paper ? `<p class="rg-sub">Paper: <a href="${esc(n.m.paper.url)}" target="_blank" rel="noopener">${esc(n.m.paper.title)}</a></p>` : ""}
+        ${ln ? `<p class="rg-sub">${n.m.paper ? "Paper" : "Reported in"}: <a href="${esc(ln.url)}" target="_blank" rel="noopener">${esc(ln.title)}</a></p>` : ""}
         <div class="rg-big"><strong>${fmt(n.th, d)}</strong><span>${u} vs ${esc(MET[g.ref].name)}<br>95% ± ${fmt(1.96 * n.se, d)}</span></div>
         ${
           ex.view === "years" && F && F[ex.metric].byMethod.get(n.i)
