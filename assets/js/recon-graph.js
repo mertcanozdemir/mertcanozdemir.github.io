@@ -1,4 +1,4 @@
-// Evidence graph: reconstruction methods linked by the conditions they were
+// Comparison graph: reconstruction methods linked by the conditions they were
 // measured in side by side, from assets/json/mri_recon_graph.json.
 //
 // Drawn as a network: methods measured side by side sit close together.
@@ -374,7 +374,7 @@
 
     // Circles of equal standard error around the reference, on the ground.
     // Every method sits at rk·√SE from it, so the circles read as how firmly
-    // the evidence ties a method to U-Net (bin/graph-layout.js).
+    // the comparisons tie a method to U-Net (bin/graph-layout.js).
     ctx.globalAlpha = 1 - PJ.g;
     if (G.ref && G.g.rk && G.k && PJ.g < 0.99) {
       const top = d3.max(G.nodes, (n) => n.se) || 0;

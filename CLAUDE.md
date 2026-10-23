@@ -114,9 +114,9 @@ biomedical engineer. I work on…") went too far and was reverted.
 Do not deploy after every change. Commit locally, let work accumulate, and push
 when he says so.
 
-## Home — the evidence graph (/)
+## Home — the comparison graph (/)
 
-`_pages/home.md` is the evidence graph from Mertcan's UMRAM project
+`_pages/home.md` is the comparison graph from Mertcan's UMRAM project
 (`~/Documents/umram-project2-path1`), inside the site's normal layout: title,
 a short list of how to use it (no counts, on request), then the graph, drawn
 by `assets/js/recon-graph.js` with d3 from cdnjs on one canvas through a small

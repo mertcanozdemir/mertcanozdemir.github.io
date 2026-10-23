@@ -1,11 +1,11 @@
-// Lays out the evidence graph ahead of time, so /graph/ does not spend
+// Lays out the comparison graph ahead of time, so /graph/ does not spend
 // a second or more in a force simulation before it can draw anything.
 //
 // Reads assets/json/mri_recon_graph.json and appends [x, y] to every node of
 // every window, in place. Run it again whenever that file is regenerated:
 //   node bin/graph-layout.js
 //
-// The layout is radial and reads as evidence strength. The reference method
+// The layout is radial and reads as θ's precision. The reference method
 // (U-Net) is pinned to the centre, and every other method sits on a circle of
 // radius rk·√SE, where SE is the standard error of its θ against U-Net. SE²/σ²
 // is the effective resistance between the two methods in the comparison graph

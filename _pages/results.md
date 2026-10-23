@@ -1,5 +1,5 @@
 ---
-# The papers/results browser, hidden for now while the evidence graph is the
+# The papers/results browser, hidden for now while the comparison graph is the
 # home page. To open it again, drop `published: false`, take its data and
 # script out of `exclude` in _config.yml, and give it a menu entry (nav: true).
 published: false
