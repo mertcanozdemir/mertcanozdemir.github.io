@@ -793,7 +793,7 @@
       p.innerHTML = `
         <button type="button" class="rg-close" data-close>Back to graph</button>
         <h3>${esc(n.m.name)}</h3>
-        <p class="rg-sub">${dot(n.m.family)}${n.m.family} · ${n.m.proposed ? "proposed in a study of Fig. 2" : "comparator only"} · since ${Math.floor(n.m.year)}</p>
+        <p class="rg-sub">${dot(n.m.family)}${n.m.family} · ${n.m.proposed ? `proposed in a study of Fig. 2 · since ${Math.floor(n.m.year)}` : "comparator only"}</p>
         ${
           ln
             ? `<p class="rg-sub">${n.m.paper ? "Paper" : "Reported in"}: <a href="${esc(ln.url)}" target="_blank" rel="noopener">${esc(ln.title)}</a></p>`
@@ -1024,7 +1024,7 @@
       const u = UNIT[ex.metric],
         d = ex.metric === "psnr" ? 2 : 3;
       tip.innerHTML = n
-        ? `<b>${esc(n.m.name)}</b><br>${dot(n.m.family)}${n.m.family} · ${n.m.proposed ? "proposed" : "comparator"} · since ${Math.floor(n.m.year)}<br>θ <span class="rg-num">${fmt(n.th, d)} ± ${fmt(1.96 * n.se, d)}</span> ${u}<br><span class="rg-num">${n.ns}</span> studies · <span class="rg-num">${n.nc}</span> conditions · <span class="rg-num">${n.dg}</span> neighbours${
+        ? `<b>${esc(n.m.name)}</b><br>${dot(n.m.family)}${n.m.family} · ${n.m.proposed ? `proposed · since ${Math.floor(n.m.year)}` : "comparator"}<br>θ <span class="rg-num">${fmt(n.th, d)} ± ${fmt(1.96 * n.se, d)}</span> ${u}<br><span class="rg-num">${n.ns}</span> studies · <span class="rg-num">${n.nc}</span> conditions · <span class="rg-num">${n.dg}</span> neighbours${
             PJ.g > 0.5 ? "<br>No study of its own in Fig. 2; θ from all years" : ""
           }`
         : `<b>${pt[3].length ? esc(pt[3].map((i) => MET[i].name).join(", ")) : "A study"}</b><br>${dot(pt[2])}${pt[2]} · ${Math.floor(pt[0])}<br>θ <span class="rg-num">${fmt(pt[1], d)}</span> ${u} vs ${esc(MET[G.g.ref].name)} in Fig. 2`;
