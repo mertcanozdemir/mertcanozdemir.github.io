@@ -174,18 +174,23 @@
     });
   }
 
-  // Every graph of a metric is drawn at one scale, so a circle of equal
-  // standard error is as wide in each window as in all years: the farthest
-  // method of any of them reaches the edge of the canvas, and in 3D their 98th
-  // percentile of |θ| rises to half that radius, so a few extreme methods do
-  // not flatten the rest.
+  // Every window of a metric is drawn at one scale, so a circle of equal
+  // standard error is as wide in each of them: the farthest method of any
+  // window reaches the edge of the canvas. All years is the exception and fits
+  // its own farthest method, so its circles stop where its methods do. In 3D
+  // the 98th percentile of |θ| over all the metric's graphs rises to half that
+  // radius, so heights compare everywhere and a few extreme methods do not
+  // flatten the rest.
   const scales = {};
-  function scaleOf(metric) {
-    if (!scales[metric]) {
-      const nodes = Object.values(D.networks[metric]).flatMap((g) => g.nodes);
-      scales[metric] = { se: d3.max(nodes, (n) => n[2]) || 1, q: d3.quantile(nodes, 0.98, (n) => Math.abs(n[1])) || 1 };
+  function scaleOf(metric, win) {
+    const key = `${metric} ${win === "all"}`;
+    if (!scales[key]) {
+      const nets = Object.entries(D.networks[metric]),
+        every = nets.flatMap(([, g]) => g.nodes),
+        own = nets.filter(([w]) => (w === "all") === (win === "all")).flatMap(([, g]) => g.nodes);
+      scales[key] = { se: d3.max(own, (n) => n[2]) || 1, q: d3.quantile(every, 0.98, (n) => Math.abs(n[1])) || 1 };
     }
-    return scales[metric];
+    return scales[key];
   }
 
   // Places the graph on the canvas at its metric's scale, around the reference
@@ -193,7 +198,7 @@
   function targets() {
     if (!G.forced) runForce();
     const c = G.ref || { sx: 0, sy: 0 },
-      sc = scaleOf(ex.metric);
+      sc = scaleOf(ex.metric, ex.win);
     G.R = Math.min(W, H) / 2 - 26;
     const k = G.R / (G.g.rk * Math.sqrt(sc.se));
     G.k = k;
@@ -390,10 +395,10 @@
     // Circles of equal standard error around the reference, on the ground.
     // Every method sits at rk·√SE from it, so the circles read as how firmly
     // the comparisons tie a method to U-Net (bin/graph-layout.js). They are
-    // the same in every window of a metric (scaleOf).
+    // the same in every window of a metric; all years has its own (scaleOf).
     ctx.globalAlpha = 1 - PJ.g;
     if (G.ref && G.g.rk && G.k && PJ.g < 0.99) {
-      const top = scaleOf(ex.metric).se;
+      const top = scaleOf(ex.metric, ex.win).se;
       const e10 = 10 ** Math.floor(Math.log10(top / 4)),
         f = top / 4 / e10;
       const step = (f < 1.5 ? 1 : f < 3.5 ? 2 : f < 7.5 ? 5 : 10) * e10;
