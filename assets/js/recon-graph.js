@@ -174,24 +174,34 @@
     });
   }
 
-  // Fit the graph to the canvas around the reference method, which sits in the
-  // middle of the view.
+  // Every graph of a metric is drawn at one scale, so a circle of equal
+  // standard error is as wide in each window as in all years: the farthest
+  // method of any of them reaches the edge of the canvas, and in 3D their 98th
+  // percentile of |θ| rises to half that radius, so a few extreme methods do
+  // not flatten the rest.
+  const scales = {};
+  function scaleOf(metric) {
+    if (!scales[metric]) {
+      const nodes = Object.values(D.networks[metric]).flatMap((g) => g.nodes);
+      scales[metric] = { se: d3.max(nodes, (n) => n[2]) || 1, q: d3.quantile(nodes, 0.98, (n) => Math.abs(n[1])) || 1 };
+    }
+    return scales[metric];
+  }
+
+  // Places the graph on the canvas at its metric's scale, around the reference
+  // method, which sits in the middle of the view.
   function targets() {
     if (!G.forced) runForce();
-    const c = G.ref || { sx: 0, sy: 0 };
-    const rx = d3.max(G.nodes, (n) => Math.abs(n.sx - c.sx)) || 1,
-      ry = d3.max(G.nodes, (n) => Math.abs(n.sy - c.sy)) || 1;
-    const pad = 26,
-      k = Math.min((W / 2 - pad) / rx, (H / 2 - pad) / ry);
+    const c = G.ref || { sx: 0, sy: 0 },
+      sc = scaleOf(ex.metric);
+    G.R = Math.min(W, H) / 2 - 26;
+    const k = G.R / (G.g.rk * Math.sqrt(sc.se));
     G.k = k;
     G.nodes.forEach((n) => {
       n.gx = W / 2 + (n.sx - c.sx) * k;
       n.gy = H / 2 + (n.sy - c.sy) * k;
     });
-    // In 3D the 98th percentile of |θ| rises to half the graph's radius, so a
-    // few extreme methods do not flatten the rest.
-    G.R = d3.max(G.nodes, (n) => Math.hypot(n.gx - W / 2, n.gy - H / 2)) || 1;
-    G.q = d3.quantile(G.nodes, 0.98, (n) => Math.abs(n.th)) || 1;
+    G.q = sc.q;
     G.zs = (0.5 * G.R) / G.q;
   }
 
@@ -379,10 +389,11 @@
 
     // Circles of equal standard error around the reference, on the ground.
     // Every method sits at rk·√SE from it, so the circles read as how firmly
-    // the comparisons tie a method to U-Net (bin/graph-layout.js).
+    // the comparisons tie a method to U-Net (bin/graph-layout.js). They are
+    // the same in every window of a metric (scaleOf).
     ctx.globalAlpha = 1 - PJ.g;
     if (G.ref && G.g.rk && G.k && PJ.g < 0.99) {
-      const top = d3.max(G.nodes, (n) => n.se) || 0;
+      const top = scaleOf(ex.metric).se;
       const e10 = 10 ** Math.floor(Math.log10(top / 4)),
         f = top / 4 / e10;
       const step = (f < 1.5 ? 1 : f < 3.5 ? 2 : f < 7.5 ? 5 : 10) * e10;
@@ -780,6 +791,25 @@
 
   const dot = (f) => `<span class="rg-dot" style="background:var(--rg-f-${f})"></span>`;
 
+  // The studies a method was measured in, in this graph, newest first: the
+  // first five, and the rest folded away.
+  function studyList(n) {
+    const ids = D.studies && G.g.studies && G.g.studies[n.i];
+    if (!ids) return "";
+    const li = ids
+      .map((k) => D.studies[k])
+      .sort((a, b) => b.year - a.year || a.title.localeCompare(b.title))
+      .map(
+        (s) =>
+          `<li>${s.url ? `<a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.title)}</a>` : esc(s.title)} <span class="rg-num">${s.year}</span></li>`
+      );
+    return `<h4>Measured in</h4><ul class="rg-studies">${li.slice(0, 5).join("")}</ul>${
+      li.length > 5
+        ? `<details class="rg-studies-more"><summary>${li.length - 5} more</summary><ul class="rg-studies">${li.slice(5).join("")}</ul></details>`
+        : ""
+    }`;
+  }
+
   function renderPanel() {
     const p = $("[data-panel]"),
       g = G.g,
@@ -801,7 +831,11 @@
         <p class="rg-sub">${dot(n.m.family)}${n.m.family} · ${n.m.proposed ? `proposed in a study of Fig. 2 · since ${Math.floor(n.m.year)}` : "comparator only"}</p>
         ${
           ln
-            ? `<p class="rg-sub">${n.m.paper ? "Paper" : "Reported in"}: <a href="${esc(ln.url)}" target="_blank" rel="noopener">${esc(ln.title)}</a></p>`
+            ? `<p class="rg-sub">${n.m.paper ? "Paper" : "Reported in"}: <a href="${esc(ln.url)}" target="_blank" rel="noopener">${esc(ln.title)}</a></p>${
+                D.studies && ln.study == null
+                  ? `<p class="rg-note">Not one of the studies here${n === G.ref ? "" : "; its θ comes from the studies below that measured it"}.</p>`
+                  : ""
+              }`
             : n.m.note
               ? `<p class="rg-sub">${esc(n.m.note)}</p>`
               : ""
@@ -818,6 +852,7 @@
             : ""
         }
         <dl class="rg-kv"><dt>Studies in this graph</dt><dd>${n.ns}</dd><dt>Conditions</dt><dd>${n.nc}</dd><dt>Directly compared methods</dt><dd>${n.dg}</dd></dl>
+        ${studyList(n)}
         ${
           path
             ? `<h4>Shortest link to the reference</h4><div class="rg-path">${path

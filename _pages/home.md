@@ -5,7 +5,7 @@ wide: true
 title: How MRI reconstruction methods compare
 ---
 
-<p class="rg-howto">Methods from the studies behind Fig. 2 of the paper, joined when a study measured them side by side. Distance from U-Net is not quality: the closer a method, the more firmly the comparisons tie it to U-Net (circles: ± standard error). Click one for details; the notes under the graph explain the controls.</p>
+<p class="rg-howto">Methods from the studies behind Fig. 2 of the paper, joined when a study measured them side by side. Distance from U-Net is not quality: the closer a method, the more firmly the comparisons tie it to U-Net (circles: ± standard error, the same in every window). Click one for details; the notes under the graph explain the controls.</p>
 
 <div
   class="recon-graph"
@@ -53,6 +53,7 @@ title: How MRI reconstruction methods compare
   <li><b>θ</b> is the difference from U-Net (fastMRI), in dB for PSNR or logit for SSIM, fitted only on differences within a study, so methods never compared directly still share one scale.</li>
   <li><b>A window</b> (2025 covers 2024–2026) is fitted on its studies alone and shows every method they measured, older baselines included: a 2019 method appears in 2026 when a 2026 study compared against it.</li>
   <li><b>Proposed only</b> hides the methods no study proposed. In a window it keeps only those that came out in its years.</li>
+  <li><b>Measured in</b>, on a method's card, lists the studies its θ comes from; a comparator's own paper is usually not one of them.</li>
   <li><b>Since</b> marks a proposed method's first year in these studies. Comparators get none, as their own paper can be much older than the studies that compared them.</li>
   <li><b>3D</b> lifts each method to its θ, so height is the difference from U-Net: drag down to tilt into it, drag to turn, let go near the top view to return to 2D.</li>
   <li><b>Other</b>, classical and miscellaneous methods, starts hidden; click a family under the graph to show or hide it. <b>In ≥2 studies</b> keeps the methods measured that often.</li>
