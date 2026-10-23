@@ -816,6 +816,30 @@ html[data-theme="dark"] .recon-graph {
   font-size: 0.88rem;
 }
 
+// The notes on the controls, under the graph: columns, so they take the width
+// rather than the height, each of readable length.
+.rg-guide {
+  max-width: 72rem;
+  columns: 3 19rem;
+  column-gap: 1.75rem;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--global-text-color-light);
+  font-size: 0.88rem;
+  line-height: 1.45;
+
+  li {
+    break-inside: avoid;
+    margin-bottom: 0.4rem;
+  }
+
+  b {
+    color: var(--global-text-color);
+    font-weight: 600;
+  }
+}
+
 .rg-note {
   color: var(--global-text-color-light);
   font-size: 0.78rem;
