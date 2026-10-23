@@ -35,7 +35,8 @@
     return (v < 0 && +t !== 0 ? "−" : "") + t;
   };
   const int = (v) => v.toLocaleString("en-US");
-  const winLabel = (w) => (w === "all" ? "All years, one graph" : `${w} window · ${Math.max(2018, +w - 1)}–${Math.min(2026, +w + 1)}`);
+  const winYears = (w) => [Math.max(2018, +w - 1), Math.min(2026, +w + 1)];
+  const winLabel = (w) => (w === "all" ? "All years, one graph" : `${w} window · ${winYears(w).join("–")}`);
 
   // Canvas colours come from CSS custom properties, re-read when the theme flips.
   let T = {};
@@ -76,7 +77,11 @@
     camTween = null,
     marks = []; // the years view's hollow marks as last drawn: [x, y, method]
   const rad = (n) => 1.8 + 1.5 * Math.sqrt(n.ns);
-  const vis = (n) => n === ex.sel || n === G.ref || (!ex.hidden.has(n.m.family) && n.ns >= ex.minStud && (!ex.proposedOnly || n.m.proposed));
+  // "Proposed only" keeps the methods a study proposed and, in a window, only
+  // those that came out in its years: MoDL, rerun by a 2026 study to try its
+  // sampling mask, is a method of 2019, not of the 2026 window.
+  const fresh = (m) => m.proposed && (ex.win === "all" || (m.year >= winYears(ex.win)[0] && m.year <= winYears(ex.win)[1]));
+  const vis = (n) => n === ex.sel || n === G.ref || (!ex.hidden.has(n.m.family) && n.ns >= ex.minStud && (!ex.proposedOnly || fresh(n.m)));
   const winKeys = (m) => [
     "all",
     ...Object.keys(D.networks[m])
