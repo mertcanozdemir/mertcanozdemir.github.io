@@ -808,9 +808,10 @@ html[data-theme="dark"] .recon-graph {
   }
 }
 
-// One line on how to read the graph, above it on the home page.
+// One line on how to read the graph, above it on the home page, as wide as
+// the graph and its card: .rg-explorer's 54rem + 14px + 300px.
 .rg-howto {
-  max-width: var(--measure);
+  max-width: 73.625rem;
   margin: -1rem 0 0.75rem;
   color: var(--global-text-color-light);
   font-size: 0.88rem;
