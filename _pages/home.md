@@ -5,7 +5,7 @@ wide: true
 title: How MRI reconstruction methods compare
 ---
 
-<p class="rg-authors">Mertcan Özdemir, Bilal Kabas, Emine U. Saritas, Tolga Çukur · UMRAM, Bilkent University</p>
+<p class="rg-authors">Mertcan Özdemir, Bilal Kabas, Emine U. Saritas, Tolga Çukur · <a href="https://www.icon.bilkent.edu.tr">ICON Lab</a>, UMRAM, Bilkent University</p>
 <p class="rg-howto">Methods from published studies of learning-based MRI reconstruction, joined when a study measured them side by side. Distance from U-Net is not quality: the closer a method, the more firmly the studies tie it to U-Net (circles: ± standard error). Click a method for details; the notes under the graph explain the controls.</p>
 
 <div
