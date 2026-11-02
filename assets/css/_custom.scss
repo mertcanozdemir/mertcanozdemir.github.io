@@ -816,6 +816,16 @@ html[data-theme="dark"] .recon-graph {
   font-size: 0.88rem;
 }
 
+// Who made it, between the page title and that line.
+.rg-authors {
+  margin: -1rem 0 0.35rem;
+  color: var(--global-text-color-light);
+
+  + .rg-howto {
+    margin-top: 0;
+  }
+}
+
 // The notes on the controls, under the graph: columns, so they take the width
 // rather than the height, each of readable length.
 .rg-guide {

@@ -833,7 +833,7 @@
       p.innerHTML = `
         <button type="button" class="rg-close" data-close>Back to graph</button>
         <h3>${esc(n.m.name)}</h3>
-        <p class="rg-sub">${dot(n.m.family)}${n.m.family} · ${n.m.proposed ? `proposed in a study of Fig. 2 · since ${Math.floor(n.m.year)}` : "comparator only"}</p>
+        <p class="rg-sub">${dot(n.m.family)}${n.m.family} · ${n.m.proposed ? `proposed in a study here · since ${Math.floor(n.m.year)}` : "comparator only"}</p>
         ${
           ln
             ? `<p class="rg-sub">${n.m.paper ? "Paper" : "Reported in"}: <a href="${esc(ln.url)}" target="_blank" rel="noopener">${esc(ln.title)}</a></p>${

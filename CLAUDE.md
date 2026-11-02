@@ -131,6 +131,11 @@ Other included. A standalone page in the umram
 preview's own look was tried at /graph/ and dropped in favour of this;
 `_pages/graph-redirect.html` sends that address home.
 
+Under the title of the graph and baselines pages sits the credit line, with the
+same names as the lab page (`icon-lab/mri-recon-comparison-graph`). Text a
+visitor reads never says "the paper" or "Fig. 2": nobody can look either up
+before it is out. Only the years view does, and it opens with the paper.
+
 The graph has two views, switched top left. **2D** is the network from above.
 **3D** tilts it and lifts each method to its θ: height is the difference from
 U-Net, distance from U-Net's axis is still the SE. A drag that sets off
