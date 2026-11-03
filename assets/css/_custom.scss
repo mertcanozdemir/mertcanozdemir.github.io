@@ -1174,3 +1174,15 @@ a.piece:hover .piece-title {
     align-items: stretch;
   }
 }
+
+.pieces-intro {
+  max-width: 60rem;
+  margin: 1rem auto 0;
+  color: var(--global-text-color-light);
+}
+
+@media (max-width: 40rem) {
+  .piece.is-lead {
+    margin-bottom: 0.5rem;
+  }
+}

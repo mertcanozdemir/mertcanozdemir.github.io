@@ -9,32 +9,11 @@ Draft: the home page as a list of pieces, newest first. The pictures are
 placeholders until each piece has its own live preview.
 {% endcomment %}
 
+<p class="pieces-intro">Mertcan Özdemir · MRI, ice hockey, small electronics</p>
+
 <div class="pieces">
 
-<a class="piece is-lead" href="#">
-  <svg class="piece-art" viewBox="0 0 200 100" aria-hidden="true">
-    <rect x="6" y="6" width="88" height="88" rx="4" class="art-panel" />
-    <g class="art-lines">
-      <line x1="10" x2="90" y1="14" y2="14" /><line x1="10" x2="90" y1="26" y2="26" />
-      <line x1="10" x2="90" y1="38" y2="38" /><line x1="10" x2="90" y1="46" y2="46" />
-      <line x1="10" x2="90" y1="50" y2="50" /><line x1="10" x2="90" y1="54" y2="54" />
-      <line x1="10" x2="90" y1="62" y2="62" /><line x1="10" x2="90" y1="74" y2="74" />
-      <line x1="10" x2="90" y1="86" y2="86" />
-    </g>
-    <rect x="106" y="6" width="88" height="88" rx="4" class="art-panel" />
-    <ellipse cx="150" cy="50" rx="30" ry="36" class="art-head" />
-    <ellipse cx="150" cy="30" rx="30" ry="36" class="art-ghost" />
-    <ellipse cx="150" cy="70" rx="30" ry="36" class="art-ghost" />
-  </svg>
-  <span class="piece-text">
-    <span class="piece-title">Why does an MRI take so long?</span>
-    <span class="piece-desc">Sample k-space yourself and watch the image come together, then see how
-    deep learning tries to skip most of the wait.</span>
-    <span class="piece-meta">coming soon</span>
-  </span>
-</a>
-
-<a class="piece" href="{{ '/drills/' | relative_url }}">
+<a class="piece is-lead" href="{{ '/drills/' | relative_url }}">
   <svg class="piece-art" viewBox="0 0 200 100" aria-hidden="true">
     <rect x="6" y="6" width="188" height="88" rx="28" class="art-panel" />
     <line x1="100" x2="100" y1="6" y2="94" class="art-red" />
@@ -49,6 +28,28 @@ placeholders until each piece has its own live preview.
     <span class="piece-desc">Fifty-two practice drills you can play step by step.</span>
   </span>
 </a>
+
+<div class="piece is-soon">
+  <svg class="piece-art" viewBox="0 0 200 100" aria-hidden="true">
+    <rect x="6" y="6" width="88" height="88" rx="4" class="art-panel" />
+    <g class="art-lines">
+      <line x1="10" x2="90" y1="14" y2="14" /><line x1="10" x2="90" y1="26" y2="26" />
+      <line x1="10" x2="90" y1="38" y2="38" /><line x1="10" x2="90" y1="46" y2="46" />
+      <line x1="10" x2="90" y1="50" y2="50" /><line x1="10" x2="90" y1="54" y2="54" />
+      <line x1="10" x2="90" y1="62" y2="62" /><line x1="10" x2="90" y1="74" y2="74" />
+      <line x1="10" x2="90" y1="86" y2="86" />
+    </g>
+    <rect x="106" y="6" width="88" height="88" rx="4" class="art-panel" />
+    <ellipse cx="150" cy="50" rx="26" ry="30" class="art-head" />
+    <ellipse cx="150" cy="38" rx="26" ry="30" class="art-ghost" />
+    <ellipse cx="150" cy="62" rx="26" ry="30" class="art-ghost" />
+  </svg>
+  <span class="piece-text">
+    <span class="piece-title">Why does an MRI take so long?</span>
+    <span class="piece-desc">Sample k-space yourself and watch the image come together.</span>
+    <span class="piece-meta">coming soon</span>
+  </span>
+</div>
 
 <div class="piece is-soon">
   <svg class="piece-art" viewBox="0 0 200 100" aria-hidden="true">
