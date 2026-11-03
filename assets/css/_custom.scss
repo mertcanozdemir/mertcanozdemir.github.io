@@ -1223,5 +1223,10 @@ a.piece:hover .piece-more {
     flex-direction: column;
     align-items: stretch;
     gap: 1rem;
+
+    // Stacked, a percentage basis would be taken from the piece's height.
+    .piece-art {
+      flex: none;
+    }
   }
 }
