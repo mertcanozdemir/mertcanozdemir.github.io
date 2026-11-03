@@ -13,23 +13,7 @@ placeholders until each piece has its own live preview.
 
 <div class="pieces">
 
-<a class="piece is-lead" href="{{ '/drills/' | relative_url }}">
-  <svg class="piece-art" viewBox="0 0 200 100" aria-hidden="true">
-    <rect x="6" y="6" width="188" height="88" rx="28" class="art-panel" />
-    <line x1="100" x2="100" y1="6" y2="94" class="art-red" />
-    <line x1="66" x2="66" y1="6" y2="94" class="art-blue" />
-    <line x1="134" x2="134" y1="6" y2="94" class="art-blue" />
-    <circle cx="100" cy="50" r="14" class="art-circle" />
-    <path d="M 40 70 Q 70 30 110 40" class="art-path" />
-    <circle cx="40" cy="70" r="4" class="art-player" />
-  </svg>
-  <span class="piece-text">
-    <span class="piece-title">Hockey drills, animated</span>
-    <span class="piece-desc">Fifty-two practice drills you can play step by step.</span>
-  </span>
-</a>
-
-<div class="piece is-soon">
+<div class="piece is-lead is-soon">
   <svg class="piece-art" viewBox="0 0 200 100" aria-hidden="true">
     <rect x="6" y="6" width="88" height="88" rx="4" class="art-panel" />
     <g class="art-lines">
@@ -50,6 +34,22 @@ placeholders until each piece has its own live preview.
     <span class="piece-meta">coming soon</span>
   </span>
 </div>
+
+<a class="piece" href="{{ '/drills/' | relative_url }}">
+  <svg class="piece-art" viewBox="0 0 200 100" aria-hidden="true">
+    <rect x="6" y="6" width="188" height="88" rx="28" class="art-panel" />
+    <line x1="100" x2="100" y1="6" y2="94" class="art-red" />
+    <line x1="66" x2="66" y1="6" y2="94" class="art-blue" />
+    <line x1="134" x2="134" y1="6" y2="94" class="art-blue" />
+    <circle cx="100" cy="50" r="14" class="art-circle" />
+    <path d="M 40 70 Q 70 30 110 40" class="art-path" />
+    <circle cx="40" cy="70" r="4" class="art-player" />
+  </svg>
+  <span class="piece-text">
+    <span class="piece-title">Hockey drills, animated</span>
+    <span class="piece-desc">Fifty-two practice drills you can play step by step.</span>
+  </span>
+</a>
 
 <div class="piece is-soon">
   <svg class="piece-art" viewBox="0 0 200 100" aria-hidden="true">

@@ -1186,3 +1186,8 @@ a.piece:hover .piece-title {
     margin-bottom: 0.5rem;
   }
 }
+
+// The lead piece stays at full strength even before it is out.
+.piece.is-lead.is-soon {
+  opacity: 1;
+}
