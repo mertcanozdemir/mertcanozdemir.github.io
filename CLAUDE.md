@@ -56,46 +56,30 @@ jekyll-minifier mangles `var()` inside `calc()` — `calc(var(--gutter) - 6px)`
 is served as `calc(var( -  - gutter) - 6px)`, which browsers drop. Use a plain
 value there, or compute the whole thing in a custom property.
 
-## Two traps that have already caused bugs
+## What the site is built from
 
-1. **The CV page reads `assets/json/resume.json`, not `_data/cv.yml`.**
-   `_layouts/cv.liquid` starts with `{% unless site.data.resume %}` and
-   `jekyll_get_json` loads resume.json into `site.data.resume`, so cv.yml is a
-   dead fallback. Edit resume.json.
+al-folio's layouts were removed in "Delete al-folio" (2d89e38): every page goes
+through `_layouts/base.liquid` (with `_includes/site/` for the head, the menu
+and the foot), styled by `assets/css/site.scss`, which imports `_custom.scss`.
+Older notes about al-folio's CV page (`resume.json`) and distill posts no longer
+apply. jekyll-scholar still renders `{% bibliography %}` on the about page.
 
-2. **Distill posts resolve their bibliography against `/assets/bibliography/`**
-   (see `_layouts/distill.liquid`), not `_bibliography/`. `_bibliography/papers.bib`
-   is for the publications page via jekyll-scholar; per-post `.bib` files go in
-   `assets/bibliography/`.
+What is Mertcan's:
 
-## Content that is Mertcan's, vs the theme's
-
-The repository was a lightly edited al-folio template and most demo content has
-now been removed. What is real:
-
+- `_pages/about.md` — two paragraphs, publications, teaching, links.
 - `_bibliography/papers.bib` — 10 publications including the 2025 _Diagnostics_
   paper and patent WO2023163682A1.
-- `_posts/2025-04-09-spin-echo-sequences.md` — the only real post.
-- `_projects/1_project.md` — Endotracheal Tube Cuff Pressure Monitor. **Its six
-  images were never committed**, so the figure blocks sit inside `{% comment %}`
-  with a note. Drop the images into `assets/img/` and uncomment.
-- `_pages/teaching.md` — BMM411 and BMM316, topics taken from the ABYS catalogue.
-- `assets/img/` — only `prof_pic.jpg` and `mybrain.gif` (an MRI scan of his own
-  brain, shown on the home page).
+- `assets/pdf/MertcanOzdemirCV.pdf`, linked from the about page.
+- `assets/img/` — `prof_pic.jpg` and `favicon.svg`.
+- The drills, the home pieces and the game, below.
 
-Anything that reads like "a post with images", Albert Einstein, or lorem ipsum
-is theme scaffolding and should be removed, not preserved.
+The spin-echo post, the cuff-pressure project page and the teaching page went
+with al-folio; git history has them if they are wanted back.
 
 ## Conventions
 
-- **Navigation is deliberately three tabs**: publications → cv → teaching.
-  `projects` and `blog` keep their pages but sit at `nav: false` until each has
-  more than one entry. `latest_posts` and `announcements` are off for the same
-  reason. Re-enable by flipping those flags, not by rebuilding anything.
-- `imagemagick.widths` is `[200]` because ImageMagick never upscales and the
-  largest image is 222px wide. **Raise it when larger images are added**, or the
-  srcset will reference files that are never generated — this previously broke
-  the link check.
+- **Navigation** is a menu behind the button top left: home, then about →
+  drills → play (`nav_order` 1–3).
 - Upstream workflows that publish Docker images are guarded with
   `github.repository_owner == 'alshedivat'` so they never run here. `Dockerfile`
   and `docker-compose.yml` are kept: they are how INSTALL.md runs the site locally.
@@ -125,23 +109,33 @@ when he says so.
 
 Mertcan wants the site to be a place to try popular-science pieces, not a CV:
 `about` is where people find out who he is. The home page is a list of pieces,
-newest first, each something to play with beside a few lines on where it leads.
-The markup is in `_includes/home/pieces.liquid` (prettier flattens HTML nested
-in the Markdown page), the styles under "Home page" in `assets/css/_custom.scss`.
+each something to play with beside a few lines on where it leads, and he asked
+for them to be fun — "fantastic, funny, creative" — rather than sober. The
+markup is in `_includes/home/pieces.liquid` (prettier flattens HTML nested in
+the Markdown page), the styles under "Home page" in `assets/css/_custom.scss`.
 A "coming soon" placeholder was tried and dropped: a piece goes up when it works.
 
-- **Why does an MRI take so long?** (`assets/js/kspace.js`): k-space beside the
-  image rebuilt from the measured lines alone (zero-filled inverse FFT, 128×128,
-  in the browser). It opens with every fourth line measured, so the head folds
-  over itself; moving over k-space measures the lines under the pointer and
-  every line since its last position. The image is a modified Shepp–Logan
-  phantom drawn in code; `data-image` on the piece swaps in a picture, such as a
-  real MR slice. (The old `mybrain.gif` in git history is a rotating 3D surface
-  render, not a slice, so it cannot stand in.) The piece links to the comparison
-  graph on the lab's site; the article behind it is still to be written.
+- **Why does an MRI take so long?** (`assets/js/kspace.js`): the patient is a
+  cat, drawn in code as an MR scan might show it. k-space sits beside the image
+  rebuilt from the measured lines alone (zero-filled inverse FFT, 128×128, in
+  the browser, each line density compensated, the display windowed to the
+  brightest pixel). It opens with every fourth line measured, so the cat folds
+  over itself; moving over k-space measures the lines under the pointer. After
+  84 lines the cat moves, and lines measured after that come from the moved
+  cat, so a full scan has motion ghosts: the case for scanning fast. Filling
+  only the centre brings the cat back with ghosted edges and the whiskers (the
+  finest detail) go last. `data-image` on the piece swaps in any picture, such
+  as a real MR slice; it moves the same way. (The old `mybrain.gif` in git
+  history is a rotating 3D surface render, not a slice.) A Shepp–Logan phantom
+  was tried first and was too sober. The piece links to the comparison graph on
+  the lab's site; the article behind it is still to be written.
+- **Three on three** links to the game (below); its picture is one frame of the
+  computer playing itself, a few seconds in, different on every visit.
 - **Hockey drills**: one real drill, the 2-on-1 Give and Go, loops through
   `drills.js` in preview mode (`data-preview`: no controls, plays only while on
-  screen, a still frame for reduced motion). The page loads only that drill.
+  screen, a still frame for reduced motion). In preview the players have eyes
+  instead of numbers, looking where they skate, or at the puck when they stand;
+  the drills page keeps its numbers, which the steps refer to.
 
 ### The comparison graph moved to the lab's site
 
@@ -160,6 +154,33 @@ The papers/results browser (`_pages/results.md`, `assets/js/recon.js`) is
 - `assets/json/mri_recon_data.json` is copied from the umram project's
   `rapor/site/mri_recon_data.json` and regenerated there with
   `scripts/site_verisi.py`. Never hand-edit it.
+
+## The game — /play/
+
+`assets/js/game.js`: three on three against the computer on the drills' rink
+(drills.js sets `window.rinkSVG` for it), with the same round players with eyes.
+An original game: an earlier idea was to embed King of 94, an online arena
+for the original NHL '94; it forbids framing (`X-Frame-Options: DENY`) and the
+game is EA's, so that was not done, and nothing of NHL '94 (name, look) is here.
+
+The simulation (`Game`) has no DOM in it. **Run `node bin/check-game.js` after
+touching it** (exits non-zero on problems): it plays the computer against
+itself, against a person who does nothing, and against a scripted person, and
+checks that nothing leaves the rink or turns into NaN, the puck never sits
+loose, goals come at a sensible rate, and the scripted person can score. Its
+numbers are the way to tune the balance; bugs it has caught include the net's
+mouth acting as a wall, defenders pushing a carrier along instead of reaching
+the puck, carriers parking in the slot, and an asymmetric collision that made
+one computer team three times as good as the other.
+
+How it plays: the person controls one skater (the dashed ring) and takes over
+whoever on their team gets the puck; Space shoots or pokes, X passes or
+switches. Goalies sit on an arc in front of the net and save with a chance that
+falls with shot speed, rebounds, close range and their own sideways motion;
+fast shots can also be blocked, or slip past a body. Against a person the
+computer's team is a little sharper (`sharp()`: as fast, keener pokes, better
+goalie). Three minutes, then sudden-death overtime if tied. Touch screens get a
+stick and two buttons, shown by `(pointer: coarse)` or after the first touch.
 
 ## Hockey drills — /drills/
 

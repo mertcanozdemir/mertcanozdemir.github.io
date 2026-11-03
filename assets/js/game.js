@@ -900,6 +900,8 @@
       show("Paused", "The computer is waiting. Patiently, for now.", "resume");
       hud();
     }
+    // Buttons give focus back, so Space shoots instead of pressing them again.
+    rootEl.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => b.blur()));
     button.addEventListener("click", start);
     $("[data-pause]").addEventListener("click", () => (state === "playing" ? pause() : state === "paused" ? start() : null));
     $("[data-restart]").addEventListener("click", () => {
