@@ -1,0 +1,53 @@
+{% comment %}
+  The home page body: a list of pieces, the newest first. Kept out of
+  _pages/home.md so it stays indented — prettier flattens HTML nested in the
+  Markdown page. Wrapped in one element so kramdown passes it through untouched.
+  Each piece is something to play with, then a line on where it leads.
+{% endcomment %}
+<div class="home">
+  <p class="pieces-intro">Mertcan Özdemir · MRI, ice hockey, small electronics</p>
+
+  <div class="pieces">
+    <section class="piece is-lead" aria-labelledby="piece-kspace" data-kspace>
+      <div class="piece-art kspace">
+        <figure>
+          <canvas data-k aria-label="k-space: move over it to measure more lines"></canvas>
+          <figcaption>k-space</figcaption>
+        </figure>
+        <figure>
+          <canvas data-img role="img" aria-label="The image rebuilt from the measured lines"></canvas>
+          <figcaption>image</figcaption>
+        </figure>
+      </div>
+      <div class="piece-text">
+        <h2 class="piece-title" id="piece-kspace">Why does an MRI take so long?</h2>
+        <p class="piece-desc">
+          A scanner does not take a picture. It measures k‑space, the image's frequencies, one line at a time. Here only every fourth line was
+          measured: the scan took a quarter of the time, and the head folds over itself. Move over k‑space to measure the rest.
+        </p>
+        <p class="kspace-status">
+          <span data-status aria-live="polite"></span>
+          <button type="button" data-reset>start again</button>
+        </p>
+        <a class="piece-more" href="https://icon-lab.github.io/mri-recon-comparison-graph/"
+          >How the methods that fill in the missing lines compare&nbsp;→</a
+        >
+      </div>
+    </section>
+
+    <a class="piece is-lead is-flip" href="{{ '/drills/' | relative_url }}">
+      <span class="piece-art piece-drill" data-drill="two-on-one-give-and-go" data-preview>
+        <svg viewBox="-30.6 -16.8 61.2 34.2" aria-hidden="true">
+          <g class="trails"></g>
+          <g class="events"></g>
+          <g class="actors"></g>
+        </svg>
+      </span>
+      <span class="piece-text">
+        <span class="piece-title">Hockey drills, animated</span>
+        <span class="piece-desc">Fifty-two practice drills you can play step by step.</span>
+        <span class="piece-more">See the drills&nbsp;→</span>
+      </span>
+    </a>
+  </div>
+</div>

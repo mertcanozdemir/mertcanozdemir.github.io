@@ -1056,20 +1056,30 @@ html[data-theme="dark"] .recon-graph {
   font-style: italic;
 }
 
-// Home page (draft): a list of pieces, the newest one large. The pictures are
-// placeholder SVGs drawn in the theme's colours until each piece has its own.
+// Home page: a list of pieces, each something to play with (the k-space demo,
+// a drill) beside a few lines on where it leads. Wide pieces alternate sides.
+.home {
+  max-width: 64rem;
+  margin: 0 auto;
+}
+
+.pieces-intro {
+  margin: 1rem 0 0;
+  color: var(--global-text-color-light);
+}
+
 .pieces {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 2rem 1.5rem;
-  max-width: 60rem;
-  margin: 2rem auto 0;
+  gap: 3.5rem 1.5rem;
+  margin-top: 2rem;
 }
 
 .piece {
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
+  margin: 0;
   color: inherit;
   text-decoration: none;
 
@@ -1077,18 +1087,19 @@ html[data-theme="dark"] .recon-graph {
     grid-column: 1 / -1;
     flex-direction: row;
     align-items: center;
-    gap: 1.5rem;
+    gap: 2rem;
 
     .piece-art {
-      flex: 0 0 55%;
+      flex: 0 0 56%;
     }
+
     .piece-title {
       font-size: 1.6rem;
     }
   }
 
-  &.is-soon {
-    opacity: 0.55;
+  &.is-flip {
+    flex-direction: row-reverse;
   }
 }
 
@@ -1097,8 +1108,8 @@ a.piece:hover .piece-title {
 }
 
 .piece-art {
+  display: block;
   width: 100%;
-  height: auto;
   border-radius: 6px;
   background: var(--global-card-bg-color);
 }
@@ -1106,100 +1117,111 @@ a.piece:hover .piece-title {
 .piece-text {
   display: flex;
   flex-direction: column;
-  gap: 0.3rem;
+  gap: 0.5rem;
 }
 
 .piece-title {
+  margin: 0;
   font-size: 1.15rem;
   font-weight: 600;
   line-height: 1.3;
 }
 
 .piece-desc {
+  margin: 0;
   color: var(--global-text-color-light);
 }
 
-.piece-meta {
+.piece-more {
+  color: var(--global-theme-color);
+  font-weight: 500;
+  text-decoration: none;
+}
+
+a.piece-more:hover,
+a.piece:hover .piece-more {
+  text-decoration: underline;
+}
+
+// The k-space demo (kspace.js): k-space and the image rebuilt from it.
+.kspace {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  padding: 10px;
+
+  figure {
+    margin: 0;
+  }
+
+  canvas {
+    display: block;
+    width: 100%;
+    aspect-ratio: 1;
+    border-radius: 4px;
+    background: #000;
+  }
+
+  canvas[data-k] {
+    image-rendering: pixelated;
+    cursor: crosshair;
+    touch-action: none; // a finger on k-space measures lines instead of scrolling
+  }
+
+  figcaption {
+    margin-top: 0.35rem;
+    color: var(--global-text-color-light);
+    font-size: 0.8rem;
+    text-align: center;
+  }
+}
+
+.kspace-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.8rem;
+  margin: 0;
   color: var(--global-text-color-light);
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
 
-.art-panel {
-  fill: none;
-  stroke: var(--global-divider-color);
-}
-.art-lines line {
-  stroke: var(--global-theme-color);
-  stroke-width: 1.5;
-}
-.art-head {
-  fill: none;
-  stroke: var(--global-text-color);
-  stroke-width: 1.5;
-}
-.art-ghost {
-  fill: none;
-  stroke: var(--global-text-color-light);
-  stroke-dasharray: 3 3;
-  opacity: 0.6;
-}
-.art-red {
-  stroke: #c0392b;
-}
-.art-blue {
-  stroke: var(--global-theme-color);
-}
-.art-circle {
-  fill: none;
-  stroke: var(--global-divider-color);
-}
-.art-path {
-  fill: none;
-  stroke: var(--global-text-color);
-  stroke-width: 1.5;
-  stroke-dasharray: 4 3;
-}
-.art-player {
-  fill: var(--global-theme-color);
-}
+  button {
+    padding: 0.15rem 0.6rem;
+    border: 1px solid var(--global-divider-color);
+    border-radius: 999px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
 
-@media (max-width: 40rem) {
-  .pieces {
-    grid-template-columns: 1fr;
-  }
-  .piece.is-lead {
-    flex-direction: column;
-    align-items: stretch;
+    &:hover {
+      border-color: var(--global-theme-color);
+      color: var(--global-theme-color);
+    }
   }
 }
 
-.pieces-intro {
-  max-width: 60rem;
-  margin: 1rem auto 0;
-  color: var(--global-text-color-light);
-}
-
-@media (max-width: 40rem) {
-  .piece.is-lead {
-    margin-bottom: 0.5rem;
-  }
-}
-
-// The lead piece stays at full strength even before it is out.
-.piece.is-lead.is-soon {
-  opacity: 1;
-}
-
-// The drill playing on its own in the home page's drills piece.
+// The drill playing on its own in the drills piece.
 .piece-drill {
-  display: block;
   padding: 4px;
 
   svg {
     display: block;
     width: 100%;
     height: auto;
+  }
+}
+
+@media (max-width: 40rem) {
+  .pieces {
+    grid-template-columns: 1fr;
+    gap: 3rem;
+  }
+
+  .piece.is-lead {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
   }
 }

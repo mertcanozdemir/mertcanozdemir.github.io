@@ -35,6 +35,13 @@ way, since it pins Ruby 3.2.2 and Gemfile.lock is untracked.
 `node` is available, and `node_modules/` holds prettier and js-yaml (both
 pinned in `package.json`).
 
+In a Claude Code cloud session the Docker container cannot reach rubygems.org
+through the session's proxy, but the container has Ruby 3.3:
+`bundle config set --local path vendor/bundle`, then
+`SSL_CERT_FILE=/root/.ccr/ca-bundle.crt bundle install`, then
+`LANG=C.UTF-8 LC_ALL=C.UTF-8 bundle exec jekyll serve`. Without the UTF-8 locale
+bibtex-ruby fails on the Turkish letters in `papers.bib`.
+
 ## Prettier
 
 `.github/workflows/prettier.yml` runs `npm install --save-dev --save-exact
@@ -114,52 +121,36 @@ biomedical engineer. I work on…") went too far and was reverted.
 Do not deploy after every change. Commit locally, let work accumulate, and push
 when he says so.
 
-## Home — the comparison graph (/)
+## Home (/)
 
-`_pages/home.md` is the comparison graph from Mertcan's UMRAM project
-(`~/Documents/umram-project2-path1`), inside the site's normal layout: title,
-a short list of how to use it (no counts, on request), then the graph, drawn
-by `assets/js/recon-graph.js` with d3 from cdnjs on one canvas through a small
-parallel projection (no WebGL). The reference method, U-Net, sits
-in the middle of the view (`bin/graph-layout.js` pins it to the centre of the
-layout). The layout is radial: every other method sits on the circle of radius
-rk·√SE, SE being the standard error of its θ against U-Net (SE²/σ² is the
-effective resistance between the two in the comparison graph), and the page
-draws circles of equal SE; the square root keeps the hubs off U-Net. The page opens with U-Net selected and the Other family switched off;
-"reset view" clears the selection, search and zoom and shows every family,
-Other included. A standalone page in the umram
-preview's own look was tried at /graph/ and dropped in favour of this;
-`_pages/graph-redirect.html` sends that address home.
+Mertcan wants the site to be a place to try popular-science pieces, not a CV:
+`about` is where people find out who he is. The home page is a list of pieces,
+newest first, each something to play with beside a few lines on where it leads.
+The markup is in `_includes/home/pieces.liquid` (prettier flattens HTML nested
+in the Markdown page), the styles under "Home page" in `assets/css/_custom.scss`.
+A "coming soon" placeholder was tried and dropped: a piece goes up when it works.
 
-Under the title of the graph and baselines pages sits the credit line, with the
-same names as the lab page (`icon-lab/mri-recon-comparison-graph`). Text a
-visitor reads never says "the paper" or "Fig. 2": nobody can look either up
-before it is out. Only the years view does, and it opens with the paper.
+- **Why does an MRI take so long?** (`assets/js/kspace.js`): k-space beside the
+  image rebuilt from the measured lines alone (zero-filled inverse FFT, 128×128,
+  in the browser). It opens with every fourth line measured, so the head folds
+  over itself; moving over k-space measures the lines under the pointer and
+  every line since its last position. The image is a modified Shepp–Logan
+  phantom drawn in code; `data-image` on the piece swaps in a picture, such as a
+  real MR slice. (The old `mybrain.gif` in git history is a rotating 3D surface
+  render, not a slice, so it cannot stand in.) The piece links to the comparison
+  graph on the lab's site; the article behind it is still to be written.
+- **Hockey drills**: one real drill, the 2-on-1 Give and Go, loops through
+  `drills.js` in preview mode (`data-preview`: no controls, plays only while on
+  screen, a still frame for reduced motion). The page loads only that drill.
 
-The graph has two views, switched top left. **2D** is the network from above.
-**3D** tilts it and lifts each method to its θ: height is the difference from
-U-Net, distance from U-Net's axis is still the SE. A drag that sets off
-downwards in 2D tilts into 3D, and letting go near the top view (under about
-14°) settles back into 2D; in 3D a drag turns the view, with the tilt held
-between the top and the side (full rotation was tried and rejected),
-shift-drag pans, and "straighten axes" (bottom right, shown only while the view
-is turned) brings it back square. 3D leaves out the background edges, which
-crossing at every height hid the heights; the selected method's edges stay,
-fainter for hubs, U-Net's included (asked for). Labels never overlap: each
-takes the first free spot beside its method or is left out. The SE circles and
-the θ axis use `--rg-grid` and `--rg-muted`, darkened for contrast on request.
+### The comparison graph moved to the lab's site
 
-**Years**, a third view showing the paper's Fig. 2, lives on the local branch
-`years` and **must not be pushed before the paper** (Mertcan's choice,
-2026-10-12). On master its code is dormant: without the button and `data-fig2`
-in `home.md` the page never loads it. The branch adds those,
-`assets/json/mri_recon_fig2.json` and `bin/fig2-data.py`, which writes the file
-from the umram project in about ten minutes. Its points are Fig. 2's studies,
-linked to their methods so they can be hovered and clicked, each method drawn
-once at its first study: a study whose proposed methods were all in the corpus
-before it (a mask or training-data contribution on top of E2E-VarNet, say) is
-left out, a few are refitted without such methods; the trend and its numbers
-stay the paper's. To publish it, merge `years` into master.
+It is at <https://icon-lab.github.io/mri-recon-comparison-graph/> (repository
+`icon-lab/mri-recon-comparison-graph`, which has its own README on updating it),
+and `/graph/` redirects there. Its files here — `assets/js/recon-graph.js`,
+`assets/json/mri_recon_graph.json`, `bin/graph-layout.js` and the "Comparison
+graph" styles — are no longer used. The local branch `years` (the paper's Fig. 2
+view of the graph) still **must not be pushed before the paper**.
 
 The papers/results browser (`_pages/results.md`, `assets/js/recon.js`) is
 **hidden, not deleted**: `published: false`, and its dataset and script are in
@@ -169,26 +160,6 @@ The papers/results browser (`_pages/results.md`, `assets/js/recon.js`) is
 - `assets/json/mri_recon_data.json` is copied from the umram project's
   `rapor/site/mri_recon_data.json` and regenerated there with
   `scripts/site_verisi.py`. Never hand-edit it.
-- `assets/json/mri_recon_graph.json` is written by the umram project's
-  `scripts/site_graf_verisi.py` (to `rapor/site/mri_recon_graph.json`; copy it
-  here). Its universe is the paper's Fig. 2 only: the studies of
-  `temporal_trajectory*.json` at the analysed acceleration factors (the user's
-  choice, 2026-10-07; a full-corpus view with a toggle was built and dropped),
-  so its counts need not match the paper's own network counts. Display names come from
-  `configs/site_gosterim_adlari.json` (English, hand-curated), then the paper's
-  figure names, then the name as written in the paper with LaTeX and
-  "ours/proposed" tags stripped; identities that would share a name get the
-  first author and year. `python3 scripts/site_graf_verisi.py --denetle` lists
-  names that still look wrong. After replacing the file, **run
-  `node bin/graph-layout.js`**, which appends the radial layout ([x, y] per
-  node and `rk` per network); the force simulation takes over a second in the
-  browser. A method's `year` is the first year it appears in the corpus, which
-  the page shows as "in the literature since".
-- θ is fitted to within-cell differences only, so the graph respects the rule
-  that reported values are only comparable within a cell (one paper, one
-  protocol). The plan: publish the graph now, and release the extracted data and
-  analysis code with the paper (on acceptance, or just before submission). The
-  page says so; nothing else from the paper goes on the site before then.
 
 ## Hockey drills — /drills/
 
