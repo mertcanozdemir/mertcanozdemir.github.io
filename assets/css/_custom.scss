@@ -1191,3 +1191,15 @@ a.piece:hover .piece-title {
 .piece.is-lead.is-soon {
   opacity: 1;
 }
+
+// The drill playing on its own in the home page's drills piece.
+.piece-drill {
+  display: block;
+  padding: 4px;
+
+  svg {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+}

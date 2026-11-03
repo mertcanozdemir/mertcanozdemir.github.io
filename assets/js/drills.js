@@ -330,6 +330,13 @@
 
     let raf = null,
       t = 0;
+    // A preview (the home page) has no controls: it loops on its own, only
+    // while on screen, and holds a still frame for reduced motion.
+    if (card.hasAttribute("data-preview")) {
+      preview(card, drill, frame);
+      return;
+    }
+
     const stop = () => {
       cancelAnimationFrame(raf);
       raf = null;
@@ -378,6 +385,29 @@
     );
 
     frame(0);
+  }
+
+  function preview(card, drill, frame) {
+    const still = 0.6;
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) return frame(still);
+    const hold = 1.2; // seconds on the last frame before starting over
+    const cycle = drill.duration + hold;
+    let raf = null,
+      start = null;
+    function loop(now) {
+      if (start === null) start = now;
+      const s = ((now - start) / 1000) % cycle;
+      frame(Math.min(s / drill.duration, 1));
+      raf = requestAnimationFrame(loop);
+    }
+    frame(0);
+    new IntersectionObserver(([e]) => {
+      if (e.isIntersecting && !raf) raf = requestAnimationFrame(loop);
+      if (!e.isIntersecting && raf) {
+        cancelAnimationFrame(raf);
+        raf = null;
+      }
+    }).observe(card);
   }
 
   document.addEventListener("DOMContentLoaded", () => {
