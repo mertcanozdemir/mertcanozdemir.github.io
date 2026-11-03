@@ -1,0 +1,44 @@
+{% comment %}
+  The game page body (assets/js/game.js): the scoreboard, the rink, and on
+  touch screens a stick and two buttons. Kept out of _pages/play.md so it
+  stays indented — prettier flattens HTML nested in the Markdown page.
+{% endcomment %}
+<div class="game" data-game>
+  <div class="game-hud">
+    <p class="game-score">
+      <span class="game-team is-a">you</span> <b data-score-a>0</b> <span aria-hidden="true">–</span> <b data-score-b>0</b>
+      <span class="game-team is-b">computer</span>
+    </p>
+    <p class="game-clock" data-clock>3:00</p>
+    <p class="game-buttons">
+      <button type="button" data-pause>pause</button>
+      <button type="button" data-restart>start again</button>
+    </p>
+  </div>
+
+  <div class="game-stage">
+    <svg viewBox="-30.6 -16.8 61.2 34.2" role="img" aria-label="The rink, seen from above" tabindex="-1"></svg>
+    <p class="game-toast" data-toast hidden></p>
+    <div class="game-overlay" data-overlay hidden>
+      <h2 data-overlay-title></h2>
+      <p data-overlay-text></p>
+      <button type="button" data-overlay-button></button>
+    </div>
+  </div>
+
+  <p class="game-rotate">Turn your phone sideways for a bigger rink.</p>
+
+  <div class="game-touch">
+    <div class="game-stick" data-stick aria-label="Skate"><span data-knob></span></div>
+    <div class="game-pads">
+      <button type="button" class="game-pass" data-pass>pass</button>
+      <button type="button" class="game-shoot" data-shoot>shoot</button>
+    </div>
+  </div>
+
+  <p class="game-keys">
+    <kbd>←</kbd><kbd>↑</kbd><kbd>↓</kbd><kbd>→</kbd> or <kbd>WASD</kbd> to skate · <kbd>Space</kbd> to shoot, or to poke the puck loose ·
+    <kbd>X</kbd> to pass, or to switch skater · <kbd>P</kbd> to pause
+  </p>
+  <p class="game-live" data-live aria-live="polite"></p>
+</div>

@@ -11,3 +11,4 @@ wide: true
 </script>
 <script src="{{ '/assets/js/drills.js' | relative_url }}"></script>
 <script src="{{ '/assets/js/kspace.js' | relative_url }}"></script>
+<script src="{{ '/assets/js/game.js' | relative_url }}"></script>

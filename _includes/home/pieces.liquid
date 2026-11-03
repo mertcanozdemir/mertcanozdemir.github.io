@@ -15,15 +15,16 @@
           <figcaption>k-space</figcaption>
         </figure>
         <figure>
-          <canvas data-img role="img" aria-label="The image rebuilt from the measured lines"></canvas>
-          <figcaption>image</figcaption>
+          <canvas data-img role="img" aria-label="The cat, rebuilt from the measured lines"></canvas>
+          <figcaption>the cat</figcaption>
         </figure>
       </div>
       <div class="piece-text">
         <h2 class="piece-title" id="piece-kspace">Why does an MRI take so long?</h2>
         <p class="piece-desc">
-          A scanner does not take a picture. It measures k‑space, the image's frequencies, one line at a time. Here only every fourth line was
-          measured: the scan took a quarter of the time, and the head folds over itself. Move over k‑space to measure the rest.
+          A scanner does not take a picture: it measures k‑space, the image's frequencies, one line at a time. Today's patient is a cat. We measured
+          only every fourth line, so the scan was quick, and the cat folds over itself. Move over k‑space to measure the rest, but be quick: cats do
+          not wait.
         </p>
         <p class="kspace-status">
           <span data-status aria-live="polite"></span>
@@ -35,7 +36,18 @@
       </div>
     </section>
 
-    <a class="piece is-lead is-flip" href="{{ '/drills/' | relative_url }}">
+    <a class="piece is-lead is-flip" href="{{ '/play/' | relative_url }}">
+      <span class="piece-art piece-drill" data-game="still">
+        <svg viewBox="-30.6 -16.8 61.2 34.2" aria-hidden="true"></svg>
+      </span>
+      <span class="piece-text">
+        <span class="piece-title">Three on three</span>
+        <span class="piece-desc">A small hockey game against the computer, which has been practising.</span>
+        <span class="piece-more">Play&nbsp;→</span>
+      </span>
+    </a>
+
+    <a class="piece is-lead" href="{{ '/drills/' | relative_url }}">
       <span class="piece-art piece-drill" data-drill="two-on-one-give-and-go" data-preview>
         <svg viewBox="-30.6 -16.8 61.2 34.2" aria-hidden="true">
           <g class="trails"></g>
@@ -45,7 +57,7 @@
       </span>
       <span class="piece-text">
         <span class="piece-title">Hockey drills, animated</span>
-        <span class="piece-desc">Fifty-two practice drills you can play step by step.</span>
+        <span class="piece-desc">Fifty-two practice drills, skated by small round players who never get tired.</span>
         <span class="piece-more">See the drills&nbsp;→</span>
       </span>
     </a>

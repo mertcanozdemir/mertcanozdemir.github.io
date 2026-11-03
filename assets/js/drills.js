@@ -70,6 +70,8 @@
     });
     return p.join("");
   }
+  // The game (game.js) plays on the same rink.
+  window.rinkSVG = rinkSVG;
 
   // A point on the Catmull-Rom curve through k, between k[i] and k[i + 1].
   function curvePoint(k, i, u) {
@@ -283,15 +285,40 @@
     );
     const puckEls = [...gA.querySelectorAll("[data-puck]")];
 
+    // A preview (the home page) gives its players faces instead of labels: two
+    // eyes that look where the player is going, or at the puck when it stands.
+    const faces = card.hasAttribute("data-preview");
+    const face = `<circle cx="-0.48" cy="-0.1" r="0.48" fill="#fff"/><circle cx="0.48" cy="-0.1" r="0.48" fill="#fff"/>
+      <circle data-pupil cx="-0.48" cy="-0.1" r="0.23" fill="#111"/><circle data-pupil cx="0.48" cy="-0.1" r="0.23" fill="#111"/>`;
     drill.actors.forEach((a) =>
       gA.insertAdjacentHTML(
         "beforeend",
         `<g data-actor="${a.id}">
           <circle r="1.25" fill="var(--rink-team-${a.team})" stroke="var(--rink-puck)" stroke-width="0"/>
-          <text y="0.42" text-anchor="middle" font-size="1.1" fill="#fff"
-            font-weight="600">${a.label}</text></g>`
+          ${
+            faces
+              ? face
+              : `<text y="0.42" text-anchor="middle" font-size="1.1" fill="#fff"
+            font-weight="600">${a.label}</text>`
+          }</g>`
       )
     );
+
+    function look(a, t, pucks) {
+      const [x, y] = along(a, t),
+        [x1, y1] = along(a, Math.min(1, t + 0.03)),
+        [x0, y0] = along(a, Math.max(0, t - 0.03));
+      let dx = x1 - x0,
+        dy = y1 - y0;
+      if (Math.hypot(dx, dy) < 0.2 && pucks.length) {
+        [dx, dy] = [pucks[0].pos[0] - x, pucks[0].pos[1] - y];
+      }
+      const d = Math.hypot(dx, dy) || 1;
+      gA.querySelectorAll(`[data-actor="${a.id}"] [data-pupil]`).forEach((p, i) => {
+        p.setAttribute("cx", (i ? 0.48 : -0.48) + (0.22 * dx) / d);
+        p.setAttribute("cy", -0.1 + (0.22 * dy) / d);
+      });
+    }
 
     function frame(t) {
       drill.actors.forEach((a) => {
@@ -319,6 +346,7 @@
       drill.actors.forEach((a) =>
         gA.querySelector(`[data-actor="${a.id}"] circle`).setAttribute("stroke-width", pucks.some((p) => p.carrier === a) ? "0.35" : "0")
       );
+      if (faces) drill.actors.forEach((a) => look(a, t, pucks));
 
       // The current step is the last one that has started.
       let current = -1;
