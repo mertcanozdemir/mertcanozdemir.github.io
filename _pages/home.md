@@ -2,63 +2,63 @@
 layout: base
 permalink: /
 wide: true
-title: How MRI reconstruction methods compare
 ---
 
-<p class="rg-authors">Mertcan Özdemir, Bilal Kabas, Emine U. Saritas, Tolga Çukur · <a href="https://www.icon.bilkent.edu.tr">ICON Lab</a>, UMRAM, Bilkent University</p>
-<p class="rg-howto">Methods from published studies of learning-based MRI reconstruction, joined when a study measured them side by side. Distance from U-Net is not quality: the closer a method, the more firmly the studies tie it to U-Net (circles: ± standard error). Click a method for details; the notes under the graph explain the controls.</p>
+{% comment %}
+Draft: the home page as a list of pieces, newest first. The pictures are
+placeholders until each piece has its own live preview.
+{% endcomment %}
 
-<div
-  class="recon-graph"
-  data-graph
-  data-src="{{ '/assets/json/mri_recon_graph.json' | relative_url }}?v={{ site.time | date: '%s' }}"
->
-  <div class="rg-controls">
-    <div class="rg-seg" data-metric role="group" aria-label="Metric">
-      <button type="button" aria-pressed="true" data-v="psnr">PSNR</button>
-      <button type="button" aria-pressed="false" data-v="ssim">SSIM</button>
-    </div>
-    <select data-win aria-label="Publication window"></select>
-    <div class="rg-seg" role="group" aria-label="Methods shown">
-      <button type="button" aria-pressed="false" data-proposed>Proposed only</button>
-    </div>
-    <select data-min aria-label="Minimum number of studies">
-      <option value="1">all methods</option>
-      <option value="2">in ≥2 studies</option>
-      <option value="3">in ≥3 studies</option>
-      <option value="5">in ≥5 studies</option>
-    </select>
-    <input type="search" data-find list="rg-names" placeholder="find a method" aria-label="Find a method" />
-    <datalist id="rg-names"></datalist>
-  </div>
-  <div class="rg-explorer">
-    <div class="rg-main">
-      <div class="rg-stage" data-stage>
-        <canvas aria-label="Comparison graph of reconstruction methods"></canvas>
-        <div class="rg-seg rg-view" data-view role="group" aria-label="View">
-          <button type="button" aria-pressed="true" data-v="2d">2D</button>
-          <button type="button" aria-pressed="false" data-v="3d">3D</button>
-        </div>
-        <button type="button" class="rg-reset" data-reset>reset view</button>
-        <button type="button" class="rg-straighten" data-straighten hidden>straighten axes</button>
-        <p class="rg-hint" data-hint hidden>Height: difference from U-Net. Drag to turn.</p>
-        <div class="rg-tip" data-tip hidden></div>
-      </div>
-      <div class="rg-legend" data-legend role="group" aria-label="Model families"></div>
-    </div>
-    <aside class="rg-panel" data-panel aria-live="polite"></aside>
-  </div>
+<div class="pieces">
+
+<a class="piece is-lead" href="#">
+  <svg class="piece-art" viewBox="0 0 200 100" aria-hidden="true">
+    <rect x="6" y="6" width="88" height="88" rx="4" class="art-panel" />
+    <g class="art-lines">
+      <line x1="10" x2="90" y1="14" y2="14" /><line x1="10" x2="90" y1="26" y2="26" />
+      <line x1="10" x2="90" y1="38" y2="38" /><line x1="10" x2="90" y1="46" y2="46" />
+      <line x1="10" x2="90" y1="50" y2="50" /><line x1="10" x2="90" y1="54" y2="54" />
+      <line x1="10" x2="90" y1="62" y2="62" /><line x1="10" x2="90" y1="74" y2="74" />
+      <line x1="10" x2="90" y1="86" y2="86" />
+    </g>
+    <rect x="106" y="6" width="88" height="88" rx="4" class="art-panel" />
+    <ellipse cx="150" cy="50" rx="30" ry="36" class="art-head" />
+    <ellipse cx="150" cy="30" rx="30" ry="36" class="art-ghost" />
+    <ellipse cx="150" cy="70" rx="30" ry="36" class="art-ghost" />
+  </svg>
+  <span class="piece-text">
+    <span class="piece-title">Why does an MRI take so long?</span>
+    <span class="piece-desc">Sample k-space yourself and watch the image come together, then see how
+    deep learning tries to skip most of the wait.</span>
+    <span class="piece-meta">coming soon</span>
+  </span>
+</a>
+
+<a class="piece" href="{{ '/drills/' | relative_url }}">
+  <svg class="piece-art" viewBox="0 0 200 100" aria-hidden="true">
+    <rect x="6" y="6" width="188" height="88" rx="28" class="art-panel" />
+    <line x1="100" x2="100" y1="6" y2="94" class="art-red" />
+    <line x1="66" x2="66" y1="6" y2="94" class="art-blue" />
+    <line x1="134" x2="134" y1="6" y2="94" class="art-blue" />
+    <circle cx="100" cy="50" r="14" class="art-circle" />
+    <path d="M 40 70 Q 70 30 110 40" class="art-path" />
+    <circle cx="40" cy="70" r="4" class="art-player" />
+  </svg>
+  <span class="piece-text">
+    <span class="piece-title">Hockey drills, animated</span>
+    <span class="piece-desc">Fifty-two practice drills you can play step by step.</span>
+  </span>
+</a>
+
+<div class="piece is-soon">
+  <svg class="piece-art" viewBox="0 0 200 100" aria-hidden="true">
+    <rect x="6" y="6" width="188" height="88" rx="4" class="art-panel" />
+    <path d="M 14 50 h 30 l 6 -24 l 10 48 l 10 -48 l 10 48 l 6 -24 h 100" class="art-path" />
+  </svg>
+  <span class="piece-text">
+    <span class="piece-title">Why is an MRI so loud?</span>
+    <span class="piece-meta">coming soon</span>
+  </span>
 </div>
 
-<ul class="rg-guide">
-  <li><b>θ</b> is the difference from U-Net (fastMRI), in dB for PSNR or logit for SSIM, fitted only on differences within a study, so methods never compared directly still share one scale.</li>
-  <li><b>A window</b> (2025 covers 2024–2026) is fitted on its studies alone and shows every method they measured, older baselines included: a 2019 method appears in 2026 when a 2026 study compared against it. The circles stay the same from one window to the next.</li>
-  <li><b>Proposed only</b> hides the methods no study proposed. In a window it keeps only those that came out in its years.</li>
-  <li><b>Measured in</b>, on a method's card, lists the studies its θ comes from; a comparator's own paper is usually not one of them.</li>
-  <li><b>Since</b> marks a proposed method's first year in these studies. Comparators get none, as their own paper can be much older than the studies that compared them.</li>
-  <li><b>3D</b> lifts each method to its θ, so height is the difference from U-Net: drag down to tilt into it, drag to turn, let go near the top view to return to 2D.</li>
-  <li><b>Other</b>, classical and miscellaneous methods, starts hidden; click a family under the graph to show or hide it. <b>In ≥2 studies</b> keeps the methods measured that often.</li>
-</ul>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
-<script src="{{ '/assets/js/recon-graph.js' | relative_url }}?v={{ site.time | date: '%s' }}"></script>
+</div>
