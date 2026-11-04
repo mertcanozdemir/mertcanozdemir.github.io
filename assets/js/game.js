@@ -1678,8 +1678,6 @@
     }
   }
 
-  // The home page's piece: the computer against itself, a few seconds in,
-  // drawn once.
   // The view the visitor last chose, tilted unless they chose the one from above.
   const chosenView = () => {
     try {
@@ -1689,10 +1687,12 @@
     }
   };
 
+  // The home page's piece: the computer against itself, a few seconds in,
+  // drawn once, from above whatever view the game was last played in.
   function still(rootEl) {
     const game = new Game({ human: false });
     for (let t = 0; t < 7; t += STEP) game.step(STEP);
-    draw(rootEl.querySelector("svg"), game, { view: chosenView() });
+    draw(rootEl.querySelector("svg"), game, { view: "top" });
   }
 
   function play(rootEl) {

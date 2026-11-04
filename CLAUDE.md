@@ -130,7 +130,8 @@ A "coming soon" placeholder was tried and dropped: a piece goes up when it works
   was tried first and was too sober. The piece links to the comparison graph on
   the lab's site; the article behind it is still to be written.
 - **Three on three** links to the game (below); its picture is one frame of the
-  computer playing itself, a few seconds in, different on every visit.
+  computer playing itself, a few seconds in, different on every visit, always
+  drawn from above (Mertcan asked), whatever view the game was last played in.
 - **Hockey drills**: one real drill, the 2-on-1 Give and Go, loops through
   `drills.js` in preview mode (`data-preview`: no controls, plays only while on
   screen, a still frame for reduced motion). Its players are the same numbered
@@ -229,8 +230,7 @@ as "izometrik": high in the stands at centre ice, looking across through a
 long lens, so drawn without perspective (`YAW` 0, `SQUASH`, `RISE`, the `TILT`
 matrix). It frames `VIEW` metres of the rink (44) and pans after the puck, and a map
 of the whole rink sits in the top right corner (players, the puck, the stretch
-the camera shows). The home page's still shows the whole rink instead
-(`follow` off). The ice and what lies on it (markings, marks, the ring round
+the camera shows). The ice and what lies on it (markings, marks, the ring round
 your skater) are one plane drawn through the matrix; on it stand boards with a
 far face and a see-through near face, nets with mesh and a red frame, and
 players standing up (`TALL`, 0.95: at 1.15 with a 38 m frame Mertcan found
