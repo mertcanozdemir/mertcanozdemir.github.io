@@ -1,0 +1,503 @@
+// The Kamboni's cab: driving the ice resurfacer from its seat, between periods
+// of the hockey game (game.js starts it). In 3D, with WebGL: the ice is the
+// game's own rink drawing, frosted and scratched up, turning to wet ice where
+// the Kamboni has been; round it the boards, the glass and the stands. Over
+// that the cab: its frame, a mirror looking back at the clean band, the
+// dashboard (the wheel, a gauge for how clean the ice is, an arrow to the
+// dirtiest ice and a cat that nods along) and a map of the rink.
+//
+// Rink coordinates as in the game, in metres: x along the rink, y across it
+// (+y the near side), h up. WebGL's X, Y and Z are x, h and y.
+(function (root) {
+  const PX = 32, // ice texture pixels a metre, over 64 × 32 m
+    TW = 64 * PX,
+    TH = 32 * PX;
+  const EYE = { up: 2.5, ahead: 1, left: 0.45, pitch: -0.23 }; // the driver's, from the Kamboni's middle
+  const ARENA = [0.11, 0.125, 0.15]; // the dark of the arena, and its haze
+
+  // ——— Matrices: column-major 4 × 4, as WebGL takes them ———
+  function perspective(fovy, aspect, near, far) {
+    const f = 1 / Math.tan(fovy / 2),
+      nf = 1 / (near - far);
+    return [f / aspect, 0, 0, 0, 0, f, 0, 0, 0, 0, (far + near) * nf, -1, 0, 0, 2 * far * near * nf, 0];
+  }
+  function lookAt(e, c, u) {
+    let zx = e[0] - c[0],
+      zy = e[1] - c[1],
+      zz = e[2] - c[2],
+      l = Math.hypot(zx, zy, zz);
+    [zx, zy, zz] = [zx / l, zy / l, zz / l];
+    let xx = u[1] * zz - u[2] * zy,
+      xy = u[2] * zx - u[0] * zz,
+      xz = u[0] * zy - u[1] * zx;
+    l = Math.hypot(xx, xy, xz);
+    [xx, xy, xz] = [xx / l, xy / l, xz / l];
+    const yx = zy * xz - zz * xy,
+      yy = zz * xx - zx * xz,
+      yz = zx * xy - zy * xx;
+    const dot = (a, b, c) => a * e[0] + b * e[1] + c * e[2];
+    return [xx, yx, zx, 0, xy, yy, zy, 0, xz, yz, zz, 0, -dot(xx, xy, xz), -dot(yx, yy, yz), -dot(zx, zy, zz), 1];
+  }
+  function mul(a, b) {
+    const o = new Array(16);
+    for (let i = 0; i < 4; i++)
+      for (let j = 0; j < 4; j++) {
+        let s = 0;
+        for (let k = 0; k < 4; k++) s += a[k * 4 + j] * b[i * 4 + k];
+        o[i * 4 + j] = s;
+      }
+    return o;
+  }
+
+  const VERT = `attribute vec3 p; attribute vec2 t; attribute vec4 c;
+uniform mat4 m; uniform float flip; varying vec2 vt; varying vec4 vc; varying float vd;
+void main() { vec4 q = m * vec4(p, 1.0); q.x *= flip; gl_Position = q; vt = t; vc = c; vd = q.w; }`;
+  const FRAG = `precision mediump float;
+uniform sampler2D tex; uniform float textured; uniform vec3 haze;
+varying vec2 vt; varying vec4 vc; varying float vd;
+void main() {
+  vec4 col = vc;
+  if (textured > 0.5) col *= texture2D(tex, vt);
+  gl_FragColor = vec4(mix(col.rgb, haze, clamp((vd - 25.0) / 110.0, 0.0, 0.5)), col.a);
+}`;
+
+  // Any CSS colour as [r, g, b, a], each 0 to 1.
+  const probe = document.createElement("canvas").getContext("2d");
+  function rgba(css) {
+    probe.fillStyle = "#000";
+    probe.fillStyle = css;
+    const v = probe.fillStyle;
+    if (v[0] === "#") return [1, 3, 5].map((i) => parseInt(v.slice(i, i + 2), 16) / 255).concat(1);
+    const n = v.match(/[\d.]+/g).map(Number);
+    return [n[0] / 255, n[1] / 255, n[2] / 255, n.length > 3 ? n[3] : 1];
+  }
+  const cssVar = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+  // An SVG drawing in rink metres, onto a 64 × 32 m canvas; the page's CSS
+  // variables are put in, since an image cannot see them.
+  function rasterize(markup, canvas, done) {
+    const text = markup.replace(/var\((--[\w-]+)\)/g, (m, name) => cssVar(name) || "#888");
+    const img = new Image();
+    img.onload = () => {
+      const ctx = ctx2d(canvas);
+      ctx.clearRect(0, 0, TW, TH);
+      ctx.drawImage(img, 0, 0, TW, TH);
+      done(true);
+    };
+    img.onerror = () => done(false);
+    img.src =
+      "data:image/svg+xml;charset=utf-8," +
+      encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="${TW}" height="${TH}" viewBox="-32 -16 64 32">${text}</svg>`);
+  }
+  const canvas2d = (w, h) => Object.assign(document.createElement("canvas"), { width: w, height: h });
+  // A 2D context that is read back often (for WebGL), so kept off the GPU.
+  const ctx2d = (c) => c.getContext("2d", { willReadFrequently: true });
+
+  // The boards' white face, 20 m of it: an advert for the Kamboni now and then.
+  function boardsTexture() {
+    const c = canvas2d(1024, 64),
+      g = c.getContext("2d");
+    g.fillStyle = "#f6f8fa";
+    g.fillRect(0, 0, 1024, 64);
+    g.fillStyle = cssVar("--rink-team-a") || "#1f6fd0";
+    g.fillRect(0, 2, 1024, 4);
+    g.font = "bold 36px system-ui, sans-serif";
+    g.textAlign = "center";
+    g.textBaseline = "middle";
+    g.fillText("KAMBONI", 512, 36);
+    return c;
+  }
+  // The stands: 10 × 5 m of them, rows of seats 0.83 m apart, about half of
+  // the seats taken (it is the intermission).
+  function crowdTexture() {
+    const c = canvas2d(512, 256),
+      g = c.getContext("2d");
+    let seed = 7;
+    const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    const shirts = [cssVar("--rink-team-a"), cssVar("--rink-team-b"), "#e9edf1", "#59626c", "#b3261e", "#2b2f36", cssVar("--rink-team-a")];
+    const skins = ["#f1c8a6", "#e8b896", "#e2ad86"];
+    for (let row = 0; row < 6; row++) {
+      const y0 = Math.round((row * 256) / 6),
+        y1 = Math.round(((row + 1) * 256) / 6);
+      g.fillStyle = row % 2 ? "#2e333a" : "#353b43";
+      g.fillRect(0, y0, 512, y1 - y0);
+      g.fillStyle = "#454c55";
+      g.fillRect(0, y1 - 13, 512, 5); // the seats' backs
+      for (let x = 12; x < 512; x += 25.6) {
+        if (rnd() > 0.5) continue;
+        const px = x + (rnd() - 0.5) * 4;
+        g.fillStyle = shirts[Math.floor(rnd() * shirts.length)];
+        g.beginPath();
+        g.roundRect(px - 7, y1 - 26, 14, 18, 5);
+        g.fill();
+        g.fillStyle = skins[Math.floor(rnd() * skins.length)];
+        g.beginPath();
+        g.arc(px, y1 - 31, 5.5, 0, 2 * Math.PI);
+        g.fill();
+      }
+    }
+    return c;
+  }
+  // Two triangles a quad, nine numbers a corner: x, h, y, u, v, r, g, b, a.
+  function quads() {
+    const v = [];
+    return {
+      v,
+      add(a, b, c, d, col, uv = [-1, -1, -1, -1]) {
+        const [u0, v0, u1, v1] = uv,
+          t = [
+            [u0, v0],
+            [u1, v0],
+            [u1, v1],
+            [u0, v1],
+          ],
+          p = [a, b, c, d];
+        for (const i of [0, 1, 2, 0, 2, 3]) v.push(p[i][0], p[i][1], p[i][2], t[i][0], t[i][1], ...col);
+      },
+    };
+  }
+
+  const FRAME_SVG = `<path d="M 0 0 H 100 V 3.2 H 0 Z M 0 0 H 7 L 2.6 50 H 0 Z M 100 0 H 93 L 97.4 50 H 100 Z" fill="#14171b"/>
+    <rect x="49.4" y="2.6" width="1.2" height="1.8" fill="#14171b"/>
+    <rect x="40" y="4" width="20" height="8" rx="1" fill="none" stroke="#14171b" stroke-width="5" vector-effect="non-scaling-stroke"/>`;
+  const DASH_SVG = `<path d="M -300 60 V 21 Q 200 3 700 21 V 60 Z" fill="#1b1f25"/>
+    <path d="M -300 21 Q 200 3 700 21" fill="none" stroke="#3b424b" stroke-width="1.2"/>
+    <g transform="translate(118 52)"><g data-wheel>
+      <circle r="34" fill="none" stroke="#2b3036" stroke-width="7"/>
+      <circle r="37.2" fill="none" stroke="#434a53" stroke-width="0.8"/>
+      <path d="M -31 4 L -8 1 M 31 4 L 8 1 M 0 8 V 30" stroke="#2b3036" stroke-width="5" stroke-linecap="round"/>
+      <circle r="9" fill="#2b3036"/><text y="2.6" font-size="7.5" font-weight="700" text-anchor="middle" fill="#8b949e">K</text>
+      <ellipse cx="-29" cy="-17" rx="6" ry="8" transform="rotate(-30 -29 -17)" fill="var(--rink-team-a)"/>
+      <ellipse cx="29" cy="-17" rx="6" ry="8" transform="rotate(30 29 -17)" fill="var(--rink-team-a)"/></g></g>
+    <g transform="translate(205 31)">
+      <circle r="9.5" fill="#0f1215" stroke="#3b424b" stroke-width="0.8"/>
+      <path data-arrow d="M 0 -7 L 4.2 3 L 0 1 L -4.2 3 Z" fill="#ffd54a"/>
+      <text y="15.5" font-size="3.6" text-anchor="middle" fill="#8b949e">to dirty ice</text></g>
+    <g transform="translate(282 33)">
+      <circle r="13.5" fill="#0f1215" stroke="#3b424b" stroke-width="0.8"/>
+      <path data-goal fill="none" stroke="#34c759" stroke-width="2.2"/>
+      <line data-needle y2="-10.5" stroke="#ff6b4a" stroke-width="1.4" stroke-linecap="round"/>
+      <circle r="1.6" fill="#3b424b"/>
+      <text y="-4.2" font-size="3.4" text-anchor="middle" fill="#8b949e">ICE</text>
+      <text data-ice y="8.5" font-size="4.6" font-weight="700" text-anchor="middle" fill="#e6ebf0">0%</text></g>
+    <g transform="translate(345 26)">
+      <rect x="-5" y="-1" width="10" height="9" rx="2" fill="#4a525c"/>
+      <g data-cat><path d="M 0 -2 V -4" stroke="#8b949e" stroke-width="1"/>
+        <path d="M -6.4 -11 L -5.4 -19 L -1.4 -14.6 Z M 6.4 -11 L 5.4 -19 L 1.4 -14.6 Z" fill="#a9b1ba"/>
+        <circle cy="-10" r="7" fill="#a9b1ba"/>
+        <circle cx="-2.6" cy="-11" r="1.2" fill="#1b1f25"/><circle cx="2.6" cy="-11" r="1.2" fill="#1b1f25"/>
+        <path d="M -0.9 -8.6 H 0.9 L 0 -7.7 Z" fill="#e8919a"/>
+        <path d="M -2 -8 L -7.5 -9 M -2 -7.4 L -7.5 -6.8 M 2 -8 L 7.5 -9 M 2 -7.4 L 7.5 -6.8" stroke="#6b737d" stroke-width="0.35"/></g></g>`;
+
+  function KamboniCab(stage, deps) {
+    const { RZ, outline } = deps;
+    const el = document.createElement("div");
+    el.className = "game-cab";
+    el.hidden = true;
+    const view = document.createElement("canvas");
+    el.appendChild(view);
+    const gl = view.getContext("webgl", { antialias: true, alpha: false });
+    if (!gl) return null;
+    el.insertAdjacentHTML(
+      "beforeend",
+      `<svg class="cab-frame" viewBox="0 0 100 50" preserveAspectRatio="none" aria-hidden="true">${FRAME_SVG}</svg>
+      <svg class="cab-dash" viewBox="0 0 400 50" preserveAspectRatio="xMidYMax meet" aria-hidden="true">${DASH_SVG}</svg>
+      <svg class="cab-map" viewBox="-31 -16 62 32" aria-hidden="true">
+        <rect x="-30" y="-15" width="60" height="30" rx="8.5" fill="var(--rink-ice)" fill-opacity="0.92" stroke="var(--rink-board)" stroke-width="0.8"/>
+        <path d="M 0 -15 V 15 M -26 -13 V 13 M 26 -13 V 13" stroke="var(--rink-red)" stroke-width="0.5"/>
+        <path d="M -7.5 -15 V 15 M 7.5 -15 V 15" stroke="var(--rink-blue)" stroke-width="0.6"/>
+        <polyline data-track fill="none" stroke="var(--rink-team-a)" stroke-opacity="0.45" stroke-width="${RZ.width}" stroke-linecap="round" stroke-linejoin="round"/>
+        <path data-me d="M 3 0 L -2.2 -1.9 L -1.2 0 L -2.2 1.9 Z" fill="#ffd54a" stroke="#14171b" stroke-width="0.4" stroke-linejoin="round"/></svg>`
+    );
+    stage.querySelector("svg").after(el);
+    const $ = (s) => el.querySelector(s);
+    const parts = {
+      wheel: $("[data-wheel]"),
+      arrow: $("[data-arrow]"),
+      needle: $("[data-needle]"),
+      ice: $("[data-ice]"),
+      cat: $("[data-cat]"),
+      track: $("[data-track]"),
+      me: $("[data-me]"),
+    };
+    // The gauge's green: from what is enough to all of it.
+    const arc = (a) => [Math.sin(a) * 11, -Math.cos(a) * 11].map((v) => v.toFixed(2)).join(" ");
+    const a0 = ((-120 + 240 * RZ.done) * Math.PI) / 180;
+    $("[data-goal]").setAttribute("d", `M ${arc(a0)} A 11 11 0 0 1 ${arc((120 * Math.PI) / 180)}`);
+
+    // ——— WebGL ———
+    const shader = (type, src) => {
+      const s = gl.createShader(type);
+      gl.shaderSource(s, src);
+      gl.compileShader(s);
+      return s;
+    };
+    const prog = gl.createProgram();
+    gl.attachShader(prog, shader(gl.VERTEX_SHADER, VERT));
+    gl.attachShader(prog, shader(gl.FRAGMENT_SHADER, FRAG));
+    gl.linkProgram(prog);
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) return null;
+    gl.useProgram(prog);
+    const at = { p: gl.getAttribLocation(prog, "p"), t: gl.getAttribLocation(prog, "t"), c: gl.getAttribLocation(prog, "c") };
+    const un = {
+      m: gl.getUniformLocation(prog, "m"),
+      flip: gl.getUniformLocation(prog, "flip"),
+      textured: gl.getUniformLocation(prog, "textured"),
+      haze: gl.getUniformLocation(prog, "haze"),
+    };
+    gl.uniform3fv(un.haze, ARENA);
+    gl.enable(gl.DEPTH_TEST);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    const aniso = gl.getExtension("EXT_texture_filter_anisotropic");
+    function texture(source, repeat) {
+      const t = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, t);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
+      const wrap = repeat ? gl.REPEAT : gl.CLAMP_TO_EDGE;
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrap);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrap);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      if (aniso)
+        gl.texParameterf(gl.TEXTURE_2D, aniso.TEXTURE_MAX_ANISOTROPY_EXT, Math.min(8, gl.getParameter(aniso.MAX_TEXTURE_MAX_ANISOTROPY_EXT)));
+      gl.generateMipmap(gl.TEXTURE_2D);
+      return t;
+    }
+    function mesh(q, tex, glass) {
+      const buf = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(q.v), gl.STATIC_DRAW);
+      return { buf, n: q.v.length / 9, tex, glass };
+    }
+
+    // The ice: the rink drawing as it is now (dirty), and as it will be (clean,
+    // wet); the clean one is painted onto the dirty one along the track.
+    const dirty = canvas2d(TW, TH),
+      clean = canvas2d(TW, TH);
+    const iceTex = texture(dirty, false);
+    let meshes = [];
+    let rz = null,
+      ready = 0,
+      painted = 0,
+      pattern = null,
+      mapPoints = "",
+      mapped = 0;
+
+    // The arena, built when the colours are known (they follow the theme).
+    function build() {
+      for (const m of meshes) gl.deleteBuffer(m.buf);
+      const wall = rgba(cssVar("--rink-wall") || "#fdfefe"),
+        trim = rgba(cssVar("--rink-board") || "#c8ced4");
+      const ice = quads(),
+        boards = quads(),
+        plain = quads(),
+        stands = quads(),
+        glass = quads();
+      ice.add([-32, 0, -16], [32, 0, -16], [32, 0, 16], [-32, 0, 16], [1, 1, 1, 1], [0, 0, 1, 1]);
+      const pts = outline();
+      let s = 0;
+      for (let i = 0; i < pts.length; i++) {
+        const a = pts[i],
+          b = pts[(i + 1) % pts.length],
+          len = Math.hypot(b.x - a.x, b.y - a.y);
+        const P = (o, h, q) => [q.x + q.nx * o, h, q.y + q.ny * o];
+        const band = (h0, h1, col, o0 = 0, o1 = 0) => plain.add(P(o0, h0, a), P(o0, h0, b), P(o1, h1, b), P(o1, h1, a), col);
+        band(0, 0.22, trim);
+        boards.add(P(0, 0.22, a), P(0, 0.22, b), P(0, 1, b), P(0, 1, a), wall, [s / 20, 1, (s + len) / 20, 0]);
+        band(1, 1.15, trim);
+        band(1.15, 1.15, trim, 0, 0.2);
+        glass.add(P(0.08, 1.15, a), P(0.08, 1.15, b), P(0.08, 2.9, b), P(0.08, 2.9, a), [0.8, 0.88, 0.95, 0.13]);
+        glass.add(P(0.08, 2.84, a), P(0.08, 2.84, b), P(0.08, 2.9, b), P(0.08, 2.9, a), [0.9, 0.95, 1, 0.45]);
+        stands.add(P(0.4, 1.2, a), P(0.4, 1.2, b), P(24, 16.5, b), P(24, 16.5, a), [1, 1, 1, 1], [s / 10, 5.6, (s + len) / 10, 0]);
+        s += len;
+      }
+      const boardTex = texture(boardsTexture(), true),
+        crowdTex = texture(crowdTexture(), true);
+      meshes = [mesh(ice, iceTex), mesh(plain, null), mesh(boards, boardTex), mesh(stands, crowdTex), mesh(glass, null, true)];
+    }
+
+    function scene(mvp, flip) {
+      gl.uniformMatrix4fv(un.m, false, mvp);
+      gl.uniform1f(un.flip, flip);
+      for (const m of meshes) {
+        if (m.glass) {
+          gl.enable(gl.BLEND);
+          gl.depthMask(false);
+        }
+        gl.bindBuffer(gl.ARRAY_BUFFER, m.buf);
+        gl.enableVertexAttribArray(at.p);
+        gl.enableVertexAttribArray(at.t);
+        gl.enableVertexAttribArray(at.c);
+        gl.vertexAttribPointer(at.p, 3, gl.FLOAT, false, 36, 0);
+        gl.vertexAttribPointer(at.t, 2, gl.FLOAT, false, 36, 12);
+        gl.vertexAttribPointer(at.c, 4, gl.FLOAT, false, 36, 20);
+        gl.uniform1f(un.textured, m.tex ? 1 : 0);
+        if (m.tex) gl.bindTexture(gl.TEXTURE_2D, m.tex);
+        gl.drawArrays(gl.TRIANGLES, 0, m.n);
+        if (m.glass) {
+          gl.disable(gl.BLEND);
+          gl.depthMask(true);
+        }
+      }
+    }
+
+    // New track since the last frame: clean ice painted onto the dirty, and
+    // only that patch sent to the texture.
+    function paint() {
+      if (ready < 2 || painted >= rz.track.length) return;
+      const g = ctx2d(dirty),
+        from = Math.max(0, painted - 1),
+        pad = (RZ.width * PX) / 2 + 2;
+      let x0 = Infinity,
+        y0 = Infinity,
+        x1 = -Infinity,
+        y1 = -Infinity;
+      g.save();
+      g.strokeStyle = pattern;
+      g.lineWidth = RZ.width * PX;
+      g.lineCap = g.lineJoin = "round";
+      g.beginPath();
+      for (let i = from; i < rz.track.length; i++) {
+        const px = (rz.track[i][0] + 32) * PX,
+          py = (rz.track[i][1] + 16) * PX;
+        if (i === from) g.moveTo(px, py);
+        g.lineTo(px + (i === from ? 0.01 : 0), py);
+        [x0, y0, x1, y1] = [Math.min(x0, px), Math.min(y0, py), Math.max(x1, px), Math.max(y1, py)];
+      }
+      g.stroke();
+      g.restore();
+      painted = rz.track.length;
+      const rx = Math.max(0, Math.floor(x0 - pad)),
+        ry = Math.max(0, Math.floor(y0 - pad)),
+        rw = Math.min(TW, Math.ceil(x1 + pad)) - rx,
+        rh = Math.min(TH, Math.ceil(y1 + pad)) - ry;
+      if (rw <= 0 || rh <= 0) return;
+      gl.bindTexture(gl.TEXTURE_2D, iceTex);
+      gl.texSubImage2D(gl.TEXTURE_2D, 0, rx, ry, gl.RGBA, gl.UNSIGNED_BYTE, g.getImageData(rx, ry, rw, rh));
+      gl.generateMipmap(gl.TEXTURE_2D);
+    }
+
+    // The dashboard's arrow points at the dirtiest ice near by: the ice in
+    // 4 m blocks, each worth its dirty cells over how far it is.
+    let aimAt = null,
+      aimed = -1e9;
+    function dirtiest(now) {
+      if (now - aimed < 300) return;
+      aimed = now;
+      const bins = new Map();
+      for (const c of rz.cells) {
+        if (c.clean) continue;
+        const k = Math.floor((c.x + 32) / 4) * 100 + Math.floor((c.y + 16) / 4),
+          b = bins.get(k) || { n: 0, x: 0, y: 0 };
+        b.n++;
+        b.x += c.x;
+        b.y += c.y;
+        bins.set(k, b);
+      }
+      let best = 0;
+      aimAt = null;
+      for (const b of bins.values()) {
+        const bx = b.x / b.n,
+          by = b.y / b.n,
+          worth = b.n / (Math.hypot(bx - rz.x, by - rz.y) + 6);
+        if (worth > best) [best, aimAt] = [worth, [bx, by]];
+      }
+    }
+
+    const cat = { a: 0, w: 0 };
+    let last = null,
+      shake = 0;
+    return {
+      el,
+      // A new intermission: the ice as the period left it (`marks`, the
+      // game's skate marks), and the colours of the current theme.
+      start(r, marks) {
+        rz = r;
+        ready = painted = mapped = 0;
+        mapPoints = "";
+        aimed = -1e9;
+        last = null;
+        build();
+        const floor = `<rect x="-32" y="-16" width="64" height="32" fill="#2a2f36"/>`;
+        const rink = (root.rinkSVG ? root.rinkSVG() : "").replace(/<rect[^>]*data-rink-net[^>]*\/>/g, "");
+        const shape = `x="-30" y="-15" width="60" height="30" rx="8.5"`;
+        rasterize(`${floor}${rink}<rect ${shape} fill="var(--rink-wet)"/>`, clean, (ok) => {
+          if (!ok) return;
+          pattern = ctx2d(dirty).createPattern(clean, "no-repeat");
+          ready++;
+        });
+        const frost = `<defs>${deps.frost}</defs><rect ${shape} fill="url(#rink-frost)"/>`;
+        rasterize(`${floor}${rink}${marks ? marks.outerHTML.replace(/ mask="[^"]*"/, "") : ""}${frost}`, dirty, (ok) => {
+          if (!ok) return;
+          gl.bindTexture(gl.TEXTURE_2D, iceTex);
+          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, dirty);
+          gl.generateMipmap(gl.TEXTURE_2D);
+          ready++;
+        });
+      },
+      show(on) {
+        el.hidden = !on;
+      },
+      frame(now) {
+        const dt = last === null ? 0 : Math.min(0.05, (now - last) / 1000);
+        last = now;
+        const dpr = Math.min(2, root.devicePixelRatio || 1),
+          W = Math.round(view.clientWidth * dpr),
+          H = Math.round(view.clientHeight * dpr);
+        if (!W || !H) return;
+        if (view.width !== W || view.height !== H) [view.width, view.height] = [W, H];
+        paint();
+        // The driver's eye: on the left, toward the front, swaying a little
+        // into turns and shaken by the boards.
+        if (rz.bonk) shake = 0.35;
+        shake = Math.max(0, shake - dt);
+        const c = Math.cos(rz.h),
+          s = Math.sin(rz.h),
+          jolt = shake * 0.25 * Math.sin(now / 22);
+        const eye = [rz.x + c * EYE.ahead + s * EYE.left, EYE.up + jolt, rz.y + s * EYE.ahead - c * EYE.left];
+        const roll = -rz.wheel * Math.min(1, Math.abs(rz.v) / 12) * 0.035,
+          up = [-s * Math.sin(roll), Math.cos(roll), c * Math.sin(roll)];
+        const look = (h, pitch) => [eye[0] + Math.cos(h) * Math.cos(pitch), eye[1] + Math.sin(pitch), eye[2] + Math.sin(h) * Math.cos(pitch)];
+        gl.viewport(0, 0, W, H);
+        gl.clearColor(...ARENA, 1);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+        scene(mul(perspective(0.95, W / H, 0.1, 260), lookAt(eye, look(rz.h, EYE.pitch), up)), 1);
+        // The mirror, in its frame at the top: behind, and the wrong way round.
+        const mx = Math.round(W * 0.4),
+          mw = Math.round(W * 0.2),
+          my = Math.round(H * 0.76),
+          mh = Math.round(H * 0.16);
+        gl.enable(gl.SCISSOR_TEST);
+        gl.scissor(mx, my, mw, mh);
+        gl.viewport(mx, my, mw, mh);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+        scene(mul(perspective(0.6, mw / mh, 0.1, 260), lookAt(eye, look(rz.h + Math.PI, -0.32), [0, 1, 0])), -1);
+        gl.disable(gl.SCISSOR_TEST);
+
+        // The dashboard.
+        parts.wheel.setAttribute("transform", `rotate(${(rz.wheel * 100).toFixed(1)})`);
+        parts.needle.setAttribute("transform", `rotate(${(-120 + 240 * rz.part).toFixed(1)})`);
+        parts.ice.textContent = `${Math.floor(100 * rz.part)}%`;
+        dirtiest(now);
+        parts.arrow.style.display = aimAt ? "" : "none";
+        if (aimAt) {
+          const turn = Math.atan2(aimAt[1] - rz.y, aimAt[0] - rz.x) - rz.h;
+          parts.arrow.setAttribute("transform", `rotate(${((turn * 180) / Math.PI).toFixed(1)})`);
+        }
+        // The cat nods: a spring, pushed by turns and bumps.
+        const yaw = rz.wheel * RZ.lock * Math.min(1, Math.max(0.3, Math.abs(rz.v) / 3)) * Math.sign(rz.v || 1);
+        cat.w += (-70 * cat.a - 4 * cat.w - rz.v * yaw * 0.08) * dt;
+        if (rz.bonk) cat.w += 7;
+        cat.a = Math.max(-0.6, Math.min(0.6, cat.a + cat.w * dt));
+        parts.cat.setAttribute("transform", `rotate(${((cat.a * 180) / Math.PI).toFixed(1)} 0 -2)`);
+        // The map.
+        for (; mapped < rz.track.length; mapped++)
+          mapPoints += `${mapPoints ? " " : ""}${rz.track[mapped][0].toFixed(1)},${rz.track[mapped][1].toFixed(1)}`;
+        if (parts.track.getAttribute("points") !== mapPoints) parts.track.setAttribute("points", mapPoints);
+        parts.me.setAttribute("transform", `translate(${rz.x.toFixed(1)} ${rz.y.toFixed(1)}) rotate(${((rz.h * 180) / Math.PI).toFixed(0)})`);
+      },
+    };
+  }
+
+  root.KamboniCab = KamboniCab;
+})(typeof window !== "undefined" ? window : globalThis);

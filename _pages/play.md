@@ -12,3 +12,4 @@ wide: true
 
 <script src="{{ '/assets/js/drills.js' | relative_url }}"></script>
 <script src="{{ '/assets/js/game.js' | relative_url }}"></script>
+<script src="{{ '/assets/js/kamboni.js' | relative_url }}"></script>

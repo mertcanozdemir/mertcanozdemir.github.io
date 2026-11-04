@@ -57,7 +57,8 @@ function run(seed, mode) {
     t = 0;
   const counts = { save: 0, post: 0, steal: 0, block: 0, pass: 0, hit: 0 };
   while (game.phase !== "over" && t < 600) {
-    if (game.phase === "intermission") game.nextPeriod();
+    // Between periods everyone skates off, then the next one starts.
+    if (game.phase === "intermission" && game.benched) game.nextPeriod();
     const input = mode === "script" ? scripted(game) : {};
     game.step(STEP, input);
     t += STEP;
@@ -83,60 +84,32 @@ function run(seed, mode) {
   return { score: game.score, shots: game.shots, counts, longestLoose, problems, overtime: game.overtime, t };
 }
 
-// The Kamboni: in rows along the rink, turning at the ends, or wandering
-// (a new way every second or so).
-function kamboni(seed, wander) {
+// The Kamboni: the crew's way (rows along the rink), or anyhow: steering a
+// new way every second or so, from above or from the cab.
+function kamboni(seed, how) {
   Math.random = mulberry32(seed * 13 + 5);
   const rz = new Resurfacer();
   const problems = [];
-  const edge = 15 - RZ.radius;
-  const rows = [];
-  for (let y = -edge; y < edge; y += RZ.width - 1) rows.push(y);
-  rows.push(edge);
-  // How far a row goes: to the boards, round the corners and short of the nets.
-  const reach = (y) =>
-    (Math.abs(y) > 6.5
-      ? 21.5 + Math.sqrt(Math.max(0, (8.5 - RZ.radius) ** 2 - (Math.abs(y) - 6.5) ** 2))
-      : Math.abs(y) < 1.35 + RZ.radius + 0.5
-        ? 26 - RZ.radius
-        : 30 - RZ.radius) - 1.5;
-  const route = rows.flatMap((y, i) =>
-    i % 2
-      ? [
-          [reach(y), y],
-          [-reach(y), y],
-        ]
-      : [
-          [-reach(y), y],
-          [reach(y), y],
-        ]
-  );
-  let leg = 0,
-    input = { x: 1, y: 0 };
-  while (wander ? rz.time < 60 : !rz.done && rz.time < 120) {
-    if (wander) {
-      if (Math.random() < STEP / 0.9) {
-        const a = Math.random() * 2 * Math.PI;
-        input = { x: Math.cos(a), y: Math.sin(a) };
-      }
-    } else {
-      let [tx, ty] = route[leg % route.length];
-      if (Math.hypot(tx - rz.x, ty - rz.y) < 2.5) [tx, ty] = route[++leg % route.length];
-      const d = Math.hypot(tx - rz.x, ty - rz.y) || 1;
-      input = { x: (tx - rz.x) / d, y: (ty - rz.y) / d };
+  let input = {};
+  while (how === "crew" ? !rz.done && rz.time < 120 : rz.time < 60) {
+    if (how === "crew") input = rz.autopilot();
+    else if (Math.random() < STEP / 0.9) {
+      const a = Math.random() * 2 * Math.PI;
+      input = how === "cab" ? { drive: true, steer: Math.random() * 2 - 1, throttle: Math.random() * 2 - 1 } : { x: Math.cos(a), y: Math.sin(a) };
     }
     rz.step(STEP, input);
     if (![rz.x, rz.y, rz.h, rz.v].every(Number.isFinite)) {
       problems.push(`NaN at ${rz.time.toFixed(1)} s`);
       break;
     }
-    if (!inside(rz, RZ.radius - 0.1)) problems.push(`outside the rink at ${rz.time.toFixed(1)} s`);
-    const nx = Math.max(0, 26 - Math.abs(rz.x), Math.abs(rz.x) - 27.6),
-      ny = Math.max(0, Math.abs(rz.y) - 1.35);
-    if (Math.hypot(nx, ny) < RZ.radius - 0.1) problems.push(`in a net at ${rz.time.toFixed(1)} s`);
+    // Its front and back stay on the ice.
+    for (const o of [-1.6, 1.6]) {
+      const end = { x: rz.x + Math.cos(rz.h) * o, y: rz.y + Math.sin(rz.h) * o };
+      if (!inside(end, RZ.body / 2 - 0.1)) problems.push(`off the ice at ${rz.time.toFixed(1)} s`);
+    }
     if (problems.length > 5) break;
   }
-  if (!wander && !rz.done) problems.push(`not clean after ${rz.time.toFixed(0)} s (${(100 * rz.part).toFixed(0)}%)`);
+  if (how === "crew" && !rz.done) problems.push(`not clean after ${rz.time.toFixed(0)} s (${(100 * rz.part).toFixed(0)}%)`);
   return { time: rz.time, part: rz.part, problems };
 }
 
@@ -182,14 +155,16 @@ for (const mode of ["cpu", "idle", "script"]) {
     part = 0,
     slowest = 0;
   for (let i = 1; i <= games; i++) {
-    const rows = kamboni(i, false),
-      anyhow = kamboni(i, true);
-    time += rows.time;
-    slowest = Math.max(slowest, rows.time);
+    const crew = kamboni(i, "crew"),
+      anyhow = kamboni(i, "above"),
+      cab = kamboni(i, "cab");
+    time += crew.time;
+    slowest = Math.max(slowest, crew.time);
     part += anyhow.part;
     for (const [how, r] of [
-      ["in rows", rows],
-      ["anyhow", anyhow],
+      ["the crew's way", crew],
+      ["anyhow from above", anyhow],
+      ["anyhow from the cab", cab],
     ]) {
       if (r.problems.length) {
         bad++;
@@ -198,12 +173,12 @@ for (const mode of ["cpu", "idle", "script"]) {
     }
   }
   console.log(
-    `kamboni in rows: ${(100 * RZ.done).toFixed(0)}% clean in ${(time / games).toFixed(1)} s; anyhow: ${((100 * part) / games).toFixed(0)}% clean after a minute`
+    `kamboni, the crew's way: ${(100 * RZ.done).toFixed(0)}% clean in ${(time / games).toFixed(1)} s; anyhow: ${((100 * part) / games).toFixed(0)}% clean after a minute`
   );
-  // In rows it should take well under a minute: the intermission is a break.
-  if (slowest > 40) {
+  // The crew's way should take well under a minute: the intermission is a break.
+  if (slowest > 45) {
     bad++;
-    console.log(`  the Kamboni took ${slowest.toFixed(0)} s in rows: want 40 at most`);
+    console.log(`  the Kamboni took ${slowest.toFixed(0)} s the crew's way: want 45 at most`);
   }
 }
 console.log(bad ? `\n${bad} problem(s)` : "\nok");

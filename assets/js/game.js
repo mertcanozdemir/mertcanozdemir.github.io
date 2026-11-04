@@ -212,7 +212,7 @@
         const s = DIR[p.team];
         if (p.role === "goalie") [p.x, p.y] = [-s * (GOAL_X - 1), 0];
         else [p.x, p.y] = [s * spots[p.slot][0], s * spots[p.slot][1]];
-        Object.assign(p, { vx: 0, vy: 0, fx: s, fy: 0, wx: 0, wy: 0, noTouch: 0, cool: 0, down: 0, dash: 0, checkCool: 0, oneTimer: 0 });
+        Object.assign(p, { vx: 0, vy: 0, fx: s, fy: 0, wx: 0, wy: 0, noTouch: 0, cool: 0, down: 0, dash: 0, checkCool: 0, oneTimer: 0, off: false });
       }
       Object.assign(this.puck, { x: 0, y: 0, vx: 0, vy: 0, carrier: null, last: null, held: 0, beat: null, rebound: 0, trail: [] });
       if (this.human) this.controlled = this.players[0];
@@ -224,7 +224,8 @@
     // One simulation step. `input` is the person's: {x, y} to skate, and
     // `shoot` and `pass` for presses since the last step.
     step(dt, input = {}) {
-      if (this.phase === "over" || this.phase === "intermission") return;
+      if (this.phase === "over") return;
+      if (this.phase === "intermission") return this.leave(dt);
       if (this.phase !== "play") {
         this.wait -= dt;
         if (this.phase === "goal") this.glide(dt);
@@ -240,6 +241,9 @@
           this.clock = 0;
           if (this.period < this.periods) {
             this.phase = "intermission";
+            this.wait = 0;
+            this.puck.carrier = null;
+            for (const p of this.players) Object.assign(p, { down: 0, dash: 0, braking: false });
             this.events.push({ type: "intermission", period: this.period });
             return;
           }
@@ -272,8 +276,57 @@
       this.movePuck(dt);
     }
 
+    // The end of a period: everyone skates off to the bench (on the near side,
+    // each team's in its own half), and the puck slides to a stop. Once all
+    // are off, or after a few seconds, `benched`.
+    leave(dt) {
+      this.wait += dt;
+      for (const p of this.players) {
+        if (p.off) continue;
+        const tx = -DIR[p.team] * (3.4 + p.slot * 2.3),
+          ty = W - SKATER_R - 0.4;
+        const dx = tx - p.x,
+          dy = ty - p.y,
+          d = hypot(dx, dy);
+        if (d < 0.7 || this.wait > 6) {
+          p.off = true;
+          continue;
+        }
+        const want = Math.min(6.5, d * 2),
+          ax = (dx / d) * want - p.vx,
+          ay = (dy / d) * want - p.vy,
+          al = hypot(ax, ay) || 1,
+          acc = Math.min(al, 10 * dt);
+        p.vx += (ax / al) * acc;
+        p.vy += (ay / al) * acc;
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        const sp = hypot(p.vx, p.vy);
+        if (sp > 0.5) [p.fx, p.fy] = [p.vx / sp, p.vy / sp];
+        const r = p.role === "goalie" ? GOALIE_R : SKATER_R;
+        confine(p, r);
+        outOfNet(p, r);
+      }
+      const pk = this.puck,
+        f = Math.max(0, 1 - 1.2 * dt);
+      pk.vx *= f;
+      pk.vy *= f;
+      pk.x += pk.vx * dt;
+      pk.y += pk.vy * dt;
+      const n = confine(pk, PUCK_R) || (offFrame(pk, PUCK_R) || {}).n;
+      if (n) {
+        const vn = pk.vx * n[0] + pk.vy * n[1];
+        if (vn < 0) [pk.vx, pk.vy] = [pk.vx - 1.6 * vn * n[0], pk.vy - 1.6 * vn * n[1]];
+      }
+      if (!this.benched && this.players.every((p) => p.off)) {
+        this.benched = true;
+        this.events.push({ type: "benched" });
+      }
+    }
+
     nextPeriod() {
       if (this.phase !== "intermission") return;
+      this.benched = false;
       this.period++;
       this.clock = this.periodLength;
       this.faceoff();
@@ -930,23 +983,30 @@
 
   // ——— Between periods: the Kamboni ———
   // An ice resurfacer the person drives over the cut-up ice until enough of it
-  // is clean; the page draws it. How wide it cleans (m) and how far behind its
-  // middle, how near the boards its middle gets, how fast it drives (m/s) and
-  // turns (rad/s), and how much of the ice is enough.
-  const RZ = { width: 6.25, rear: 3.4, radius: 3, speed: 12, turn: 2.8, done: 0.85 };
+  // is clean; the page draws it. About life size, so the crew takes the nets
+  // off the ice first, as in a real arena. Lengths in m, speeds in m/s.
+  const RZ = {
+    length: 5.2, // the body; the conditioner and towel trail behind it
+    body: 2.6, // wide
+    width: 3, // the band the conditioner cleans, its middle `rear` behind the Kamboni's
+    rear: 2.85,
+    speed: 16, // flat out
+    cruise: 12, // from the cab with no keys pressed: it keeps going
+    turn: 3.2, // rad/s, steering toward a direction, from above
+    lock: 2.4, // rad/s at full lock, from the cab
+    done: 0.65, // how much of the ice is enough
+  };
 
-  // The ice as 1 m cells, to measure how much of it is clean: inside the
-  // boards, less what the nets stand on.
+  // The ice as 1 m cells, to measure how much of it is clean.
   function iceCells() {
     const cells = [];
-    for (let x = -29.5; x < 30; x++)
-      for (let y = -14.5; y < 15; y++) if (!confine({ x, y }, 0.4) && !outOfNet({ x, y }, 0.4)) cells.push({ x, y, clean: false });
+    for (let x = -29.5; x < 30; x++) for (let y = -14.5; y < 15; y++) if (!confine({ x, y }, 0.4)) cells.push({ x, y, clean: false });
     return cells;
   }
 
   class Resurfacer {
     constructor() {
-      Object.assign(this, { x: -20, y: -11, h: 0, v: 0, time: 0, bonk: false });
+      Object.assign(this, { x: -21, y: -12, h: 0, v: 0, wheel: 0, time: 0, bonk: false, leg: 0 });
       this.track = []; // where its back has been: the middle of the clean band
       this.cells = iceCells();
       this.clean = 0;
@@ -957,37 +1017,61 @@
     get done() {
       return this.part >= RZ.done;
     }
-    // `input` is the person's {x, y}: the way to drive, on the ice. It turns
-    // that way like a vehicle, not a skater: slowing down for a sharp turn,
-    // and turning slowly when it barely moves. Into the boards or a net it
-    // stops short, with a `bonk` if it was quick.
+
+    // `input` is the person's. From above, {x, y}: the way to go, on the ice;
+    // it turns that way like a vehicle, slowing for a sharp turn, and stops
+    // when let go. From the cab, {drive: true, steer, throttle}: it keeps
+    // going at a cruise, `steer` turns the wheel (smoothly, as hands do) and
+    // `throttle` goes faster or slower, down to reversing.
     step(dt, input = {}) {
-      const ix = input.x || 0,
-        iy = input.y || 0,
-        push = Math.min(1, hypot(ix, iy));
-      if (push > 0.15) {
-        const want = Math.atan2(iy, ix),
-          dh = Math.atan2(Math.sin(want - this.h), Math.cos(want - this.h));
-        const rate = RZ.turn * (0.4 + 0.6 * Math.min(1, this.v / 4));
-        this.h += clamp(dh, -rate * dt, rate * dt);
-        const target = RZ.speed * push * (0.35 + 0.65 * Math.max(0, Math.cos(dh)));
-        this.v += clamp(target - this.v, -9 * dt, 5 * dt);
-      } else this.v += clamp(-this.v, -7 * dt, 7 * dt);
+      if (input.drive) {
+        const thr = clamp(input.throttle || 0, -1, 1),
+          target = thr >= 0 ? RZ.cruise + (RZ.speed - RZ.cruise) * thr : RZ.cruise + (RZ.cruise + 3) * thr;
+        this.v += clamp(target - this.v, -10 * dt, 6 * dt);
+        this.wheel += clamp(clamp(input.steer || 0, -1, 1) - this.wheel, -5 * dt, 5 * dt);
+        this.h += this.wheel * RZ.lock * clamp(Math.abs(this.v) / 3, 0.3, 1) * Math.sign(this.v || 1) * dt;
+      } else {
+        const ix = input.x || 0,
+          iy = input.y || 0,
+          push = Math.min(1, hypot(ix, iy));
+        if (push > 0.15) {
+          const want = Math.atan2(iy, ix),
+            dh = Math.atan2(Math.sin(want - this.h), Math.cos(want - this.h));
+          const rate = RZ.turn * (0.45 + 0.55 * Math.min(1, Math.abs(this.v) / 4));
+          this.h += clamp(dh, -rate * dt, rate * dt);
+          this.wheel = clamp(dh, -1, 1);
+          const target = RZ.speed * push * (0.4 + 0.6 * Math.max(0, Math.cos(dh)));
+          this.v += clamp(target - this.v, -12 * dt, 7 * dt);
+        } else {
+          this.v += clamp(-this.v, -9 * dt, 9 * dt);
+          this.wheel = 0;
+        }
+      }
       this.x += Math.cos(this.h) * this.v * dt;
       this.y += Math.sin(this.h) * this.v * dt;
-      const wall = confine(this, RZ.radius),
-        net = outOfNet(this, RZ.radius),
-        n = wall || net;
+      // Against the boards: the body as three circles along it. It stops
+      // short, with a `bonk` if it was quick.
+      let hit = null;
+      for (const o of [-1.6, 0, 1.6]) {
+        const cx = this.x + Math.cos(this.h) * o,
+          cy = this.y + Math.sin(this.h) * o,
+          c = { x: cx, y: cy },
+          n = confine(c, RZ.body / 2);
+        if (!n) continue;
+        this.x += c.x - cx;
+        this.y += c.y - cy;
+        hit = hit || n;
+      }
       this.bonk = false;
-      if (n) {
-        const into = -(Math.cos(this.h) * n[0] + Math.sin(this.h) * n[1]);
+      if (hit) {
+        const into = -(Math.cos(this.h) * hit[0] + Math.sin(this.h) * hit[1]) * Math.sign(this.v);
         if (into > 0.3) {
-          this.bonk = this.v > 6 && into > 0.6;
+          this.bonk = Math.abs(this.v) > 6 && into > 0.6;
           this.v *= 1 - into * Math.min(1, 12 * dt);
         }
       }
       this.time += dt;
-      // Its back cleans the ice, a band as wide as it.
+      // Its back cleans the ice, a band as wide as the conditioner.
       const bx = this.x - Math.cos(this.h) * RZ.rear,
         by = this.y - Math.sin(this.h) * RZ.rear;
       const end = this.track[this.track.length - 1];
@@ -999,6 +1083,35 @@
           this.clean++;
         }
       }
+    }
+
+    // The crew's way, as input from above: rows along the rink, turning at the
+    // ends, as near the boards and round the corners as it fits.
+    autopilot() {
+      if (!this.route) {
+        const r = RZ.body / 2,
+          edge = W - r - 0.1,
+          rows = [];
+        for (let y = -edge; y < edge; y += RZ.width - 0.4) rows.push(y);
+        rows.push(edge);
+        const reach = (y) =>
+          (Math.abs(y) > W - CORNER ? L - CORNER + Math.sqrt(Math.max(0, (CORNER - r) ** 2 - (Math.abs(y) - (W - CORNER)) ** 2)) : L - r) - 2.2;
+        this.route = rows.flatMap((y, i) =>
+          i % 2
+            ? [
+                [reach(y), y],
+                [-reach(y), y],
+              ]
+            : [
+                [-reach(y), y],
+                [reach(y), y],
+              ]
+        );
+      }
+      let [tx, ty] = this.route[this.leg % this.route.length];
+      if (hypot(tx - this.x, ty - this.y) < 2.5) [tx, ty] = this.route[++this.leg % this.route.length];
+      const d = hypot(tx - this.x, ty - this.y) || 1;
+      return { x: (tx - this.x) / d, y: (ty - this.y) / d };
     }
   }
 
@@ -1035,7 +1148,10 @@
           `<path transform="rotate(${a}) translate(0 ${-r})" d="M 0 -0.3 L 0.08 -0.08 L 0.3 0 L 0.08 0.08 L 0 0.3 L -0.08 0.08 L -0.3 0 L -0.08 -0.08 Z" fill="var(--rink-puck)"/>`
       )
       .join("")}</g>`;
-  const LAMP = `<defs><radialGradient id="rink-lamp"><stop offset="0" stop-color="#ff3b30" stop-opacity="0.85"/><stop offset="1" stop-color="#ff3b30" stop-opacity="0"/></radialGradient></defs>`;
+  // The lamps behind the nets: red for a goal, green when time is up.
+  const glow = (id, c) =>
+    `<radialGradient id="${id}"><stop offset="0" stop-color="${c}" stop-opacity="0.85"/><stop offset="1" stop-color="${c}" stop-opacity="0"/></radialGradient>`;
+  const LAMP = `<defs>${glow("rink-lamp", "#ff3b30")}${glow("rink-lamp-green", "#34c759")}</defs>`;
 
   // ——— Two views ———
   // From above, as the drills are drawn, or the TV camera: high in the stands
@@ -1209,39 +1325,26 @@
     return skins[(i * 3) % skins.length];
   };
 
-  // ——— The Kamboni, drawn ———
-  // Drawn 5 m wide at the back, and scaled to what it cleans.
-  const RZ_SCALE = (RZ.width / 5).toFixed(3);
-  // From above, facing +x: the conditioner at the back, the snow tank, the
-  // cab's roof with a beacon, headlights.
-  const KAMBONI_TOP = `<g transform="scale(${RZ_SCALE})"><rect x="-2.95" y="-2.5" width="0.5" height="5" rx="0.2" fill="var(--rink-rz-dark)"/>
-    <rect x="-2.55" y="-1.9" width="5.1" height="3.8" rx="0.7" fill="var(--rink-rz)" stroke="var(--rink-rz-edge)" stroke-width="0.08"/>
-    <path d="M -2.2 -1.72 H 2.2 M -2.2 1.72 H 2.2" stroke="var(--rink-team-a)" stroke-width="0.16"/>
-    <rect x="-2.25" y="-1.45" width="2.7" height="2.9" rx="0.4" fill="var(--rink-rz-tank)" stroke="var(--rink-rz-edge)" stroke-width="0.05"/>
-    <rect x="0.75" y="-1.35" width="1.5" height="2.7" rx="0.35" fill="var(--rink-visor)"/>
-    <circle data-rz-beacon cx="1.5" r="0.28" fill="#f5a623"/>
-    <circle cx="2.48" cy="-1.4" r="0.18" fill="#ffd54a"/><circle cx="2.48" cy="1.4" r="0.18" fill="#ffd54a"/></g>`;
-  // Standing, in the tilted view: side on, facing right, with its driver in
-  // the cab. Flipped to face left, and narrowed as it drives up or down the
-  // screen; the name stays the right way round.
-  const KAMBONI_SIDE = `<g transform="scale(${RZ_SCALE})"><ellipse rx="3.2" ry="${(3.2 * SQUASH * 0.55).toFixed(2)}" fill="var(--rink-shadow)"/>
-    <g data-rz-turn><g data-rz-flip>
-      <rect x="-2.95" y="-1.45" width="0.5" height="1.4" rx="0.12" fill="var(--rink-rz-dark)"/>
-      <rect x="-2.3" y="-3" width="2.8" height="1.1" rx="0.25" fill="var(--rink-rz-tank)" stroke="var(--rink-rz-edge)" stroke-width="0.05"/>
-      <path d="M 1.2 -2.02 Q 1.55 -2.4 1.9 -2.02 Z" fill="var(--rink-team-a)"/>
-      <circle cx="1.55" cy="-2.5" r="0.28" fill="#e8b896"/>
-      <path d="M 1.27 -2.56 Q 1.55 -2.98 1.83 -2.56 Z" fill="#c0392b"/>
-      <path d="M 1.7 -2.6 H 2.05" stroke="#c0392b" stroke-width="0.08" stroke-linecap="round"/>
-      <path d="M 0.7 -2 L 0.95 -3.3 H 2.1 L 2.35 -2" fill="var(--rink-visor-clear)" stroke="var(--rink-rz-edge)" stroke-width="0.07" stroke-linejoin="round"/>
-      <rect x="0.82" y="-3.42" width="1.42" height="0.14" rx="0.05" fill="var(--rink-rz-dark)"/>
-      <circle data-rz-beacon cx="1.53" cy="-3.53" r="0.13" fill="#f5a623"/>
-      <rect x="-2.5" y="-2.05" width="5" height="1.6" rx="0.35" fill="var(--rink-rz)" stroke="var(--rink-rz-edge)" stroke-width="0.06"/>
-      <path d="M -2.4 -0.8 H 2.4" stroke="var(--rink-team-a)" stroke-width="0.14"/>
-      <circle cx="2.5" cy="-1.62" r="0.15" fill="#ffd54a"/>
-      <circle cx="-1.6" cy="-0.45" r="0.45" fill="var(--rink-boot)"/><circle cx="1.6" cy="-0.45" r="0.45" fill="var(--rink-boot)"/>
-      <circle cx="-1.6" cy="-0.45" r="0.17" fill="var(--rink-blade)"/><circle cx="1.6" cy="-0.45" r="0.17" fill="var(--rink-blade)"/>
-    </g>
-    <text y="-1.1" font-size="0.5" font-weight="700" text-anchor="middle" letter-spacing="0.03" fill="var(--rink-team-a)">KAMBONI</text></g></g>`;
+  // ——— The Kamboni, from above ———
+  // Facing +x, to size: the towel trailing on the ice, the conditioner, the
+  // wheels, the snow tank with the name on it, the driver up front on the left
+  // at the wheel, a beacon, mirrors and headlights.
+  const KAMBONI_TOP = `<rect x="-3.75" y="-1.35" width="0.8" height="2.7" rx="0.2" fill="var(--rink-towel)"/>
+    <rect x="-3.05" y="-1.5" width="0.5" height="3" rx="0.15" fill="var(--rink-rz-dark)"/>
+    <path d="M -2.05 -1.32 H -1.15 M 1.15 -1.32 H 2.05 M -2.05 1.32 H -1.15 M 1.15 1.32 H 2.05" stroke="var(--rink-boot)" stroke-width="0.22" stroke-linecap="round"/>
+    <rect x="-2.6" y="-1.3" width="5.2" height="2.6" rx="0.45" fill="var(--rink-rz)" stroke="var(--rink-rz-edge)" stroke-width="0.06"/>
+    <path d="M -2.35 -1.16 H 2.35 M -2.35 1.16 H 2.35" stroke="var(--rink-team-a)" stroke-width="0.09"/>
+    <rect x="-2.35" y="-1.02" width="3.3" height="2.04" rx="0.3" fill="var(--rink-rz-tank)" stroke="var(--rink-rz-edge)" stroke-width="0.04"/>
+    <text x="-0.7" y="0.19" font-size="0.52" font-weight="700" text-anchor="middle" fill="var(--rink-team-a)">KAMBONI</text>
+    <rect x="-2.85" y="0.5" width="0.55" height="0.55" rx="0.14" fill="var(--rink-rz-dark)"/>
+    <rect x="1.2" y="0.05" width="1.05" height="0.95" rx="0.2" fill="var(--rink-rz-tank)" stroke="var(--rink-rz-edge)" stroke-width="0.04"/>
+    <rect x="1.15" y="-1.08" width="0.8" height="0.92" rx="0.22" fill="var(--rink-visor)"/>
+    <ellipse cx="1.5" cy="-0.62" rx="0.3" ry="0.4" fill="var(--rink-team-a)"/>
+    <circle cx="1.56" cy="-0.62" r="0.2" fill="#c0392b"/><rect x="1.72" y="-0.74" width="0.16" height="0.24" rx="0.06" fill="#a93226"/>
+    <circle cx="2.12" cy="-0.62" r="0.2" fill="none" stroke="var(--rink-stick)" stroke-width="0.07"/>
+    <path d="M 1.85 -1.42 H 2.15 M 1.85 1.42 H 2.15" stroke="var(--rink-rz-dark)" stroke-width="0.18" stroke-linecap="round"/>
+    <circle data-rz-beacon cx="1.05" cy="-1.12" r="0.16" fill="#f5a623"/>
+    <circle cx="2.55" cy="-0.95" r="0.13" fill="#ffd54a"/><circle cx="2.55" cy="0.95" r="0.13" fill="#ffd54a"/>`;
 
   // The used ice between periods: a frosted film with scratches in it, one
   // tile of them repeated (the same on every visit).
@@ -1344,7 +1447,6 @@
     game.players.forEach((p, i) =>
       el("g", { "data-player": i }, things).insertAdjacentHTML("beforeend", standingSVG(p.team, p.role === "goalie", skinOf(i)))
     );
-    things.insertAdjacentHTML("beforeend", `<g data-rz data-depth="0" style="display: none">${KAMBONI_SIDE}</g>`);
     svg.insertAdjacentHTML("beforeend", boardsSVG(false));
     for (const s of [1, -1]) {
       const [cx, cy] = TILT.at(s * (GOAL_X + NET_DEPTH * 0.5), 0, 1.2);
@@ -1365,25 +1467,25 @@
       `<g data-map><g transform="scale(${k})">
         <rect x="-31" y="-16" width="62" height="32" rx="9" fill="var(--global-bg-color)" fill-opacity="0.85" stroke="var(--rink-board)" stroke-width="0.8"/>
         <rect data-map-view y="-15" height="30" fill="var(--rink-mark)"/>
-        <polyline data-clean data-map-track ${band} stroke="var(--rink-team-a)" stroke-opacity="0.3" style="display: none"/>
         <path d="M 0 -15 V 15 M -26 -13 V 13 M 26 -13 V 13" stroke="var(--rink-red)" stroke-width="0.5"/>
         <path d="M -7.5 -15 V 15 M 7.5 -15 V 15" stroke="var(--rink-blue)" stroke-width="0.6"/>
         ${game.players.map((p, i) => `<circle data-map-player="${i}" r="1.5" fill="var(--rink-team-${p.team})"/>`).join("")}
-        <circle data-map-puck r="1" fill="var(--rink-puck)" stroke="var(--rink-puck-edge)" stroke-width="0.25"/>
-        <circle data-map-rz r="2.2" fill="var(--rink-rz)" stroke="var(--rink-rz-edge)" stroke-width="0.6" style="display: none"/></g></g>`
+        <circle data-map-puck r="1" fill="var(--rink-puck)" stroke="var(--rink-puck-edge)" stroke-width="0.25"/></g></g>`
     );
   }
 
-  // The Kamboni (a Resurfacer) and its track, when it is out; the players and
-  // the puck are off the ice then (in the styles, on `is-resurfacing`).
+  // The Kamboni (a Resurfacer) and its track, from above, when it is out; the
+  // players, the puck and the nets are off the ice then (in the styles, on
+  // `is-resurfacing`). From the cab it is kamboni.js that draws it.
   function drawResurfacer(svg, view, rz, now) {
-    svg.classList.toggle("is-resurfacing", !!rz);
-    for (const e of svg.querySelectorAll("[data-rz], [data-resurface], [data-map-track], [data-map-rz]")) e.style.display = rz ? "" : "none";
+    const out = !!rz && view === "top";
+    svg.classList.toggle("is-resurfacing", out);
+    for (const e of svg.querySelectorAll("[data-rz], [data-resurface]")) e.style.display = out ? "" : "none";
     const marks = svg.querySelector("[data-marks]");
-    if (!rz) return marks.removeAttribute("mask");
+    if (!out) return marks.removeAttribute("mask");
     marks.setAttribute("mask", "url(#rink-clean)");
     // The track as SVG points, added to as it grows.
-    const k = svg.rzDrawn && svg.rzDrawn.rz === rz ? svg.rzDrawn : (svg.rzDrawn = { rz, n: 0, points: "", face: 1 });
+    const k = svg.rzDrawn && svg.rzDrawn.rz === rz ? svg.rzDrawn : (svg.rzDrawn = { rz, n: 0, points: "" });
     const lines = svg.querySelectorAll("[data-clean]");
     if (k.n < rz.track.length || k.line !== lines[0]) {
       for (; k.n < rz.track.length; k.n++) k.points += `${k.points ? " " : ""}${rz.track[k.n][0].toFixed(2)},${rz.track[k.n][1].toFixed(2)}`;
@@ -1392,25 +1494,11 @@
     }
     const g = svg.querySelector("[data-rz]");
     g.querySelector("[data-rz-beacon]").setAttribute("opacity", Math.sin(now / 110) > 0 ? "1" : "0.35");
-    if (view === "top") {
-      g.setAttribute("transform", `translate(${rz.x.toFixed(2)} ${rz.y.toFixed(2)}) rotate(${((rz.h * 180) / Math.PI).toFixed(1)})`);
-      return;
-    }
-    const [x, y] = TILT.at(rz.x, rz.y);
-    g.setAttribute("transform", `translate(${x.toFixed(2)} ${y.toFixed(2)})`);
-    g.dataset.depth = y;
-    const c = Math.cos(rz.h),
-      s = Math.sin(rz.h) * SQUASH;
-    if (Math.abs(c) > 0.2) k.face = Math.sign(c);
-    g.querySelector("[data-rz-turn]").setAttribute("transform", `scale(${(0.6 + (0.4 * Math.abs(c)) / (hypot(c, s) || 1)).toFixed(2)} 1)`);
-    g.querySelector("[data-rz-flip]").setAttribute("transform", k.face < 0 ? "scale(-1 1)" : "");
-    const dot = svg.querySelector("[data-map-rz]");
-    dot.setAttribute("cx", rz.x.toFixed(1));
-    dot.setAttribute("cy", rz.y.toFixed(1));
+    g.setAttribute("transform", `translate(${rz.x.toFixed(2)} ${rz.y.toFixed(2)}) rotate(${((rz.h * 180) / Math.PI).toFixed(1)})`);
   }
 
-  // `fx` carries what only the page knows: the view, the time, a lit goal
-  // lamp, the Kamboni when it is out.
+  // `fx` carries what only the page knows: the view, the time, a lit lamp,
+  // the Kamboni when it is out.
   function draw(svg, game, fx = {}) {
     const view = fx.view || "top";
     if (svg.dataset.view !== view) build(svg, game, view);
@@ -1422,6 +1510,7 @@
     if (view === "top") {
       game.players.forEach((p, i) => {
         const g = groups[i];
+        g.style.display = p.off ? "none" : "";
         g.setAttribute("transform", `translate(${p.x.toFixed(2)} ${p.y.toFixed(2)})`);
         // Everyone watches the puck, except whoever has it, who looks ahead; a
         // player knocked down lies turned, with crosses for eyes and stars.
@@ -1437,6 +1526,7 @@
       const [px, py] = TILT.at(pk.x, pk.y);
       game.players.forEach((p, i) => {
         const g = groups[i];
+        g.style.display = p.off ? "none" : "";
         const [x, y] = TILT.at(p.x, p.y);
         g.setAttribute("transform", `translate(${x.toFixed(2)} ${y.toFixed(2)})`);
         g.dataset.depth = y;
@@ -1508,23 +1598,21 @@
       puck.dataset.depth = py;
       svg.querySelector("[data-puck-ghost]").setAttribute("transform", `translate(${px.toFixed(2)} ${py.toFixed(2)})`);
       const arrow = svg.querySelector("[data-you-arrow]");
-      arrow.style.display = game.human ? "" : "none";
-      if (game.human) {
+      const here = game.human && !game.controlled.off;
+      arrow.style.display = here ? "" : "none";
+      if (here) {
         const [ax, ay] = TILT.at(game.controlled.x, game.controlled.y);
         const lift = 3.25 * TALL + 0.35 + Math.sin(now / 220) * 0.15;
         arrow.setAttribute("transform", `translate(${ax.toFixed(2)} ${(ay - lift).toFixed(2)})`);
       }
-      // The camera pans after the puck (or the Kamboni), a little ahead of it,
-      // and stops at the ends of the rink. Without `follow` (the home page) it
-      // shows the lot.
+      // The camera pans after the puck, a little ahead of it, and stops at the
+      // ends of the rink. Without `follow` (the home page) it shows the lot.
       const box = svg.rinkBox,
         map = svg.querySelector("[data-map]");
       let vx = box.x0,
         vw = box.x1 - box.x0;
       if (fx.follow) {
-        const rz = fx.rz,
-          ahead = rz ? TILT.at(rz.x, rz.y)[0] + Math.cos(rz.h) * rz.v * 0.35 : px + pk.vx * 0.35;
-        const want = clamp(ahead, box.x0 + VIEW / 2, box.x1 - VIEW / 2);
+        const want = clamp(px + pk.vx * 0.35, box.x0 + VIEW / 2, box.x1 - VIEW / 2);
         // Eased, in the animation; a redraw without a time jumps straight there.
         const ease = svg.camAt === undefined || !fx.now || !svg.camT ? 1 : 1 - Math.exp(-clamp((now - svg.camT) / 1000, 0, 0.1) * 3.5);
         svg.camAt = svg.camAt === undefined ? want : svg.camAt + (want - svg.camAt) * ease;
@@ -1540,6 +1628,7 @@
         view.setAttribute("width", (vw / Math.cos(YAW)).toFixed(1));
         game.players.forEach((p, i) => {
           const dot = map.querySelector(`[data-map-player="${i}"]`);
+          dot.style.display = p.off ? "none" : "";
           dot.setAttribute("cx", p.x.toFixed(1));
           dot.setAttribute("cy", p.y.toFixed(1));
           dot.setAttribute("stroke", game.human && p === game.controlled ? "var(--global-text-color)" : "none");
@@ -1557,11 +1646,14 @@
     }
     svg.querySelector("[data-trail]").setAttribute("points", pk.trail.map((t) => t.map((v) => v.toFixed(2)).join(",")).join(" "));
     const you = svg.querySelector("[data-you]");
-    you.style.display = game.human ? "" : "none";
+    you.style.display = game.human && !game.controlled.off ? "" : "none";
     if (game.human) you.setAttribute("transform", `translate(${game.controlled.x.toFixed(2)} ${game.controlled.y.toFixed(2)})`);
+    // A goal lights its lamp, flickering; the end of a period lights both, green.
     for (const lamp of svg.querySelectorAll("[data-lamp]")) {
-      const on = fx.lamp && +lamp.dataset.lamp === fx.lamp.side && now < fx.lamp.until;
-      lamp.setAttribute("opacity", on ? (0.55 + 0.35 * Math.sin(now / 80)).toFixed(2) : "0");
+      const l = fx.lamp,
+        on = l && (!l.side || +lamp.dataset.lamp === l.side) && now < l.until;
+      lamp.setAttribute("fill", l && l.green ? "url(#rink-lamp-green)" : "url(#rink-lamp)");
+      lamp.setAttribute("opacity", on ? (l.green ? 0.75 + 0.2 * Math.sin(now / 240) : 0.55 + 0.35 * Math.sin(now / 80)).toFixed(2) : "0");
     }
     // Hats fall onto the ice, spinning, stay a while and fade: from beyond the
     // far boards seen from above, from the sky when tilted.
@@ -1701,19 +1793,28 @@
     const overlay = $("[data-overlay]"),
       title = $("[data-overlay-title]"),
       text = $("[data-overlay-text]"),
-      button = $("[data-overlay-button]");
+      button = $("[data-overlay-button]"),
+      alt = $("[data-overlay-alt]");
     const toast = $("[data-toast]"),
       live = $("[data-live]");
     let game = new Game();
-    let state = "ready"; // ready, playing, paused, intermission, resurfacing, over
+    // ready, playing, paused, buzzer (a period has just ended), intermission
+    // (the choice), resurfacing (the person drives the Kamboni), crew, over
+    let state = "ready";
     let view = chosenView();
+    let lamp = null,
+      buzzed = 0,
+      period = 1;
+    let rz = null, // the Kamboni, between periods
+      rzView = "top", // seen from its cab, or from above
+      cab; // the cab, made when first wanted; null without WebGL
     // The running game and the Kamboni, for tests and the console.
-    rootEl.hockey = { game: () => game, rz: () => rz };
+    rootEl.hockey = { game: () => game, rz: () => rz, view: () => (rz ? rzView : view), state: () => state };
     draw(svg, game, { view, follow: true });
     const marks = skateMarks(svg);
-    let rz = null; // the Kamboni, between periods
+    const ordinal = (n) => ["first", "second"][n - 1] || "last";
+    const touchy = () => rootEl.classList.contains("is-touch") || matchMedia("(pointer: coarse)").matches;
 
-    const alt = $("[data-overlay-alt]");
     function show(t, body, label, other) {
       title.textContent = t;
       text.textContent = body;
@@ -1733,12 +1834,13 @@
     function hud() {
       $("[data-score-a]").textContent = game.score.a;
       $("[data-score-b]").textContent = game.score.b;
-      // The clock, or between periods how clean the ice is, as a bar filling
-      // up to what is enough.
+      // The clock, blinking when time is up; between periods how clean the
+      // ice is, as a bar filling up to what is enough.
       const clock = $("[data-clock]"),
-        meter = state === "resurfacing";
-      clock.classList.toggle("is-meter", meter);
-      if (meter) {
+        out = state === "resurfacing" || state === "crew";
+      clock.classList.toggle("is-meter", out);
+      clock.classList.toggle("is-buzzer", state === "buzzer");
+      if (out) {
         const bar = Math.min(100, (100 * rz.part) / RZ.done).toFixed(1);
         clock.textContent = `ice ${Math.floor(100 * rz.part)}% clean`;
         clock.style.backgroundImage = `linear-gradient(90deg, var(--rink-meter) ${bar}%, transparent ${bar}%)`;
@@ -1751,17 +1853,55 @@
               ? "overtime"
               : `${["1st", "2nd", "3rd"][game.period - 1] || ""} · ${minutes(Math.ceil(game.clock))}`;
       }
-      $("[data-pause]").textContent = state === "paused" ? "resume" : "pause";
-      $("[data-view]").textContent = view === "tilt" ? "view from above" : "TV camera";
+      const pauseButton = $("[data-pause]"),
+        viewButton = $("[data-view]");
+      pauseButton.textContent = { paused: "resume", resurfacing: "let the crew finish", crew: "skip" }[state] || "pause";
+      viewButton.textContent = out ? (rzView === "cab" ? "view from above" : "from the cab") : view === "tilt" ? "view from above" : "TV camera";
+      viewButton.disabled = out && (state === "crew" || !cab);
     }
+
+    // The cab, made the first time it is wanted.
+    function cabView() {
+      if (cab === undefined) {
+        try {
+          cab = (root.KamboniCab && root.KamboniCab($(".game-stage"), { RZ, outline, frost: frostSVG() })) || null;
+        } catch (e) {
+          cab = null;
+        }
+      }
+      return cab;
+    }
+    // Between periods: the Kamboni from its cab, or the rink from above.
+    function showKamboni(now) {
+      const inCab = rzView === "cab" && !!cab;
+      if (cab) cab.show(inCab);
+      rootEl.classList.toggle("is-cab", inCab);
+      if (!inCab) draw(svg, game, { view: "top", now, rz });
+    }
+    const controls = () =>
+      rzView === "cab"
+        ? touchy()
+          ? "Steer with the stick; push it up to go faster."
+          : "← and → steer. ↑ goes faster, ↓ slower."
+        : touchy()
+          ? "Drive with the stick."
+          : "Drive with the arrows.";
     $("[data-view]").addEventListener("click", () => {
+      if (state === "crew") return;
+      if (state === "resurfacing") {
+        if (!cab) return;
+        rzView = rzView === "cab" ? "top" : "cab";
+        showKamboni(performance.now());
+        say(controls(), 2.6);
+        return hud();
+      }
       view = view === "tilt" ? "top" : "tilt";
       try {
         localStorage.setItem("hockey-view", view);
       } catch (e) {
         // Not remembered, which is fine.
       }
-      draw(svg, game, { view, follow: true, rz: state === "resurfacing" ? rz : null });
+      draw(svg, game, { view, follow: true, lamp, now: performance.now() });
       hud();
     });
 
@@ -1785,21 +1925,58 @@
     // Buttons give focus back, so Space shoots instead of pressing them again.
     rootEl.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => b.blur()));
     button.addEventListener("click", () => (state === "intermission" ? resurface() : start()));
-    alt.addEventListener("click", () => state === "intermission" && endResurfacing(true));
+    alt.addEventListener("click", () => state === "intermission" && crew());
 
-    // Between periods: drive the Kamboni until enough of the ice is clean, or
-    // let the crew do it.
-    function resurface() {
-      state = "resurfacing";
-      overlay.hidden = true;
-      rz = new Resurfacer();
-      last = null;
-      svg.focus({ preventScroll: true });
+    // The end of a period: the green lights behind the nets (time is up, as in
+    // a real arena), and the players skate off to their benches; then the choice.
+    function buzzer(ev, now) {
+      state = "buzzer";
+      buzzed = now;
+      period = ev.period;
+      lamp = { green: true, until: now + 3400 };
+      say(`End of the ${ordinal(ev.period)} period.`, 3);
+    }
+    function intermission() {
+      state = "intermission";
+      rz = null;
+      show(
+        `End of the ${ordinal(period)} period`,
+        `The crew has taken the nets off. Drive the Kamboni until ${Math.round(RZ.done * 100)}% of the ice is clean, or let the crew do it.`,
+        "drive the Kamboni",
+        "let the crew do it"
+      );
       hud();
     }
-    function endResurfacing(skipped) {
-      let msg = "The crew did it. Fresh ice.";
-      if (!skipped) {
+    // The person drives: from the cab if the game was being watched on the
+    // TV camera (and there is WebGL), else from above. It waits for them.
+    function resurface() {
+      overlay.hidden = true;
+      rz = new Resurfacer();
+      rz.started = false;
+      rzView = view === "tilt" && cabView() ? "cab" : "top";
+      if (cab) cab.start(rz, svg.querySelector("[data-marks]"));
+      state = "resurfacing";
+      last = null;
+      showKamboni(performance.now());
+      svg.focus({ preventScroll: true });
+      say(controls(), 3.2);
+      hud();
+    }
+    // The crew drives the rows they always drive, from above and ten times as
+    // fast as life; any key or a tap skips to the end.
+    function crew() {
+      overlay.hidden = true;
+      const took = state === "resurfacing";
+      if (!rz) rz = new Resurfacer();
+      state = "crew";
+      rzView = "top";
+      showKamboni(performance.now());
+      say(took ? "The crew takes over." : "The crew is on it.", 2.2);
+      hud();
+    }
+    function endResurfacing(byCrew) {
+      let msg = rz && rz.started ? "The crew finished it. Fresh ice." : "The crew did it. Fresh ice.";
+      if (!byCrew && rz) {
         // The time it took, against the best in this browser.
         const t = Math.round(rz.time);
         let best = 0;
@@ -1811,6 +1988,9 @@
         }
         msg = `Fresh ice, in ${minutes(t)}.` + (best && t < best ? " Your best yet." : best ? ` Best: ${minutes(best)}.` : "");
       }
+      if (cab) cab.show(false);
+      rootEl.classList.remove("is-cab");
+      rz = null;
       marks.clear();
       game.nextPeriod();
       state = "playing";
@@ -1820,25 +2000,40 @@
       say(msg, 2.6);
       hud();
     }
-    // It drives where the keys or the stick point; Space (or shoot) is the horn.
     function resurfaceStep(dt) {
-      const inp = input();
-      rz.step(dt, inp);
-      if (rz.bonk) say("Bonk.", 0.7);
+      if (state === "crew") {
+        for (let i = 0; i < 10 && !rz.done; i++) rz.step(dt, rz.autopilot());
+        if (rz.done) endResurfacing(true);
+        return;
+      }
+      // Space (or shoot) is the horn.
+      const inp = input(false);
       if (inp.shoot) say("Beep beep.", 0.7);
+      if (!rz.started && !inp.x && !inp.y) return;
+      rz.started = true;
+      rz.step(dt, rzView === "cab" ? { drive: true, steer: inp.x, throttle: -inp.y } : inp);
+      if (rz.bonk) say("Bonk.", 0.7);
       if (rz.done) endResurfacing(false);
     }
-    $("[data-pause]").addEventListener("click", () => (state === "playing" ? pause() : state === "paused" ? start() : null));
+    $("[data-pause]").addEventListener("click", () =>
+      state === "playing" ? pause() : state === "paused" ? start() : state === "resurfacing" ? crew() : state === "crew" ? endResurfacing(true) : null
+    );
     $("[data-restart]").addEventListener("click", () => {
       game = new Game();
       marks.clear();
+      rz = null;
+      lamp = null;
+      if (cab) cab.show(false);
+      rootEl.classList.remove("is-cab");
       draw(svg, game, { view, follow: true });
       state = "playing";
       overlay.hidden = true;
       toast.hidden = true;
       last = null;
+      hud();
     });
     document.addEventListener("visibilitychange", () => document.hidden && pause());
+    $(".game-stage").addEventListener("pointerdown", () => state === "crew" && endResurfacing(true));
 
     // Input: the keyboard, and on touch screens a stick and two buttons. The
     // first touch shows those, for touch screens the media query misses.
@@ -1863,7 +2058,10 @@
     ];
     window.addEventListener("keydown", (e) => {
       if (e.target.closest && e.target.closest("input, textarea, select")) return;
-      if ((state === "playing" || state === "resurfacing") && GAME_KEYS.includes(e.code)) e.preventDefault();
+      const busy = state === "playing" || state === "buzzer" || state === "resurfacing" || state === "crew";
+      if (busy && GAME_KEYS.includes(e.code)) e.preventDefault();
+      // The crew at work: any key skips to the end.
+      if (state === "crew" && !e.repeat && (GAME_KEYS.includes(e.code) || e.code === "Enter" || e.code === "Escape")) return endResurfacing(true);
       if (e.code === "KeyP" || e.code === "Escape") return state === "playing" ? pause() : state === "paused" ? start() : null;
       // Enter or Space take the overlay's first button, unless a button has
       // the focus (it then takes the key itself).
@@ -1922,12 +2120,15 @@
       $(`[data-${name}]`).addEventListener("pointerdown", (e) => {
         e.preventDefault();
         if (state === "playing" || state === "resurfacing") presses[name] = true;
+        else if (state === "crew") endResurfacing(true);
         else if (state === "intermission") resurface();
-        else start();
+        else if (state !== "buzzer") start();
       });
     }
 
-    function input() {
+    // The keys and the stick, as directions on the screen; `onIce`, as
+    // directions on the ice (in the TV camera's view those are not the same).
+    function input(onIce) {
       let x = touch.x,
         y = touch.y;
       if (keys.has("ArrowLeft") || keys.has("KeyA")) x -= 1;
@@ -1936,9 +2137,7 @@
       if (keys.has("ArrowDown") || keys.has("KeyS")) y += 1;
       let l = hypot(x, y);
       if (l > 1) [x, y, l] = [x / l, y / l, 1];
-      // Keys and the stick mean directions on the screen: tilted, that is not
-      // the same direction on the ice.
-      if (view === "tilt" && l > 0) {
+      if (onIce && view === "tilt" && l > 0) {
         const [ix, iy] = TILT.back(x, y),
           il = hypot(ix, iy);
         [x, y] = [(ix / il) * l, (iy / il) * l];
@@ -1955,18 +2154,21 @@
       const dt = last === null ? 0 : Math.min(0.05, (now - last) / 1000);
       last = now;
       if (toastTimer > 0 && (toastTimer -= dt) <= 0) toast.hidden = true;
-      if (state === "resurfacing") {
+      if (state === "resurfacing" || state === "crew") {
         resurfaceStep(dt);
-        if (state === "resurfacing") {
-          draw(svg, game, { now, lamp, view, follow: true, rz });
+        if (state === "resurfacing" || state === "crew") {
+          if (rzView === "cab" && cab) cab.frame(now);
+          else draw(svg, game, { view: "top", now, rz });
           hud();
           return;
         }
       }
-      if (state !== "playing") return;
+      // Once the players are off and the lights have had their moment, the choice.
+      if (state === "buzzer" && game.benched && now - buzzed > 2600) intermission();
+      if (state !== "playing" && state !== "buzzer") return;
       spare += dt;
       // Presses count once, in the first step of the frame.
-      const held = input();
+      const held = input(true);
       let first = true;
       while (spare >= STEP) {
         game.step(STEP, first ? held : { x: held.x, y: held.y });
@@ -1991,15 +2193,8 @@
         } else if (ev.type === "shot" && ev.oneTimer && ev.you) say("One-timer!", 0.8);
         else if (ev.type === "post") say("Off the post!", 1);
         else if (ev.type === "overtime") say("Tied. Next goal wins.", 2.5);
-        else if (ev.type === "intermission") {
-          state = "intermission";
-          show(
-            `End of the ${["first", "second"][ev.period - 1] || "last"} period`,
-            `The ice is all cut up. Drive the Kamboni until ${Math.round(RZ.done * 100)}% of it is clean, or let the crew do it.`,
-            "drive the Kamboni",
-            "let the crew do it"
-          );
-        } else if (ev.type === "final") {
+        else if (ev.type === "intermission") buzzer(ev, now);
+        else if (ev.type === "final") {
           state = "over";
           const { a, b } = ev.score;
           const verdict = a > b ? "You win. The computer would like a rematch." : "The computer wins. It says good game, and means it.";
@@ -2010,7 +2205,6 @@
       draw(svg, game, { now, lamp, view, follow: true });
       hud();
     }
-    let lamp = null;
     hud();
     show("Three on three", "You are blue and attack the goal on the right. Three periods of a minute; most goals wins.", "play");
     requestAnimationFrame(frame);

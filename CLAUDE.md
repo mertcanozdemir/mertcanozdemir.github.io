@@ -168,9 +168,11 @@ The simulation (`Game`) has no DOM in it. **Run `node bin/check-game.js` after
 touching it** (exits non-zero on problems): it plays the computer against
 itself, against a person who does nothing, and against a scripted person, and
 checks that nothing leaves the rink or turns into NaN, the puck never sits
-loose, goals come at a sensible rate, and the scripted person can score. It
-also drives the Kamboni (below) in rows, which must get the ice clean within
-40 s (it takes about 28), and anyhow, which must stay on the ice. Its
+loose, goals come at a sensible rate, and the scripted person can score.
+Between periods it lets the players skate off, and it drives the Kamboni
+(below) the crew's way, which must get the ice clean within 45 s (it takes
+about 35), and anyhow from above and from the cab, which must stay on the ice.
+Its
 numbers are the way to tune the balance; bugs it has caught include the net's
 mouth acting as a wall, defenders pushing a carrier along instead of reaching
 the puck, carriers parking in the slot, and an asymmetric collision that made
@@ -210,17 +212,45 @@ screens get a stick and three buttons (pass, check, shoot), shown by
 `.game-touch [data-stick]`: the players' sticks in the SVG are `data-stick` too,
 and a bare `[data-stick]` picked one of those and broke the touch stick.)
 
-Between periods (`phase` "intermission"; the page calls `nextPeriod()`) the
-person can drive the **Kamboni**, an ice resurfacer, over the cut-up ice, or
-"let the crew do it". Mertcan's idea, after the cleaning and house-painting
-games; he named it Kamboni (not Zamboni, which is a brand). Its physics is
-`Resurfacer` in the simulation (`RZ`: a 6.25 m band behind it, 12 m/s, turns
-like a vehicle); the ice is counted in 1 m cells and 85% is enough. The page
-frosts the used ice (a scratched pattern) and masks the frost and the skate
-marks away along its track, which shows as wet ice, on the map too; the HUD's
-clock becomes a bar ("ice 37% clean"); the players and puck are hidden
-(`is-resurfacing`). The time is kept against the best in the browser
-(`kamboni-best`). Space honks; boards and nets bonk.
+The end of a period (`phase` "intermission") is not a sudden menu (Mertcan
+found the first version abrupt): the green lights come on behind both nets (in
+a real arena the green light means time is up), the clock blinks, and the
+players skate off to their benches (`leave()`; `benched` once all are off);
+then the choice fades in. The page calls `nextPeriod()` when the ice is done.
+
+The **Kamboni**, an ice resurfacer: Mertcan's idea, after the cleaning and
+house-painting games; he named it Kamboni (not Zamboni, which is a brand). The
+person drives it over the cut-up ice, or "lets the crew do it". About life size
+(`RZ`: 5.2 × 2.6 m, cleaning a 3 m band behind it; the first one was so big it
+could not get behind the nets), and the crew takes the nets off the ice first,
+as in a real arena. Its physics is `Resurfacer` in the simulation: from above it
+drives toward the arrows; from the cab it keeps going at a cruise, ← → steer and
+↑ ↓ change speed (easier: the first controls were found hard). Its body is three
+circles against the boards. The ice is counted in 1 m cells and 65% is enough.
+The crew's way (`autopilot()`) is rows along the rink, shown ten times as fast;
+the pause button becomes "let the crew finish", then "skip". The time is kept
+against the best in the browser (`kamboni-best`). Space honks; boards bonk.
+
+From above, the page frosts the used ice (a scratched pattern) and masks the
+frost and the skate marks away along the track, which shows as wet ice; the
+players, puck and nets are hidden (`is-resurfacing`); the drawing
+(`KAMBONI_TOP`) follows a real resurfacer: driver up front on the left, the
+snow tank, the conditioner and towel behind. The HUD's clock becomes a bar
+("ice 37% clean").
+
+**From the cab** (`assets/js/kamboni.js`, WebGL; loaded on /play/ only): Mertcan
+asked to drive from inside after the Kamboni did not work on the TV camera, so
+it is the TV camera's replacement between periods (the view button switches to
+from above). The ice texture is the game's own rink drawing with the period's
+marks and the frost, drawn into a canvas through an SVG data URL (CSS variables
+substituted, since an image cannot see them); the clean, wet ice is painted onto
+it along the track and only that patch is uploaded. Round it: boards with
+KAMBONI adverts, glass, and stands that start right behind the glass (with a
+gap you saw into the void). Over it, the cab: its frame, a mirror (a second,
+flipped render) that shows the clean band behind, a dashboard with the wheel,
+a gauge, an arrow to the dirtiest ice (4 m blocks) and a nodding cat, and a
+map. No WebGL: from above instead. Headless Chrome logs "GPU stall due to
+ReadPixels" here; that is its software compositing, not the game.
 
 Two views, switched by a button above the rink and remembered per browser
 (`hockey-view` in localStorage; the stored value for it is still `tilt`): the

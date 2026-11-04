@@ -76,7 +76,7 @@
     const { half, depth, crease } = NET;
     return `<g transform="translate(${x} ${y}) rotate(${angle || 0})">
       <path d="M 0 ${-crease} A ${crease} ${crease} 0 0 1 0 ${crease}" fill="var(--rink-crease)" stroke="var(--rink-red)" stroke-width="0.1"/>
-      <rect x="${-depth}" y="${-half}" width="${depth}" height="${2 * half}" rx="0.45"
+      <rect data-rink-net x="${-depth}" y="${-half}" width="${depth}" height="${2 * half}" rx="0.45"
         fill="var(--rink-net)" stroke="var(--rink-red)" stroke-width="0.16"/></g>`;
   }
 

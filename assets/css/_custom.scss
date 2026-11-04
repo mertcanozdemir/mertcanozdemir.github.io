@@ -1267,6 +1267,7 @@ a.piece:hover .piece-more {
   --rink-rz-edge: #8d98a4;
   --rink-rz-tank: #dce3ea;
   --rink-rz-dark: #56606b;
+  --rink-towel: #cfd9e3;
   --rink-frost: rgba(150, 168, 188, 0.24); // used ice
   --rink-wet: rgba(120, 190, 255, 0.26); // freshly cleaned ice
   --rink-meter: rgba(31, 111, 208, 0.22);
@@ -1293,6 +1294,7 @@ html[data-theme="dark"] {
   --rink-rz-edge: #10151b;
   --rink-rz-tank: #aab4be;
   --rink-rz-dark: #39414a;
+  --rink-towel: #5d6771;
   --rink-frost: rgba(215, 228, 242, 0.13);
   --rink-wet: rgba(100, 170, 245, 0.2);
   --rink-meter: rgba(74, 154, 239, 0.32);
@@ -1353,6 +1355,12 @@ html[data-theme="dark"] {
   color: var(--global-text-color-light);
   font-variant-numeric: tabular-nums;
 
+  // Time is up: the clock blinks, a few times.
+  &.is-buzzer {
+    color: var(--global-text-color);
+    animation: game-blink 0.6s steps(2, jump-none) 5;
+  }
+
   // Between periods: how clean the ice is, as a bar that fills up.
   &.is-meter {
     min-width: 9.5rem;
@@ -1370,6 +1378,24 @@ html[data-theme="dark"] {
 
   button {
     white-space: nowrap;
+
+    &:disabled {
+      opacity: 0.45;
+      cursor: default;
+      pointer-events: none;
+    }
+  }
+}
+
+@keyframes game-blink {
+  50% {
+    opacity: 0.25;
+  }
+}
+
+@keyframes game-fade-in {
+  from {
+    opacity: 0;
   }
 }
 
@@ -1396,8 +1422,10 @@ html[data-theme="dark"] {
     user-select: none;
   }
 
-  // Between periods only the Kamboni is on the ice.
+  // Between periods only the Kamboni is on the ice: the crew has taken the
+  // nets off too.
   svg.is-resurfacing {
+    [data-rink-net],
     [data-player],
     [data-puck],
     [data-puck-ghost],
@@ -1414,6 +1442,7 @@ html[data-theme="dark"] {
 .game-overlay {
   position: absolute;
   inset: 0;
+  animation: game-fade-in 0.45s ease-out;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1478,6 +1507,7 @@ html[data-theme="dark"] {
 
 .game-toast {
   position: absolute;
+  z-index: 1;
   top: 7%;
   left: 50%;
   margin: 0;
@@ -1493,6 +1523,54 @@ html[data-theme="dark"] {
   &[hidden] {
     display: none;
   }
+}
+
+// From the Kamboni's cab (kamboni.js): the 3D view, with the cab's frame and
+// mirror, the dashboard and a map over it.
+.game-cab {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #1c2026;
+
+  &[hidden] {
+    display: none;
+  }
+
+  canvas,
+  .cab-frame {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  svg {
+    pointer-events: none;
+  }
+
+  .cab-dash {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 27%;
+    overflow: visible;
+  }
+
+  .cab-map {
+    position: absolute;
+    top: 6%;
+    right: 3.5%;
+    width: 17%;
+    height: auto;
+  }
+}
+
+.game.is-cab .game-toast {
+  top: 27%;
 }
 
 .game-touch {
