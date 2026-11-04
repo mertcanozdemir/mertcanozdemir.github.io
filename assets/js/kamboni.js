@@ -6,8 +6,8 @@
 // snow tank beside the seat with a mirror on an arm looking back at the clean
 // band, the white front deck with the wheel, a camera's screen showing the
 // ice round the Kamboni from above, a gauge for how clean the ice is and a
-// cat that sways along and nods or shakes its head at the driving; a lane
-// laser on the ice ahead; and a map of the rink.
+// cat that sways along and nods or shakes its head at the driving; and a map
+// of the rink.
 //
 // Rink coordinates as in the game, in metres: x along the rink, y across it
 // (+y the near side), h up. WebGL's X, Y and Z are x, h and y.
@@ -473,7 +473,6 @@ void main() {
         streak: gl.createBuffer(),
         machine: gl.createBuffer(),
         wet: gl.createBuffer(),
-        laser: gl.createBuffer(),
       };
     let atlasTex = null,
       atlasV = 1, // the texture's height in drawing units
@@ -746,73 +745,33 @@ void main() {
       return q;
     }
 
-    // The lane laser (real resurfacers can have one): two lines on the ice
-    // ahead, where the edges of the clean band will run. Each stretch shows
-    // what is just outside it: green, the wet edge of an earlier pass or the
-    // boards, which is how drivers line up their passes ("keep your tires
-    // lined up with the line of the surfaced ice"); amber, a strip of cut-up
-    // ice between it and the wet ice, which would be left; white, nothing
-    // to line up with; dim blue, ice already clean. `mood` is for the cat.
+    // How the driving goes, for the cat: "yes" when an edge of the clean band
+    // ahead runs along the wet edge of an earlier pass or the boards (drivers
+    // line their passes up so: "keep your tires lined up with the line of the
+    // surfaced ice"), "no" when a strip of cut-up ice would be left between.
     let grid = null;
     const cellAt = (x, y) => {
       const c = grid.get(Math.floor(x + 30) * 31 + Math.floor(y + 15));
       return c ? (c.clean ? "clean" : "dirty") : "off";
     };
-    const LASER = {
-      seam: [0.25, 1, 0.45, 0.95],
-      gap: [1, 0.66, 0.12, 0.95],
-      free: [1, 1, 1, 0.6],
-      done: [0.45, 0.72, 1, 0.45],
-    };
-    function laser() {
-      const q = quads(),
-        c = Math.cos(rz.h),
+    function seam() {
+      const c = Math.cos(rz.h),
         s = Math.sin(rz.h),
         half = RZ.width / 2,
-        seen = { seam: 0, gap: 0 };
+        seen = { yes: 0, no: 0 };
       for (const side of [-1, 1]) {
         // The driver's right is (-s, c).
-        const rx = -s * side,
-          ry = c * side,
-          at = (d, o) => [rz.x + c * d + rx * o, rz.y + s * d + ry * o];
-        for (let d = 3; d < 13; d += 1.6) {
-          const [mx, my] = at(d + 0.8, half);
-          if (cellAt(mx, my) === "off" && cellAt(...at(d + 0.8, half - 1)) === "off") break;
-          const inside = cellAt(...at(d + 0.8, half - 0.6)),
-            outside = cellAt(...at(d + 0.8, half + 0.5));
-          let state = "free";
-          if (inside === "clean" && outside !== "dirty") state = "done";
-          else if (outside !== "dirty") state = "seam";
-          else
-            for (const o of [1.3, 2.1, 2.9])
-              if (cellAt(...at(d + 0.8, half + o)) === "clean") {
-                state = "gap";
-                break;
-              }
-          if (d < 8 && state in seen) seen[state]++;
-          const col = LASER[state],
-            [ax, ay] = at(d, half),
-            [bx, by] = at(d + 1.6, half),
-            w = 0.05;
-          q.add(
-            [ax - rx * w, 0.03, ay - ry * w],
-            [bx - rx * w, 0.03, by - ry * w],
-            [bx + rx * w, 0.03, by + ry * w],
-            [ax + rx * w, 0.03, ay + ry * w],
-            col
-          );
-          const glow = [col[0], col[1], col[2], col[3] * 0.25],
-            g = 0.2;
-          q.add(
-            [ax - rx * g, 0.025, ay - ry * g],
-            [bx - rx * g, 0.025, by - ry * g],
-            [bx + rx * g, 0.025, by + ry * g],
-            [ax + rx * g, 0.025, ay + ry * g],
-            glow
-          );
+        const at = (d, o) => [rz.x + c * d - s * side * o, rz.y + s * d + c * side * o];
+        for (let d = 3.8; d < 8; d += 1.6) {
+          if (cellAt(...at(d, half)) === "off" && cellAt(...at(d, half - 1)) === "off") break;
+          const inside = cellAt(...at(d, half - 0.6)),
+            outside = cellAt(...at(d, half + 0.5));
+          if (inside === "clean") continue;
+          if (outside !== "dirty") seen.yes++;
+          else if ([1.3, 2.1, 2.9].some((o) => cellAt(...at(d, half + o)) === "clean")) seen.no++;
         }
       }
-      return { q, mood: seen.seam ? "yes" : seen.gap ? "no" : null };
+      return seen.yes ? "yes" : seen.no ? "no" : null;
     }
 
     let rzColours = null; // read again for each intermission, in the theme of the moment
@@ -911,10 +870,7 @@ void main() {
         gl.viewport(0, 0, W, H);
         gl.clearColor(...ARENA, 1);
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-        const lane = laser();
-        scene(mul(perspective(0.95, W / H, 0.1, 260), lookAt(eye, look(rz.h, EYE.pitch), up)), 1, false, [
-          drawDynamic(dyn.laser, lane.q, null, { glass: true }),
-        ]);
+        scene(mul(perspective(0.95, W / H, 0.1, 260), lookAt(eye, look(rz.h, EYE.pitch), up)), 1);
         // The mirror, on its arm at the top right: behind, and the wrong way round.
         const mx = Math.round((W * MIRROR.x) / 100),
           mw = Math.round((W * MIRROR.w) / 100),
@@ -949,14 +905,14 @@ void main() {
         parts.needle.setAttribute("transform", `rotate(${(-120 + 240 * rz.part).toFixed(1)})`);
         parts.ice.textContent = `${Math.floor(100 * rz.part)}%`;
         // The cat sways: a spring, pushed by turns and bumps. And it is the
-        // driver's trainer: it nods while the laser is on the wet edge, and
-        // shakes its head at a strip about to be left.
+        // driver's trainer: it nods while the Kamboni runs along the wet edge
+        // of an earlier pass, and shakes its head at a strip about to be left.
         const yaw = rz.wheel * RZ.lock * Math.min(1, Math.max(0.3, Math.abs(rz.v) / 3)) * Math.sign(rz.v || 1);
         cat.w += (-70 * cat.a - 4 * cat.w - rz.v * yaw * 0.08) * dt;
         if (rz.bonk) cat.w += 7;
         cat.a = Math.max(-0.6, Math.min(0.6, cat.a + cat.w * dt));
         const moving = Math.abs(rz.v) > 1,
-          mood = moving ? lane.mood : null;
+          mood = moving ? seam() : null;
         cat.t += dt;
         cat.yes += ((mood === "yes" ? 1 : 0) - cat.yes) * Math.min(1, dt * 6);
         cat.no += ((mood === "no" ? 1 : 0) - cat.no) * Math.min(1, dt * 6);

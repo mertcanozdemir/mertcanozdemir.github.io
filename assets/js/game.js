@@ -2965,11 +2965,6 @@
       if (!rz.started && !inp.x && !inp.y) return;
       rz.started = true;
       rz.step(dt, { drive: true, steer: inp.x, throttle: -inp.y });
-      // Once, a few seconds in: what the lane laser says.
-      if (rzView === "cab" && !rz.toldLaser && rz.time > 4) {
-        rz.toldLaser = true;
-        say("Green laser: on the edge of the wet ice. Amber: a strip would be left.", 3.6);
-      }
       if (rz.bonk) {
         say("Bonk.", 0.7);
         sound.play("thud", true);

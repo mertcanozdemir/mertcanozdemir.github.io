@@ -438,20 +438,17 @@ as on a real resurfacer (a cab is an extra on real ones; the first version had
 a roof and pillars and looked like a truck, Mertcan said): the snow tank's side
 on the right with a mirror on an arm (a second, flipped render) that shows the
 clean band behind, a grab rail on the left, the white front deck with the
-wheel, a gauge for the ice and a cat, and the map at the top left. Two aids
-replaced an arrow to the dirtiest ice, which Mertcan found useless:
-
-- the **ICE CAM** on the dash (`screenBox()`, a third render through a hole
-  in the dash's SVG): the ice from straight above, heading up, the Kamboni
-  drawn in, and the cells the game counts as clean tinted blue (`wetCells()`),
-  so the strips still to do stand out (a real one has a rear camera on a
-  screen);
-- the **lane laser** (`laser()`; a real option on one maker's machines): two
-  lines on the ice ahead where the band's edges will run, green on the wet
-  edge of an earlier pass or the boards (drivers line their passes up so),
-  amber over a strip that would be left, white with nothing to line up with,
-  dim blue over clean ice. The cat is the trainer: it nods on the seam and
-  shakes its head at a gap. A toast says so once, four seconds in.
+wheel, a gauge for the ice and a cat, and the map at the top left. An arrow
+to the dirtiest ice, which Mertcan found useless, gave way to the **ICE CAM** on the
+dash (`screenBox()`, a third render through a hole in the dash's SVG): the ice
+from straight above, heading up, the Kamboni drawn in, and the cells the game
+counts as clean tinted blue (`wetCells()`), so the strips still to do stand out
+(a real one has a rear camera on a screen). A lane laser on the ice ahead
+(green on the wet edge, amber over a gap; a real option on one maker's
+machines) was tried and dropped as unnecessary (Mertcan). The cat is the
+driver's trainer (`seam()`): it nods while an edge of the band runs along the
+wet edge of an earlier pass or the boards (drivers line their passes up so),
+and shakes its head at a strip about to be left.
 
 No WebGL: from above instead. Headless Chrome logs "GPU stall due to
 ReadPixels" here; that is its software compositing, not the game.
