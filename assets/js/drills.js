@@ -80,8 +80,8 @@
         fill="var(--rink-net)" stroke="var(--rink-red)" stroke-width="0.16"/></g>`;
   }
 
-  // Skin tones, one per player in turn.
-  const SKINS = ["#f1c8a6", "#e2ad86", "#c68e68", "#9a6644", "#6e4a33"];
+  // Skin tones, one per player in turn: light ones only, on request.
+  const SKINS = ["#f1c8a6", "#e8b896", "#e2ad86"];
 
   // A hockey player seen from above, facing +x: shoulder pads in the team's
   // jersey, the helmet on top, open at the front where the face and eyes are,

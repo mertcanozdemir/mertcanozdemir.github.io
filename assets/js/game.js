@@ -227,6 +227,7 @@
         if (this.wait > 0) return;
         if (this.phase === "goal") return this.decided ? this.finish() : this.faceoff();
         this.phase = "play";
+        this.dropped = this.t || 0;
         return;
       }
       if (!this.overtime) {
@@ -362,7 +363,7 @@
         c = pk.carrier;
       if (c === p) return this.carry(p, dt);
       // ...or line up a body check on a carrier close by.
-      if (c && c.team !== p.team && c.role === "skater" && p.checkCool <= 0) {
+      if (c && c.team !== p.team && c.role === "skater" && p.checkCool <= 0 && (this.t || 0) - (this.dropped || 0) > 1.2) {
         const d = dist(p, c);
         if (d > 1.8 && d < 3.4 && this.random() < (this.sharp(p.team) ? 1 : 0.45) * dt) {
           return this.check(p, c.x + c.vx * 0.15 - p.x, c.y + c.vy * 0.15 - p.y);
@@ -947,14 +948,18 @@
   const LAMP = `<defs><radialGradient id="rink-lamp"><stop offset="0" stop-color="#ff3b30" stop-opacity="0.85"/><stop offset="1" stop-color="#ff3b30" stop-opacity="0"/></radialGradient></defs>`;
 
   // ——— Two views ———
-  // From above, as the drills are drawn, or tilted: an orthographic camera above
-  // the near boards, turned a little (YAW) and tilted so the ice is squashed by
-  // SQUASH, heights rising up the screen RISE a metre. The game is the same
+  // From above, as the drills are drawn, or the TV camera: high in the stands
+  // at centre ice, looking across the rink through a long lens, so nearly
+  // without perspective (an orthographic camera, tilted so the ice is squashed
+  // by SQUASH, heights rising up the screen RISE a metre; YAW would turn it).
+  // It frames about two thirds of the rink (VIEW metres) and pans to follow
+  // the puck, with a map of the whole rink in the corner. The game is the same
   // either way; only the drawing changes, and which way the keys skate.
-  const YAW = -0.2,
-    SQUASH = 0.6,
+  const YAW = 0,
+    SQUASH = 0.56,
     RISE = 0.82,
-    TALL = 1.25; // standing players are drawn this much bigger, to be seen
+    TALL = 1.15, // standing players are drawn this much bigger, to be seen
+    VIEW = 38;
   const TILT = (() => {
     const c = Math.cos(YAW),
       s = Math.sin(YAW);
@@ -1166,6 +1171,7 @@
       y0 = Math.min(...ys) - 3.1 * TALL,
       x1 = Math.max(...xs) + 1,
       y1 = Math.max(...ys) + 0.8;
+    svg.rinkBox = { x0, y0, x1, y1 };
     svg.setAttribute("viewBox", `${x0.toFixed(1)} ${y0.toFixed(1)} ${(x1 - x0).toFixed(1)} ${(y1 - y0).toFixed(1)}`);
     svg.insertAdjacentHTML("beforeend", boardsSVG(true));
     el("g", { "data-hats": "" }, svg);
@@ -1183,6 +1189,26 @@
       const [cx, cy] = TILT.at(s * (GOAL_X + NET_DEPTH * 0.5), 0, 1.2);
       el("circle", { "data-lamp": s, cx, cy, r: 3.2, fill: "url(#rink-lamp)", opacity: 0 }, svg);
     }
+    // Over everything: the puck's outline, so it is never lost behind a
+    // player, and an arrow over your skater.
+    svg.insertAdjacentHTML(
+      "beforeend",
+      `<ellipse data-puck-ghost rx="0.45" ry="${(0.45 * SQUASH).toFixed(2)}" fill="var(--rink-puck)" fill-opacity="0.25" stroke="var(--rink-puck)" stroke-width="0.09"/>
+      <path data-you-arrow d="M -0.42 -0.62 L 0.42 -0.62 L 0 0 Z" fill="var(--rink-team-a)" stroke="var(--global-bg-color)" stroke-width="0.09" stroke-linejoin="round"/>`
+    );
+    // The map: the whole rink from above, small, in the top right corner,
+    // with every player, the puck and what the camera is showing.
+    const k = 0.115;
+    svg.insertAdjacentHTML(
+      "beforeend",
+      `<g data-map><g transform="scale(${k})">
+        <rect x="-31" y="-16" width="62" height="32" rx="9" fill="var(--global-bg-color)" fill-opacity="0.85" stroke="var(--rink-board)" stroke-width="0.8"/>
+        <rect data-map-view y="-15" height="30" fill="var(--rink-mark)"/>
+        <path d="M 0 -15 V 15 M -26 -13 V 13 M 26 -13 V 13" stroke="var(--rink-red)" stroke-width="0.5"/>
+        <path d="M -7.5 -15 V 15 M 7.5 -15 V 15" stroke="var(--rink-blue)" stroke-width="0.6"/>
+        ${game.players.map((p, i) => `<circle data-map-player="${i}" r="1.5" fill="var(--rink-team-${p.team})"/>`).join("")}
+        <circle data-map-puck r="1" fill="var(--rink-puck)" stroke="var(--rink-puck-edge)" stroke-width="0.25"/></g></g>`
+    );
   }
 
   // `fx` carries what only the page knows: the view, the time, a lit goal lamp.
@@ -1280,6 +1306,45 @@
       const puck = svg.querySelector("[data-puck]");
       puck.setAttribute("transform", `translate(${px.toFixed(2)} ${py.toFixed(2)})`);
       puck.dataset.depth = py;
+      svg.querySelector("[data-puck-ghost]").setAttribute("transform", `translate(${px.toFixed(2)} ${py.toFixed(2)})`);
+      const arrow = svg.querySelector("[data-you-arrow]");
+      arrow.style.display = game.human ? "" : "none";
+      if (game.human) {
+        const [ax, ay] = TILT.at(game.controlled.x, game.controlled.y);
+        const lift = 3.25 * TALL + 0.35 + Math.sin(now / 220) * 0.15;
+        arrow.setAttribute("transform", `translate(${ax.toFixed(2)} ${(ay - lift).toFixed(2)})`);
+      }
+      // The camera pans after the puck, a little ahead of it, and stops at the
+      // ends of the rink. Without `follow` (the home page) it shows the lot.
+      const box = svg.rinkBox,
+        map = svg.querySelector("[data-map]");
+      let vx = box.x0,
+        vw = box.x1 - box.x0;
+      if (fx.follow) {
+        const want = clamp(px + pk.vx * 0.35, box.x0 + VIEW / 2, box.x1 - VIEW / 2);
+        const step = svg.camAt === undefined ? 1 : 1 - Math.exp(-Math.min(0.1, (now - (svg.camT || now)) / 1000) * 3.5);
+        svg.camAt = svg.camAt === undefined ? want : svg.camAt + (want - svg.camAt) * step;
+        svg.camT = now;
+        [vx, vw] = [svg.camAt - VIEW / 2, VIEW];
+      }
+      svg.setAttribute("viewBox", `${vx.toFixed(2)} ${box.y0.toFixed(1)} ${vw.toFixed(2)} ${(box.y1 - box.y0).toFixed(1)}`);
+      map.style.display = fx.follow ? "" : "none";
+      if (fx.follow) {
+        map.setAttribute("transform", `translate(${(vx + vw - 0.115 * 31 - 0.6).toFixed(2)} ${(box.y0 + 0.115 * 16 + 0.5).toFixed(2)})`);
+        const view = map.querySelector("[data-map-view]");
+        view.setAttribute("x", (vx / Math.cos(YAW)).toFixed(1));
+        view.setAttribute("width", (vw / Math.cos(YAW)).toFixed(1));
+        game.players.forEach((p, i) => {
+          const dot = map.querySelector(`[data-map-player="${i}"]`);
+          dot.setAttribute("cx", p.x.toFixed(1));
+          dot.setAttribute("cy", p.y.toFixed(1));
+          dot.setAttribute("stroke", game.human && p === game.controlled ? "var(--global-text-color)" : "none");
+          dot.setAttribute("stroke-width", "0.6");
+        });
+        const mp = map.querySelector("[data-map-puck]");
+        mp.setAttribute("cx", pk.x.toFixed(1));
+        mp.setAttribute("cy", pk.y.toFixed(1));
+      }
       // Far to near, so whatever is nearer is drawn over what it stands in front of.
       const things = svg.querySelector("[data-things]");
       for (const n of things.querySelectorAll("[data-net]")) n.dataset.depth ??= TILT.at(+n.dataset.net * (GOAL_X + NET_DEPTH / 2), 0)[1];
@@ -1440,7 +1505,7 @@
     let view = chosenView();
     // The running game, for tests and the console.
     rootEl.hockey = { game: () => game };
-    draw(svg, game, { view });
+    draw(svg, game, { view, follow: true });
     const marks = skateMarks(svg);
 
     function show(t, body, label) {
@@ -1462,7 +1527,7 @@
       const t = Math.ceil(game.clock);
       $("[data-clock]").textContent = game.overtime ? "overtime" : `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
       $("[data-pause]").textContent = state === "paused" ? "resume" : "pause";
-      $("[data-view]").textContent = view === "tilt" ? "view from above" : "tilted view";
+      $("[data-view]").textContent = view === "tilt" ? "view from above" : "TV camera";
     }
     $("[data-view]").addEventListener("click", () => {
       view = view === "tilt" ? "top" : "tilt";
@@ -1471,7 +1536,7 @@
       } catch (e) {
         // Not remembered, which is fine.
       }
-      draw(svg, game, { view });
+      draw(svg, game, { view, follow: true });
       hud();
     });
 
@@ -1480,7 +1545,7 @@
         game = new Game();
         marks.clear();
       }
-      if (state === "over" || state === "ready") draw(svg, game, { view });
+      if (state === "over" || state === "ready") draw(svg, game, { view, follow: true });
       state = "playing";
       overlay.hidden = true;
       last = null;
@@ -1499,7 +1564,7 @@
     $("[data-restart]").addEventListener("click", () => {
       game = new Game();
       marks.clear();
-      draw(svg, game, { view });
+      draw(svg, game, { view, follow: true });
       state = "playing";
       overlay.hidden = true;
       toast.hidden = true;
@@ -1649,7 +1714,7 @@
         }
       }
       marks.update(game, now);
-      draw(svg, game, { now, lamp, view });
+      draw(svg, game, { now, lamp, view, follow: true });
       hud();
     }
     let lamp = null;

@@ -1343,6 +1343,21 @@ html[data-theme="dark"] {
 .game-buttons {
   display: flex;
   gap: 0.5rem;
+
+  button {
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 40rem) {
+  .game-buttons {
+    gap: 0.35rem;
+
+    button {
+      padding: 0.25rem 0.65rem;
+      font-size: 0.85rem;
+    }
+  }
 }
 
 .game-stage {

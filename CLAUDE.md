@@ -182,7 +182,8 @@ blades, striped socks, hockey pants, a jersey over shoulder pads, gloves on the
 stick at the player's side (half shoot left, half right) and an open helmet with
 ear guards, a half visor and a chin strap. Goalies are another shape: big pads,
 a wide chest protector, a blocker and a catching glove, a painted mask with a
-cage and a paddle stick. Skin tones vary from player to player (`RINK_SKINS`).
+cage and a paddle stick. Skin tones vary a little from player to player
+(`RINK_SKINS`): light tones only, which Mertcan asked for.
 An earlier design, helmets with a dark full visor over plain bodies, looked
 like motorcycle helmets and couriers (Mertcan's words) and was replaced.
 
@@ -206,18 +207,22 @@ stick and three buttons (pass, check, shoot), shown by `(pointer: coarse)` or
 after the first touch.
 
 Two views, switched by a button above the rink and remembered per browser
-(`hockey-view` in localStorage): **tilted**, the default and Mertcan's idea
-("izometrik"), and **from above**, as the drills are drawn. Tilted is an
-orthographic camera above the near boards, turned a little and tilted (`YAW`,
-`SQUASH`, `RISE`, the `TILT` matrix): the ice and what lies on it (markings,
-marks, the ring round your skater) are one plane drawn through that matrix,
-and on it stand boards with a far face and a see-through near face, nets with
-mesh and a red frame, and players standing up, a quarter bigger (`TALL`), with
-the helmet's visor and eyes turned the way they face (hidden when they skate
-away up the screen), all drawn far to near. Keys and the stick mean directions
-on the screen, so tilted they are mapped back onto the ice (`TILT.back`). A true
-45° isometric view was considered and passed over: the goals would sit in the
-corners and the keys would skate diagonally.
+(`hockey-view` in localStorage; the stored value for it is still `tilt`): the
+**TV camera**, the default, and **from above**, as the drills are drawn. The TV
+camera is Mertcan's idea, after a tilted, slightly turned view he had asked for
+as "izometrik": high in the stands at centre ice, looking across through a
+long lens, so drawn without perspective (`YAW` 0, `SQUASH`, `RISE`, the `TILT`
+matrix). It frames `VIEW` metres of the rink and pans after the puck, and a map
+of the whole rink sits in the top right corner (players, the puck, the stretch
+the camera shows). The home page's still shows the whole rink instead
+(`follow` off). The ice and what lies on it (markings, marks, the ring round
+your skater) are one plane drawn through the matrix; on it stand boards with a
+far face and a see-through near face, nets with mesh and a red frame, and
+players standing up (`TALL`), drawn far to near. Over everything: an arrow over
+your skater and the puck's outline, so neither is lost in a crowd. Keys and the
+stick mean directions on the screen, mapped back onto the ice (`TILT.back`). A
+true 45° isometric view was considered and passed over: the goals would sit in
+the corners and the keys would skate diagonally.
 
 Skate marks (`skateMarks()`, page side only): every player leaves twin blade
 tracks, and a fan of snow where they stop hard, turn sharply or go down. They
