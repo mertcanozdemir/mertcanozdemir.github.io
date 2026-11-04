@@ -1,7 +1,6 @@
 // MRI reconstruction results browser.
 //
-// Renders the generated dataset (assets/json/mri_recon_data.json) two ways. The
-// comparison graph has its own page, /graph/.
+// Renders the generated dataset (assets/json/mri_recon_data.json) two ways.
 // Papers is the default, because that is the unit people look for and because a
 // value-per-row list repeats the same baselines hundreds of times — zero-filled
 // alone appears once per cell per paper. Results lists every reported value, for

@@ -184,8 +184,9 @@ A "coming soon" placeholder was tried and dropped: a piece goes up when it works
 ### The comparison graph moved to the lab's site
 
 It is at <https://icon-lab.github.io/mri-recon-comparison-graph/> (repository
-`icon-lab/mri-recon-comparison-graph`, which has its own README on updating it),
-and `/graph/` redirects there. Its files here — `assets/js/recon-graph.js`,
+`icon-lab/mri-recon-comparison-graph`, which has its own README on updating it).
+The site no longer links to it or sends `/graph/` there (that redirect was
+removed): Mertcan wants the site independent of the lab's. Its files here — `assets/js/recon-graph.js`,
 `assets/json/mri_recon_graph.json`, `bin/graph-layout.js` and the "Comparison
 graph" styles — are no longer used. The local branch `years` (the paper's Fig. 2
 view of the graph) still **must not be pushed before the paper**.
