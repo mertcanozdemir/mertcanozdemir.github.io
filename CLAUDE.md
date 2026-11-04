@@ -212,6 +212,24 @@ screens get a stick and three buttons (pass, check, shoot), shown by
 `.game-touch [data-stick]`: the players' sticks in the SVG are `data-stick` too,
 and a bare `[data-stick]` picked one of those and broke the touch stick.)
 
+The **scoreboard** (`scoreboard()` in game.js, the HUD's `[data-board]`): asked
+for because the time and period were hard to see, "digital and retro, like the
+real ones". It follows real hockey boards (Daktronics, All American spec
+sheets): seven-segment LEDs with the unlit segments faintly there, the time big
+and red (in tenths of a second under a minute, as those boards do, so with
+minute-long periods it mostly runs in tenths), the scores in amber with a red
+goal light beside each, and under them the shots on goal and the period (`ot`
+in overtime), with white captions; black whatever the theme. Between periods
+the time gives way to ICE CLEAN %. Its `aria-label` carries the same in words.
+
+The players are named after **famous players** (Mertcan asked), with the
+numbers they wore: `lineUp()` deals both line-ups from `SKATERS` and `GOALIES`
+for every game. The numbers are on the jerseys in the TV camera's view (over
+the arms, which hid them) and under the players from above; the skater you
+control has their name over the arrow; goals, hits, the intro and the final
+("star of the game") use the names. Only names: the players are the game's own
+drawings. Commercial games license real names, so this was raised with him.
+
 The end of a period (`phase` "intermission") is not a sudden menu (Mertcan
 found the first version abrupt): the green lights come on behind both nets (in
 a real arena the green light means time is up), the clock blinks, and the

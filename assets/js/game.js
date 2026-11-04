@@ -977,6 +977,7 @@
         own,
         hatTrick: !own && by.goals === 3,
         oneTimer: !!pk.oneTimer,
+        by: by ? this.players.indexOf(by) : -1,
       });
     }
   }
@@ -1123,14 +1124,196 @@
 
   if (typeof document === "undefined") return;
 
+  // Said when a goal goes in; % is the scorer.
   const QUIPS = {
-    a: ["Goal! Top shelf.", "Goal! Through the five-hole.", "Goal! The goalie is still looking for it.", "Goal! Somebody tell the computer."],
+    a: [
+      "Goal! %, top shelf.",
+      "Goal! % through the five-hole.",
+      "Goal! %. The goalie is still looking for it.",
+      "Goal! %. Somebody tell the computer.",
+    ],
     b: [
-      "The computer scores. It will be unbearable now.",
-      "Goal for the computer. It practised all night.",
-      "The computer scores, and does a small dance.",
+      "% scores for the computer. It will be unbearable now.",
+      "% scores. The computer practised all night.",
+      "% scores, and the computer does a small dance.",
     ],
   };
+
+  // Famous players, with the numbers they wore: each game deals its two
+  // line-ups from them. Only the names: the players are the game's own drawings.
+  const SKATERS = [
+    ["Gretzky", 99],
+    ["Lemieux", 66],
+    ["Orr", 4],
+    ["Howe", 9],
+    ["Jágr", 68],
+    ["Crosby", 87],
+    ["McDavid", 97],
+    ["Messier", 11],
+    ["Lidström", 5],
+    ["Bure", 10],
+    ["Yzerman", 19],
+    ["Forsberg", 21],
+    ["Kurri", 17],
+    ["Selänne", 8],
+  ];
+  const GOALIES = [
+    ["Roy", 33],
+    ["Hašek", 39],
+    ["Brodeur", 30],
+    ["Dryden", 29],
+  ];
+  function lineUp(game) {
+    const deal = (list) =>
+      list
+        .map((v) => [Math.random(), v])
+        .sort((x, y) => x[0] - y[0])
+        .map((v) => v[1]);
+    const skaters = deal(SKATERS),
+      goalies = deal(GOALIES);
+    for (const p of game.players) [p.name, p.number] = p.role === "goalie" ? goalies.shift() : skaters.shift();
+    return game;
+  }
+  // "Gretzky, Orr and Lemieux, with Roy in goal"
+  function lineUpText(game, team) {
+    const them = game.players.filter((p) => p.team === team),
+      skaters = them.filter((p) => p.role !== "goalie").map((p) => p.name);
+    return `${skaters.slice(0, -1).join(", ")} and ${skaters[skaters.length - 1]}, with ${them.find((p) => p.role === "goalie").name} in goal`;
+  }
+
+  // ——— The scoreboard, as in an arena ———
+  // Seven-segment LEDs, the unlit segments faintly there, laid out as real
+  // hockey boards are: the time big and red, in tenths of a second under a
+  // minute; either side the scores in amber, each with a red goal light; under
+  // them the shots on goal and the period. White captions. Between periods the
+  // time gives way to how clean the ice is.
+  const SEGMENTS = {
+    0: "abcdef",
+    1: "bc",
+    2: "abdeg",
+    3: "abcdg",
+    4: "bcfg",
+    5: "acdfg",
+    6: "acdefg",
+    7: "abc",
+    8: "abcdefg",
+    9: "abcdfg",
+    "-": "g",
+    o: "cdeg",
+    t: "defg",
+  };
+  const SLANT = Math.tan((7 * Math.PI) / 180);
+  // One digit, w × h with segments t thick, its top left at (x, 0).
+  function digitSVG(key, x, w, h, t) {
+    const G = t * 0.16,
+      hz = (yc) => [
+        [t / 2 + G, yc],
+        [t + G, yc - t / 2],
+        [w - t - G, yc - t / 2],
+        [w - t / 2 - G, yc],
+        [w - t - G, yc + t / 2],
+        [t + G, yc + t / 2],
+      ],
+      vt = (xc, y0, y1) => [
+        [xc, y0 + G],
+        [xc + t / 2, y0 + t / 2 + G],
+        [xc + t / 2, y1 - t / 2 - G],
+        [xc, y1 - G],
+        [xc - t / 2, y1 - t / 2 - G],
+        [xc - t / 2, y0 + t / 2 + G],
+      ];
+    const segs = {
+      a: hz(t / 2),
+      b: vt(w - t / 2, t / 2, h / 2),
+      c: vt(w - t / 2, h / 2, h - t / 2),
+      d: hz(h - t / 2),
+      e: vt(t / 2, h / 2, h - t / 2),
+      f: vt(t / 2, t / 2, h / 2),
+      g: hz(h / 2),
+    };
+    const poly = (p) => p.map((q) => q.map((v) => v.toFixed(2)).join(",")).join(" ");
+    return `<g data-digit="${key}" transform="translate(${x.toFixed(2)} 0)">${Object.entries(segs)
+      .map(([n, p]) => `<polygon data-seg="${n}" points="${poly(p)}"/>`)
+      .join("")}</g>`;
+  }
+  // A row of digits, slanted like the real ones, its top at y and centred on
+  // cx; gaps between them, and `extra` (the clock's colon and point) inside.
+  function digitsSVG(key, cls, cx, y, w, h, t, gaps, extra = () => "") {
+    const total = gaps.reduce((sum, g) => sum + g + w, w);
+    let x = cx - total / 2 + (SLANT * h) / 2,
+      out = "";
+    const xs = gaps.concat(0).map((g, i) => {
+      out += digitSVG(key + i, x, w, h, t);
+      const at = x;
+      x += w + g;
+      return at;
+    });
+    return `<g class="${cls}" transform="translate(0 ${y}) skewX(-7)">${out}${extra(xs)}</g>`;
+  }
+  function scoreboard(el) {
+    const caption = (x, y, size, text, attrs = "") => `<text x="${x}" y="${y}" font-size="${size}" ${attrs}>${text}</text>`;
+    const dot = (cx, cy, t, attr) => `<rect ${attr} x="${(cx - t / 2).toFixed(2)}" y="${(cy - t / 2).toFixed(2)}" width="${t}" height="${t}"/>`;
+    // m:ss, and ss.t: the colon between the 2nd and 3rd digits, the point between the 3rd and 4th.
+    const marks = (xs) => {
+      const colon = xs[2] - 5.5,
+        point = xs[3] - 4;
+      return dot(colon, 12, 5, "data-colon") + dot(colon, 28, 5, "data-colon") + dot(point, 37.5, 5, "data-point");
+    };
+    el.innerHTML = `<svg viewBox="0 0 320 100" role="img">
+      <rect class="sb-panel" x="1" y="1" width="318" height="98" rx="8"/>
+      <g class="sb-caption" text-anchor="middle">
+        ${caption(52, 14, 9.5, "YOU")}${caption(160, 14, 9.5, "TIME", "data-caption")}${caption(268, 14, 9.5, "COMPUTER")}
+        ${caption(52, 75, 7.5, "SHOTS")}${caption(160, 75, 7.5, "PERIOD")}${caption(268, 75, 7.5, "SHOTS")}</g>
+      <rect x="40" y="17.5" width="24" height="1.8" fill="var(--rink-team-a)"/><rect x="241" y="17.5" width="54" height="1.8" fill="var(--rink-team-b)"/>
+      <circle class="sb-lamp" data-goal="a" cx="16" cy="40" r="4"/><circle class="sb-lamp" data-goal="b" cx="304" cy="40" r="4"/>
+      ${digitsSVG("a", "sb-amber", 52, 22, 19, 36, 4.6, [6])}
+      ${digitsSVG("t", "sb-red", 160, 20, 21, 40, 5, [5, 11, 8], marks)}
+      ${digitsSVG("b", "sb-amber", 268, 22, 19, 36, 4.6, [6])}
+      ${digitsSVG("x", "sb-amber", 52, 79, 10, 17, 2.6, [3.5])}
+      ${digitsSVG("p", "sb-amber", 153.25, 79, 11, 17, 2.8, [2.5])}
+      ${digitsSVG("y", "sb-amber", 268, 79, 10, 17, 2.6, [3.5])}</svg>`;
+    const svgEl = el.querySelector("svg"),
+      digits = {};
+    for (const g of el.querySelectorAll("[data-digit]")) digits[g.dataset.digit] = { ch: null, segs: [...g.children] };
+    const write = (key, text) =>
+      [...text].forEach((ch, i) => {
+        const d = digits[key + i];
+        if (!d || d.ch === ch) return;
+        d.ch = ch;
+        const lit = SEGMENTS[ch] || "";
+        for (const seg of d.segs) seg.classList.toggle("on", lit.includes(seg.dataset.seg));
+      });
+    const two = (n) => String(n).padStart(2).slice(-2);
+    let label = null;
+    return {
+      // Scores and shots as numbers, `time` four characters and `period` two.
+      set(v) {
+        write("a", two(v.a));
+        write("b", two(v.b));
+        write("x", two(v.shotsA));
+        write("y", two(v.shotsB));
+        write("t", v.time);
+        write("p", v.period);
+        el.querySelectorAll("[data-colon]").forEach((c) => c.classList.toggle("on", !!v.colon));
+        el.querySelector("[data-point]").classList.toggle("on", !!v.point);
+        const cap = el.querySelector("[data-caption]");
+        if (cap.textContent !== v.caption) cap.textContent = v.caption;
+        el.querySelector(".sb-red").classList.toggle("sb-blink", !!v.blink);
+        el.querySelectorAll("[data-goal]").forEach((l) => l.classList.toggle("on", l.dataset.goal === v.goal));
+        if (label !== v.label) svgEl.setAttribute("aria-label", (label = v.label));
+      },
+    };
+  }
+  // The clock as a board shows it: m:ss, and under a minute ss.t.
+  function boardTime(t) {
+    const tenths = Math.ceil(t * 10 - 1e-6);
+    if (tenths >= 600) {
+      const secs = Math.ceil(t - 1e-6);
+      return { time: String(Math.floor(secs / 60)).padStart(2) + String(secs % 60).padStart(2, "0"), colon: true };
+    }
+    const secs = Math.floor(tenths / 10);
+    return { time: ` ${secs < 10 ? " " : Math.floor(secs / 10)}${secs % 10}${tenths % 10}`, point: true };
+  }
   const pick = (list) => list[Math.floor(Math.random() * list.length)];
   const NS = "http://www.w3.org/2000/svg";
   const el = (name, attrs, parent) => {
@@ -1250,8 +1433,10 @@
   // A goalie is another shape: big pads, a wide chest protector, a blocker and
   // a catching glove, a painted mask with a cage and a paddle stick. The parts
   // that turn with the player (face, arms, stick) are set by draw().
-  function standingSVG(team, goalie, skin) {
+  function standingSVG(team, goalie, skin, number = "") {
     const shirt = `var(--rink-team-${team})`;
+    const digits = (y) =>
+      `<text y="${y}" font-size="0.48" font-weight="800" text-anchor="middle" fill="#fff" stroke="var(--rink-helmet-edge)" stroke-width="0.05" paint-order="stroke">${number}</text>`;
     const edge = `stroke="var(--rink-helmet-edge)" stroke-width="0.05"`;
     const eye = (x) =>
       `<circle cx="${x}" cy="0.03" r="0.1" fill="#fff"/>
@@ -1273,6 +1458,7 @@
         <path d="M -0.7 -1.45 H 0.7 L 0.74 -1.05 H -0.74 Z" fill="var(--rink-pants)"/>
         <path d="M -1.02 -2 Q -1.05 -2.3 -0.7 -2.3 H 0.7 Q 1.05 -2.3 1.02 -2 L 0.86 -1.4 H -0.86 Z" fill="${shirt}" ${edge}/>
         <rect x="-0.86" y="-1.62" width="1.72" height="0.09" fill="#fff" opacity="0.8"/>
+        ${digits(-1.74)}
         <rect x="0.78" y="-1.78" width="0.36" height="0.5" rx="0.07" fill="var(--rink-mask)" ${edge}/>
         <circle cx="-0.98" cy="-1.6" r="0.34" fill="var(--rink-mask)" ${edge}/>
         <circle cx="-0.98" cy="-1.6" r="0.16" fill="${shirt}" opacity="0.85"/>
@@ -1305,6 +1491,7 @@
         <line data-arm="1" stroke="${shirt}" stroke-width="0.26" stroke-linecap="round"/>
         <circle data-glove="-1" r="0.15" fill="var(--rink-glove)"/>
         <circle data-glove="1" r="0.15" fill="var(--rink-glove)"/>
+        ${digits(-1.6)}
         <g transform="translate(0 -2.52)">
           <g data-back><circle r="0.4" fill="${shirt}" ${edge}/><rect x="-0.07" y="-0.38" width="0.14" height="0.62" rx="0.07" fill="#fff" opacity="0.5"/></g>
           <g data-face>
@@ -1411,7 +1598,12 @@
       el("circle", ring, plane);
       const layer = el("g", { "data-players": "" }, plane);
       game.players.forEach((p, i) => {
-        el("g", { "data-player": i }, layer).insertAdjacentHTML("beforeend", root.helmetSVG(p.team, p.role === "goalie", skinOf(i)) + starsSVG(1.5));
+        el("g", { "data-player": i }, layer).insertAdjacentHTML(
+          "beforeend",
+          root.helmetSVG(p.team, p.role === "goalie", skinOf(i)) +
+            starsSVG(1.5) +
+            (p.number ? `<text class="rink-number" y="2.25" font-size="0.95" text-anchor="middle">${p.number}</text>` : "")
+        );
       });
       plane.insertAdjacentHTML("beforeend", `<g data-rz style="display: none">${KAMBONI_TOP}</g>`);
       return;
@@ -1445,7 +1637,7 @@
       `<g data-puck><ellipse cy="0.08" rx="0.45" ry="${(0.45 * SQUASH).toFixed(2)}" fill="var(--rink-puck-edge)"/><ellipse rx="0.45" ry="${(0.45 * SQUASH).toFixed(2)}" fill="var(--rink-puck)"/></g>`
     );
     game.players.forEach((p, i) =>
-      el("g", { "data-player": i }, things).insertAdjacentHTML("beforeend", standingSVG(p.team, p.role === "goalie", skinOf(i)))
+      el("g", { "data-player": i }, things).insertAdjacentHTML("beforeend", standingSVG(p.team, p.role === "goalie", skinOf(i), p.number))
     );
     svg.insertAdjacentHTML("beforeend", boardsSVG(false));
     for (const s of [1, -1]) {
@@ -1457,7 +1649,8 @@
     svg.insertAdjacentHTML(
       "beforeend",
       `<ellipse data-puck-ghost rx="0.45" ry="${(0.45 * SQUASH).toFixed(2)}" fill="var(--rink-puck)" fill-opacity="0.25" stroke="var(--rink-puck)" stroke-width="0.09"/>
-      <path data-you-arrow d="M -0.42 -0.62 L 0.42 -0.62 L 0 0 Z" fill="var(--rink-team-a)" stroke="var(--global-bg-color)" stroke-width="0.09" stroke-linejoin="round"/>`
+      <g data-you-arrow><path d="M -0.42 -0.62 L 0.42 -0.62 L 0 0 Z" fill="var(--rink-team-a)" stroke="var(--global-bg-color)" stroke-width="0.09" stroke-linejoin="round"/>
+        <text data-you-name y="-0.88" font-size="0.62" font-weight="700" text-anchor="middle" fill="var(--rink-team-a)" stroke="var(--global-bg-color)" stroke-width="0.14" paint-order="stroke"></text></g>`
     );
     // The map: the whole rink from above, small, in the top right corner,
     // with every player, the puck and what the camera is showing.
@@ -1601,6 +1794,8 @@
       const here = game.human && !game.controlled.off;
       arrow.style.display = here ? "" : "none";
       if (here) {
+        const name = arrow.querySelector("[data-you-name]");
+        if (name.textContent !== (game.controlled.name || "")) name.textContent = game.controlled.name || "";
         const [ax, ay] = TILT.at(game.controlled.x, game.controlled.y);
         const lift = 3.25 * TALL + 0.35 + Math.sin(now / 220) * 0.15;
         arrow.setAttribute("transform", `translate(${ax.toFixed(2)} ${(ay - lift).toFixed(2)})`);
@@ -1782,7 +1977,7 @@
   // The home page's piece: the computer against itself, a few seconds in,
   // drawn once, from above whatever view the game was last played in.
   function still(rootEl) {
-    const game = new Game({ human: false });
+    const game = lineUp(new Game({ human: false }));
     for (let t = 0; t < 7; t += STEP) game.step(STEP);
     draw(rootEl.querySelector("svg"), game, { view: "top" });
   }
@@ -1797,7 +1992,7 @@
       alt = $("[data-overlay-alt]");
     const toast = $("[data-toast]"),
       live = $("[data-live]");
-    let game = new Game();
+    let game = lineUp(new Game());
     // ready, playing, paused, buzzer (a period has just ended), intermission
     // (the choice), resurfacing (the person drives the Kamboni), crew, over
     let state = "ready";
@@ -1831,28 +2026,27 @@
       live.textContent = msg;
     }
     const minutes = (t) => `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
+    const board = scoreboard($("[data-board]"));
     function hud() {
-      $("[data-score-a]").textContent = game.score.a;
-      $("[data-score-b]").textContent = game.score.b;
-      // The clock, blinking when time is up; between periods how clean the
-      // ice is, as a bar filling up to what is enough.
-      const clock = $("[data-clock]"),
-        out = state === "resurfacing" || state === "crew";
-      clock.classList.toggle("is-meter", out);
-      clock.classList.toggle("is-buzzer", state === "buzzer");
-      if (out) {
-        const bar = Math.min(100, (100 * rz.part) / RZ.done).toFixed(1);
-        clock.textContent = `ice ${Math.floor(100 * rz.part)}% clean`;
-        clock.style.backgroundImage = `linear-gradient(90deg, var(--rink-meter) ${bar}%, transparent ${bar}%)`;
-      } else {
-        clock.style.backgroundImage = "";
-        clock.textContent =
-          state === "intermission"
-            ? "intermission"
-            : game.overtime
-              ? "overtime"
-              : `${["1st", "2nd", "3rd"][game.period - 1] || ""} · ${minutes(Math.ceil(game.clock))}`;
-      }
+      const out = state === "resurfacing" || state === "crew",
+        lit = lamp && !lamp.green && performance.now() < lamp.until;
+      const clock = out
+        ? { time: String(Math.floor(100 * rz.part)).padStart(4) }
+        : game.overtime
+          ? { time: "----", colon: true }
+          : boardTime(game.clock);
+      board.set({
+        a: game.score.a,
+        b: game.score.b,
+        shotsA: game.shots.a,
+        shotsB: game.shots.b,
+        ...clock,
+        caption: out ? "ICE CLEAN %" : "TIME",
+        period: game.overtime ? "ot" : ` ${game.period}`,
+        blink: state === "buzzer",
+        goal: lit ? (lamp.side === 1 ? "a" : "b") : null,
+        label: `You ${game.score.a}, computer ${game.score.b}. ${game.overtime ? "Overtime" : `Period ${game.period}, ${minutes(Math.ceil(game.clock))}`}.`,
+      });
       const pauseButton = $("[data-pause]"),
         viewButton = $("[data-view]");
       pauseButton.textContent = { paused: "resume", resurfacing: "let the crew finish", crew: "skip" }[state] || "pause";
@@ -1905,11 +2099,14 @@
       hud();
     });
 
+    // A new game, with new line-ups (drawn afresh: their numbers are on them).
+    function newGame() {
+      game = lineUp(new Game());
+      marks.clear();
+      svg.dataset.view = "";
+    }
     function start() {
-      if (state === "over") {
-        game = new Game();
-        marks.clear();
-      }
+      if (state === "over") newGame();
       if (state === "over" || state === "ready") draw(svg, game, { view, follow: true });
       state = "playing";
       overlay.hidden = true;
@@ -2025,8 +2222,7 @@
       state === "playing" ? pause() : state === "paused" ? start() : state === "resurfacing" ? crew() : state === "crew" ? endResurfacing(true) : null
     );
     $("[data-restart]").addEventListener("click", () => {
-      game = new Game();
-      marks.clear();
+      newGame();
       rz = null;
       lamp = null;
       if (cab) cab.show(false);
@@ -2185,17 +2381,21 @@
       for (const ev of game.events.splice(0)) {
         if (ev.type === "goal") {
           lamp = { side: ev.team === "a" ? 1 : -1, until: now + 2400 };
-          let msg = pick(QUIPS[ev.team]);
+          const name = (game.players[ev.by] || {}).name;
+          let msg = name ? pick(QUIPS[ev.team]).replace("%", name) : ev.team === "a" ? "Goal!" : "The computer scores.";
           if (ev.hatTrick && ev.team === "a") {
-            msg = "Hat trick! Hats on the ice.";
+            msg = `Hat trick for ${name}! Hats on the ice.`;
             throwHats(svg, now);
-          } else if (ev.hatTrick) msg = "Hat trick for the computer. Nobody throws a hat.";
+          } else if (ev.hatTrick) msg = `Hat trick for ${name}. Nobody throws a hat.`;
+          else if (ev.own && name) msg = ev.team === "a" ? `Goal! Off ${name}'s skate.` : `Own goal by ${name}. It happens.`;
           else if (ev.own) msg = ev.team === "a" ? "Goal! Off a computer skate." : "Own goal. It happens.";
-          else if (ev.oneTimer && ev.team === "a") msg = "One-timer goal!";
+          else if (ev.oneTimer && ev.team === "a") msg = `One-timer goal! ${name}.`;
           say(ev.overtime ? (ev.team === "a" ? "Overtime winner! " : "Overtime goal. ") + msg : msg, 2.3);
         } else if (ev.type === "hit") {
-          if (ev.by === you) say(ev.boards ? "Into the boards!" : "Checked!", 1);
-          else if (ev.on === you) say(ev.boards ? "Into the boards. Ouch." : "Ouch.", 1);
+          const by = game.players[ev.by].name,
+            on = game.players[ev.on].name;
+          if (ev.by === you) say(ev.boards ? `${on} into the boards!` : `Checked ${on}!`, 1.2);
+          else if (ev.on === you) say(ev.boards ? `${by} puts you into the boards. Ouch.` : `Ouch. ${by} got you.`, 1.2);
         } else if (ev.type === "shot" && ev.oneTimer && ev.you) say("One-timer!", 0.8);
         else if (ev.type === "post") say("Off the post!", 1);
         else if (ev.type === "overtime") say("Tied. Next goal wins.", 2.5);
@@ -2203,8 +2403,13 @@
         else if (ev.type === "final") {
           state = "over";
           const { a, b } = ev.score;
+          const star = game.players.reduce((best, p) => (p.goals > (best ? best.goals : 0) ? p : best), null);
           const verdict = a > b ? "You win. The computer would like a rematch." : "The computer wins. It says good game, and means it.";
-          show(`You ${a}, computer ${b}`, verdict, "play again");
+          show(
+            `You ${a}, computer ${b}`,
+            verdict + (star ? ` Star of the game: ${star.name}, ${star.goals} goal${star.goals > 1 ? "s" : ""}.` : ""),
+            "play again"
+          );
         }
       }
       marks.update(game, now);
@@ -2212,7 +2417,11 @@
       hud();
     }
     hud();
-    show("Three on three", "You are blue and attack the goal on the right. Three periods of a minute; most goals wins.", "play");
+    show(
+      "Three on three",
+      `You are blue: ${lineUpText(game, "a")}. The computer has ${lineUpText(game, "b")}. You attack the goal on the right; three periods of a minute.`,
+      "play"
+    );
     requestAnimationFrame(frame);
   }
 

@@ -1334,42 +1334,71 @@ html[data-theme="dark"] {
   }
 }
 
-.game-score {
-  font-size: 1.1rem;
-  font-variant-numeric: tabular-nums;
+// The scoreboard (game.js): LED digits on black whatever the theme, as on an
+// arena's: red for the time, amber for the scores, shots and period.
+.game-board {
+  flex: 1 1 17rem;
+  max-width: 24rem;
 
-  b {
-    font-size: 1.5rem;
+  svg {
+    display: block;
+    width: 100%;
+    height: auto;
   }
-}
 
-.game-team.is-a {
-  color: var(--rink-team-a);
-}
+  .sb-panel {
+    fill: #0b0c0f;
+    stroke: #2c3138;
+    stroke-width: 2;
+  }
 
-.game-team.is-b {
-  color: var(--rink-team-b);
-}
+  .sb-caption {
+    fill: #efe9dc;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+  }
 
-.game-clock {
-  color: var(--global-text-color-light);
-  font-variant-numeric: tabular-nums;
+  polygon,
+  rect[data-colon],
+  rect[data-point] {
+    opacity: 0.09;
+  }
+
+  .on {
+    opacity: 1;
+  }
+
+  .sb-red {
+    fill: #ff3a2e;
+    filter: drop-shadow(0 0 2px rgba(255, 58, 46, 0.75));
+  }
+
+  .sb-amber {
+    fill: #ffb21a;
+    filter: drop-shadow(0 0 2px rgba(255, 178, 26, 0.65));
+  }
 
   // Time is up: the clock blinks, a few times.
-  &.is-buzzer {
-    color: var(--global-text-color);
+  .sb-blink {
     animation: game-blink 0.6s steps(2, jump-none) 5;
   }
 
-  // Between periods: how clean the ice is, as a bar that fills up.
-  &.is-meter {
-    min-width: 9.5rem;
-    padding: 0.1rem 0.8rem;
-    border: 1px solid var(--global-divider-color);
-    border-radius: 999px;
-    color: var(--global-text-color);
-    text-align: center;
+  .sb-lamp {
+    fill: #ff3a2e;
+    opacity: 0.14;
+
+    &.on {
+      opacity: 1;
+      filter: drop-shadow(0 0 4px #ff3a2e);
+    }
   }
+}
+
+// The players' numbers, seen from above.
+.rink-number {
+  fill: var(--global-text-color);
+  font-weight: 700;
+  opacity: 0.7;
 }
 
 .game-buttons {
