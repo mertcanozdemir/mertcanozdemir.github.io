@@ -1263,6 +1263,13 @@ a.piece:hover .piece-more {
   --rink-cage: #7b848f;
   --rink-visor-clear: rgba(150, 200, 240, 0.55);
   --rink-strap: rgba(0, 0, 0, 0.45);
+  --rink-rz: #fbfcfd; // the Kamboni, between periods
+  --rink-rz-edge: #8d98a4;
+  --rink-rz-tank: #dce3ea;
+  --rink-rz-dark: #56606b;
+  --rink-frost: rgba(150, 168, 188, 0.24); // used ice
+  --rink-wet: rgba(120, 190, 255, 0.26); // freshly cleaned ice
+  --rink-meter: rgba(31, 111, 208, 0.22);
   --game-veil: rgba(255, 255, 255, 0.82);
 }
 
@@ -1282,6 +1289,13 @@ html[data-theme="dark"] {
   --rink-cage: #a3acb6;
   --rink-visor-clear: rgba(150, 200, 240, 0.45);
   --rink-strap: rgba(0, 0, 0, 0.6);
+  --rink-rz: #e3e8ed;
+  --rink-rz-edge: #10151b;
+  --rink-rz-tank: #aab4be;
+  --rink-rz-dark: #39414a;
+  --rink-frost: rgba(215, 228, 242, 0.13);
+  --rink-wet: rgba(100, 170, 245, 0.2);
+  --rink-meter: rgba(74, 154, 239, 0.32);
   --game-veil: rgba(22, 24, 26, 0.85);
 }
 
@@ -1338,6 +1352,16 @@ html[data-theme="dark"] {
 .game-clock {
   color: var(--global-text-color-light);
   font-variant-numeric: tabular-nums;
+
+  // Between periods: how clean the ice is, as a bar that fills up.
+  &.is-meter {
+    min-width: 9.5rem;
+    padding: 0.1rem 0.8rem;
+    border: 1px solid var(--global-divider-color);
+    border-radius: 999px;
+    color: var(--global-text-color);
+    text-align: center;
+  }
 }
 
 .game-buttons {
@@ -1370,6 +1394,20 @@ html[data-theme="dark"] {
     outline: none;
     touch-action: none;
     user-select: none;
+  }
+
+  // Between periods only the Kamboni is on the ice.
+  svg.is-resurfacing {
+    [data-player],
+    [data-puck],
+    [data-puck-ghost],
+    [data-you-arrow],
+    [data-you],
+    [data-trail],
+    [data-map-player],
+    [data-map-puck] {
+      display: none;
+    }
   }
 }
 
@@ -1411,7 +1449,31 @@ html[data-theme="dark"] {
       color: #fff;
       filter: brightness(1.1);
     }
+
+    &[hidden] {
+      display: none;
+    }
+
+    &.is-quiet {
+      border: 1px solid var(--global-divider-color);
+      background: var(--global-bg-color);
+      color: var(--global-text-color);
+      font-weight: 400;
+
+      &:hover {
+        border-color: var(--global-theme-color);
+        color: var(--global-theme-color);
+        filter: none;
+      }
+    }
   }
+}
+
+.game-overlay-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
 }
 
 .game-toast {

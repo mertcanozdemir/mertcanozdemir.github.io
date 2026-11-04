@@ -167,7 +167,9 @@ The simulation (`Game`) has no DOM in it. **Run `node bin/check-game.js` after
 touching it** (exits non-zero on problems): it plays the computer against
 itself, against a person who does nothing, and against a scripted person, and
 checks that nothing leaves the rink or turns into NaN, the puck never sits
-loose, goals come at a sensible rate, and the scripted person can score. Its
+loose, goals come at a sensible rate, and the scripted person can score. It
+also drives the Kamboni (below) in rows, which must get the ice clean within
+40 s (it takes about 28), and anyhow, which must stay on the ice. Its
 numbers are the way to tune the balance; bugs it has caught include the net's
 mouth acting as a wall, defenders pushing a carrier along instead of reaching
 the puck, carriers parking in the slot, and an asymmetric collision that made
@@ -201,9 +203,23 @@ computer's skaters brake the same way. Goalies sit on an arc in front of the net
 falls with shot speed, rebounds, close range and their own sideways motion;
 fast shots can also be blocked, or slip past a body. Against a person the
 computer's team is a little sharper (`sharp()`: as fast, keener pokes, better
-goalie). Three minutes, then sudden-death overtime if tied. Touch screens get a
-stick and three buttons (pass, check, shoot), shown by `(pointer: coarse)` or
-after the first touch.
+goalie). Three periods of a minute, then sudden-death overtime if tied. Touch
+screens get a stick and three buttons (pass, check, shoot), shown by
+`(pointer: coarse)` or after the first touch. (The stick is found as
+`.game-touch [data-stick]`: the players' sticks in the SVG are `data-stick` too,
+and a bare `[data-stick]` picked one of those and broke the touch stick.)
+
+Between periods (`phase` "intermission"; the page calls `nextPeriod()`) the
+person can drive the **Kamboni**, an ice resurfacer, over the cut-up ice, or
+"let the crew do it". Mertcan's idea, after the cleaning and house-painting
+games; he named it Kamboni (not Zamboni, which is a brand). Its physics is
+`Resurfacer` in the simulation (`RZ`: a 6.25 m band behind it, 12 m/s, turns
+like a vehicle); the ice is counted in 1 m cells and 85% is enough. The page
+frosts the used ice (a scratched pattern) and masks the frost and the skate
+marks away along its track, which shows as wet ice, on the map too; the HUD's
+clock becomes a bar ("ice 37% clean"); the players and puck are hidden
+(`is-resurfacing`). The time is kept against the best in the browser
+(`kamboni-best`). Space honks; boards and nets bonk.
 
 Two views, switched by a button above the rink and remembered per browser
 (`hockey-view` in localStorage; the stored value for it is still `tilt`): the
@@ -211,13 +227,14 @@ Two views, switched by a button above the rink and remembered per browser
 camera is Mertcan's idea, after a tilted, slightly turned view he had asked for
 as "izometrik": high in the stands at centre ice, looking across through a
 long lens, so drawn without perspective (`YAW` 0, `SQUASH`, `RISE`, the `TILT`
-matrix). It frames `VIEW` metres of the rink and pans after the puck, and a map
+matrix). It frames `VIEW` metres of the rink (44) and pans after the puck, and a map
 of the whole rink sits in the top right corner (players, the puck, the stretch
 the camera shows). The home page's still shows the whole rink instead
 (`follow` off). The ice and what lies on it (markings, marks, the ring round
 your skater) are one plane drawn through the matrix; on it stand boards with a
 far face and a see-through near face, nets with mesh and a red frame, and
-players standing up (`TALL`), drawn far to near. Over everything: an arrow over
+players standing up (`TALL`, 0.95: at 1.15 with a 38 m frame Mertcan found
+them too big), drawn far to near. Over everything: an arrow over
 your skater and the puck's outline, so neither is lost in a crowd. Keys and the
 stick mean directions on the screen, mapped back onto the ice (`TILT.back`). A
 true 45° isometric view was considered and passed over: the goals would sit in

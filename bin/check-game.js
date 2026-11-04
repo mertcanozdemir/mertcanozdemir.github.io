@@ -2,13 +2,15 @@
 // Plays the hockey game (assets/js/game.js) without a browser and checks that
 // it behaves: nobody leaves the rink, nothing turns into NaN, the puck never
 // sits loose for long, and goals come at a sensible rate, for the computer
-// against itself and for a simple scripted person against the computer.
+// against itself and for a simple scripted person against the computer. And
+// the Kamboni between periods: driven in rows it cleans the ice in good time,
+// and driven anyhow it stays on the ice.
 //
 //   node bin/check-game.js [games]
 //
 // Exits non-zero when something is off.
 
-const { Game, STEP, GOAL_X } = require("../assets/js/game.js");
+const { Game, Resurfacer, RZ, STEP, GOAL_X } = require("../assets/js/game.js");
 
 function mulberry32(seed) {
   return function () {
@@ -55,6 +57,7 @@ function run(seed, mode) {
     t = 0;
   const counts = { save: 0, post: 0, steal: 0, block: 0, pass: 0, hit: 0 };
   while (game.phase !== "over" && t < 600) {
+    if (game.phase === "intermission") game.nextPeriod();
     const input = mode === "script" ? scripted(game) : {};
     game.step(STEP, input);
     t += STEP;
@@ -78,6 +81,63 @@ function run(seed, mode) {
   // A person who does nothing can hold the puck for ever; that is their call.
   if (game.phase !== "over" && mode !== "idle") problems.push("the game never ended");
   return { score: game.score, shots: game.shots, counts, longestLoose, problems, overtime: game.overtime, t };
+}
+
+// The Kamboni: in rows along the rink, turning at the ends, or wandering
+// (a new way every second or so).
+function kamboni(seed, wander) {
+  Math.random = mulberry32(seed * 13 + 5);
+  const rz = new Resurfacer();
+  const problems = [];
+  const edge = 15 - RZ.radius;
+  const rows = [];
+  for (let y = -edge; y < edge; y += RZ.width - 1) rows.push(y);
+  rows.push(edge);
+  // How far a row goes: to the boards, round the corners and short of the nets.
+  const reach = (y) =>
+    (Math.abs(y) > 6.5
+      ? 21.5 + Math.sqrt(Math.max(0, (8.5 - RZ.radius) ** 2 - (Math.abs(y) - 6.5) ** 2))
+      : Math.abs(y) < 1.35 + RZ.radius + 0.5
+        ? 26 - RZ.radius
+        : 30 - RZ.radius) - 1.5;
+  const route = rows.flatMap((y, i) =>
+    i % 2
+      ? [
+          [reach(y), y],
+          [-reach(y), y],
+        ]
+      : [
+          [-reach(y), y],
+          [reach(y), y],
+        ]
+  );
+  let leg = 0,
+    input = { x: 1, y: 0 };
+  while (wander ? rz.time < 60 : !rz.done && rz.time < 120) {
+    if (wander) {
+      if (Math.random() < STEP / 0.9) {
+        const a = Math.random() * 2 * Math.PI;
+        input = { x: Math.cos(a), y: Math.sin(a) };
+      }
+    } else {
+      let [tx, ty] = route[leg % route.length];
+      if (Math.hypot(tx - rz.x, ty - rz.y) < 2.5) [tx, ty] = route[++leg % route.length];
+      const d = Math.hypot(tx - rz.x, ty - rz.y) || 1;
+      input = { x: (tx - rz.x) / d, y: (ty - rz.y) / d };
+    }
+    rz.step(STEP, input);
+    if (![rz.x, rz.y, rz.h, rz.v].every(Number.isFinite)) {
+      problems.push(`NaN at ${rz.time.toFixed(1)} s`);
+      break;
+    }
+    if (!inside(rz, RZ.radius - 0.1)) problems.push(`outside the rink at ${rz.time.toFixed(1)} s`);
+    const nx = Math.max(0, 26 - Math.abs(rz.x), Math.abs(rz.x) - 27.6),
+      ny = Math.max(0, Math.abs(rz.y) - 1.35);
+    if (Math.hypot(nx, ny) < RZ.radius - 0.1) problems.push(`in a net at ${rz.time.toFixed(1)} s`);
+    if (problems.length > 5) break;
+  }
+  if (!wander && !rz.done) problems.push(`not clean after ${rz.time.toFixed(0)} s (${(100 * rz.part).toFixed(0)}%)`);
+  return { time: rz.time, part: rz.part, problems };
 }
 
 const games = +process.argv[2] || 12;
@@ -115,6 +175,35 @@ for (const mode of ["cpu", "idle", "script"]) {
   if (mode === "script" && totals.a === 0) {
     bad++;
     console.log("  the scripted person never scored");
+  }
+}
+{
+  let time = 0,
+    part = 0,
+    slowest = 0;
+  for (let i = 1; i <= games; i++) {
+    const rows = kamboni(i, false),
+      anyhow = kamboni(i, true);
+    time += rows.time;
+    slowest = Math.max(slowest, rows.time);
+    part += anyhow.part;
+    for (const [how, r] of [
+      ["in rows", rows],
+      ["anyhow", anyhow],
+    ]) {
+      if (r.problems.length) {
+        bad++;
+        console.log(`kamboni ${how} ${i}: ${r.problems.slice(0, 3).join("; ")}`);
+      }
+    }
+  }
+  console.log(
+    `kamboni in rows: ${(100 * RZ.done).toFixed(0)}% clean in ${(time / games).toFixed(1)} s; anyhow: ${((100 * part) / games).toFixed(0)}% clean after a minute`
+  );
+  // In rows it should take well under a minute: the intermission is a break.
+  if (slowest > 40) {
+    bad++;
+    console.log(`  the Kamboni took ${slowest.toFixed(0)} s in rows: want 40 at most`);
   }
 }
 console.log(bad ? `\n${bad} problem(s)` : "\nok");
