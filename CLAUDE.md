@@ -209,7 +209,7 @@ came out of the ideas for where the piece should lead.
 
 ### The comparison graph moved to the lab's site
 
-It is at <https://icon-lab.github.io/mri-recon-comparison-graph/> (repository
+It is at `https://icon-lab.github.io/mri-recon-comparison-graph/` (repository
 `icon-lab/mri-recon-comparison-graph`, which has its own README on updating it).
 The site no longer links to it or sends `/graph/` there (that redirect was
 removed): Mertcan wants the site independent of the lab's. Its files here — `assets/js/recon-graph.js`,
