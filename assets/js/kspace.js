@@ -508,22 +508,18 @@
     };
   }
   // In a worker where there can be one; otherwise here, on the page.
+  // A page may not be allowed workers of its own making (some security
+  // settings): then, the first time one fails, the network runs here.
   let thinker = null;
+  function inPage() {
+    const here = network();
+    thinker = (m) => here(m);
+  }
   function think(message) {
     if (!thinker) {
       try {
-        const worker = new Worker(
-          URL.createObjectURL(
-            new Blob(
-              [
-                `const think = (${network})(); onmessage = (e) => think(e.data).then((out) => postMessage({ out }), (err) => postMessage({ err: String(err) }));`,
-              ],
-              {
-                type: "text/javascript",
-              }
-            )
-          )
-        );
+        const code = `const think = (${network})(); onmessage = (e) => think(e.data).then((out) => postMessage({ out }), (err) => postMessage({ err: String(err) }));`;
+        const worker = new Worker(URL.createObjectURL(new Blob([code], { type: "text/javascript" })));
         let waiting = null;
         worker.onmessage = (e) => {
           const w = waiting;
@@ -531,10 +527,17 @@
           if (e.data.err) w.reject(new Error(e.data.err));
           else w.resolve(e.data.out);
         };
-        thinker = (m) => new Promise((resolve, reject) => ((waiting = { resolve, reject }), worker.postMessage(m)));
+        worker.onerror = (e) => {
+          e.preventDefault();
+          worker.terminate();
+          inPage();
+          const w = waiting;
+          waiting = null;
+          if (w) thinker(w.message).then(w.resolve, w.reject);
+        };
+        thinker = (m) => new Promise((resolve, reject) => ((waiting = { resolve, reject, message: m }), worker.postMessage(m)));
       } catch (e) {
-        const here = network();
-        thinker = (m) => here(m);
+        inPage();
       }
     }
     return thinker(message);
