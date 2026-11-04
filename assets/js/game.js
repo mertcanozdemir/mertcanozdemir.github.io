@@ -23,9 +23,11 @@
   // knocks down stays down, and the closing speed it takes to knock them down.
   const CHECK = { speed: 10.5, time: 0.3, down: 1.2, hard: 3.5 };
   // Skating, in m/s²: speeding up and turning, coasting to a stop once the
-  // keys are let go (about a second from full speed), and a hockey stop:
-  // skating the other way brakes hard.
-  const SKATE = { push: 13, coast: 7.5, brake: 20 };
+  // keys are let go (a little over a second from full speed), and a hockey
+  // stop: skating the other way brakes hard. Top speed is in maxSpeed():
+  // 8.6 m/s, near a real player's 9 to 11 (it was 7.6, which Mertcan found
+  // slow).
+  const SKATE = { push: 15, coast: 7.5, brake: 20 };
   // Whether a skater wants to go roughly the other way from where it is going.
   const reversing = (p) => {
     const sp = hypot(p.vx, p.vy),
@@ -148,6 +150,7 @@
       this.periods = opts.periods || 3;
       this.periodLength = opts.periodLength || 60;
       this.level = opts.level || "normal"; // easy, normal or hard: see sharp()
+      this.size = opts.size === 5 ? 5 : 3; // skaters a side: three on three, or five on five
       this.reset();
     }
 
@@ -160,8 +163,8 @@
       this.events = [];
       this.players = [];
       for (const team of ["a", "b"]) {
-        for (let slot = 0; slot < 3; slot++) this.players.push(this.player(team, "skater", slot));
-        this.players.push(this.player(team, "goalie", 3));
+        for (let slot = 0; slot < this.size; slot++) this.players.push(this.player(team, "skater", slot));
+        this.players.push(this.player(team, "goalie", this.size));
       }
       this.puck = { x: 0, y: 0, h: 0, vx: 0, vy: 0, carrier: null, last: null, held: 0, beat: null, rebound: 0, from: null, trail: [] };
       // The referee: only drawn, never in the way.
@@ -212,10 +215,14 @@
     }
 
     faceoff() {
+      // The centre at the dot, then a wing and a defender; five a side add the
+      // other wing and the other defender.
       const spots = [
         [-1.6, 0],
         [-6, -6],
         [-12, 4],
+        [-6, 6],
+        [-12, -4],
       ];
       for (const p of this.players) {
         const s = DIR[p.team];
@@ -448,7 +455,7 @@
     maxSpeed(p) {
       if (p.role === "goalie") return 5;
       const s = this.sharp(p.team);
-      const base = s ? 7.6 + 0.7 * s : this.human && p === this.controlled ? 7.8 : 7.6;
+      const base = s ? 8.6 + 0.7 * s : this.human && p === this.controlled ? 8.8 : 8.6;
       return this.puck.carrier === p ? base * 0.9 : base;
     }
 
@@ -463,13 +470,20 @@
       const mine = this.skaters(team).filter((p) => p !== c && !(this.human && p === this.controlled));
       const spots = [];
       if (c && c.team === team && c.role === "goalie") {
-        spots.push([own + s * 9, 7], [own + s * 9, -7], [own + s * 17, 0]);
+        spots.push([own + s * 9, 7], [own + s * 9, -7], [own + s * 17, 0], [own + s * 22, 9], [own + s * 22, -9]);
       } else if (c && c.team === team) {
-        // The far post, for a pass across and a one-timer; a trailer; the point.
+        // The far post, for a pass across and a one-timer; a trailer; the
+        // point; five a side, the other point and someone in front of the net.
         const deep = s * (opp - c.x) < 18;
-        spots.push([opp - s * (deep ? 4.5 : 7), c.y > 0 ? -3.5 : 3.5], [c.x - s * 8, c.y * 0.3], [opp - s * 12, c.y > 0 ? 3 : -3]);
+        spots.push(
+          [opp - s * (deep ? 4.5 : 7), c.y > 0 ? -3.5 : 3.5],
+          [c.x - s * 8, c.y * 0.3],
+          [opp - s * 12, c.y > 0 ? 3 : -3],
+          [opp - s * 16, c.y > 0 ? -7 : 7],
+          [opp - s * 3.5, c.y > 0 ? 1.5 : -1.5]
+        );
       } else if (c && c.role === "goalie") {
-        spots.push([opp - s * 9, 5], [opp - s * 9, -5], [opp - s * 18, 0]);
+        spots.push([opp - s * 9, 5], [opp - s * 9, -5], [opp - s * 18, 0], [opp - s * 15, 9], [opp - s * 15, -9]);
       } else if (c) {
         // The nearest goes for the puck, where it is about to be; the next
         // covers the opponent nearest its goal; the last minds the slot.
@@ -485,9 +499,21 @@
         // steps into the line between the carrier and the net.
         const close = hypot(own - c.x, c.y) < 11;
         spots.push(close ? [c.x + (own - c.x) * 0.35, c.y * 0.65] : [own + s * 6, clamp(pk.y * 0.35, -3, 3)]);
+        // Five a side: the next two attackers nearest the goal are covered too.
+        this.skaters(other(team))
+          .filter((o) => o !== c && o !== threat)
+          .sort((a, b) => Math.abs(a.x - own) - Math.abs(b.x - own))
+          .slice(0, 2)
+          .forEach((o) => spots.push([o.x + (own - o.x) * 0.12, o.y * 0.85]));
       } else {
         const lead = { x: pk.x + pk.vx * 0.3, y: pk.y + pk.vy * 0.3 };
-        spots.push([lead.x, lead.y], [pk.x - s * 7, pk.y * 0.5], [own + s * 7, pk.y * 0.3]);
+        spots.push(
+          [lead.x, lead.y],
+          [pk.x - s * 7, pk.y * 0.5],
+          [own + s * 7, pk.y * 0.3],
+          [pk.x - s * 6, -pk.y * 0.5 + (pk.y > 0 ? -5 : 5)],
+          [own + s * 13, -pk.y * 0.3]
+        );
       }
       // Nearest-first, so the closest skater takes the first (most urgent) spot.
       const free = mine.slice();
@@ -732,7 +758,7 @@
     pass(p, m) {
       const pk = this.puck;
       const d = dist(m, pk),
-        speed = clamp(8 + d * 0.7, 10, 20);
+        speed = clamp(10 + d * 0.8, 12, 23);
       const t = d / speed;
       const aim = { x: m.x + m.vx * t, y: m.y + m.vy * t };
       confine(aim, SKATER_R);
@@ -1571,8 +1597,8 @@
       <g transform="scale(${TALL})">
       <ellipse rx="0.85" ry="${(0.85 * SQUASH).toFixed(2)}" fill="var(--rink-shadow)"/>
       <g data-figure>
-        ${skate(-0.34)}${skate(0.06)}
-        ${sock(-0.31)}${sock(0.09)}
+        <g data-leg="-1">${skate(-0.34)}${sock(-0.31)}</g>
+        <g data-leg="1">${skate(0.06)}${sock(0.09)}</g>
         <path d="M -0.5 -1.22 H 0.5 L 0.55 -0.78 Q 0.55 -0.7 0.46 -0.7 H -0.46 Q -0.55 -0.7 -0.55 -0.78 Z" fill="var(--rink-pants)"/>
         <path d="M -0.8 -1.98 Q -0.82 -2.2 -0.56 -2.2 H 0.56 Q 0.82 -2.2 0.8 -1.98 L 0.62 -1.14 H -0.62 Z" fill="${shirt}" ${edge}/>
         <rect x="-0.62" y="-1.36" width="1.24" height="0.09" fill="#fff" opacity="0.85"/>
@@ -1600,6 +1626,23 @@
     const skins = root.RINK_SKINS || ["#e2ad86"];
     return skins[(i * 3) % skins.length];
   };
+
+  // ——— Skating ———
+  // A stride's phase for each player, going round faster the faster they
+  // skate: pushing, the skates push out to the side in turn; coasting, they
+  // glide together; a hockey stop sets them wide. `amp` is 0 standing or
+  // gliding, 1 striding at speed. Kept on the drawing, page side only.
+  function strideOf(svg, i, p, now) {
+    const all = (svg.strides = svg.strides || []),
+      s = (all[i] = all[i] || { phase: i * 1.7, amp: 0, at: now }),
+      dt = Math.min(0.1, Math.max(0, (now - s.at) / 1000)),
+      speed = hypot(p.vx, p.vy),
+      pushing = !p.idle && !p.braking && !(p.down > 0) && speed > 0.8;
+    s.at = now;
+    s.phase += dt * 2 * Math.PI * (0.7 + speed * 0.14);
+    s.amp += ((pushing ? Math.min(1, speed / 5) : 0) - s.amp) * Math.min(1, dt * 8);
+    return { phase: s.phase, amp: s.amp, speed, braking: p.braking && speed > 2 };
+  }
 
   // ——— The referee ———
   // From above, facing +x: a striped shirt, orange armbands, a black helmet.
@@ -1876,7 +1919,14 @@
         // player knocked down lies turned, with crosses for eyes and stars.
         const down = p.down > 0;
         const [lx, ly] = pk.carrier === p ? [p.fx, p.fy] : [pk.x - p.x, pk.y - p.y];
-        root.helmetLook(g, Math.atan2(p.fy, p.fx) + (down ? 1.2 : 0), lx, ly, down);
+        const turn =
+          p.role === "goalie" || down
+            ? 0
+            : (() => {
+                const { phase, amp } = strideOf(svg, i, p, fx.now || 0);
+                return 0.12 * Math.sin(phase) * amp;
+              })();
+        root.helmetLook(g, Math.atan2(p.fy, p.fx) + (down ? 1.2 : 0) + turn, lx, ly, down);
         const stars = g.querySelector("[data-stars]");
         stars.setAttribute("visibility", down ? "visible" : "hidden");
         if (down) stars.setAttribute("transform", `rotate(${((now / 4) % 360).toFixed(0)})`);
@@ -1934,13 +1984,41 @@
             glove.setAttribute("cy", hy.toFixed(2));
           }
         }
+        // Skating: each skate pushes out to the side in turn and the other
+        // comes back lifted; the body leans the way it goes, sways over the
+        // gliding skate and bobs; a hockey stop leans back on wide skates.
+        let lean = 0,
+          sway = 0,
+          bob = 0;
+        if (!goalie && !down) {
+          const { phase, amp, speed, braking } = strideOf(svg, i, p, fx.now || 0),
+            sin = Math.sin(phase);
+          for (const side of [-1, 1]) {
+            const out = Math.max(0, side * sin) * amp,
+              lift = Math.max(0, -side * sin) * amp;
+            g.querySelector(`[data-leg="${side}"]`).setAttribute(
+              "transform",
+              `translate(${(side * (out * 0.22 + (braking ? 0.13 : 0))).toFixed(3)} ${(-lift * 0.1).toFixed(3)})`
+            );
+          }
+          lean = braking ? -sx * 9 : sx * Math.min(9, speed * 1.1);
+          sway = -0.05 * sin * amp;
+          bob = -0.035 * Math.abs(sin) * amp;
+        }
+        // The top hand, where the lean and sway have taken it, for the stick.
+        const r = (lean * Math.PI) / 180,
+          tx = (top[0] * Math.cos(r) - top[1] * Math.sin(r) + sway) * TALL,
+          ty = (top[0] * Math.sin(r) + top[1] * Math.cos(r) + bob) * TALL;
         const stick = g.querySelector("[data-stick]");
-        stick.setAttribute("x1", (down ? sx * 0.6 : top[0] * TALL).toFixed(2));
-        stick.setAttribute("y1", (down ? -0.25 : top[1] * TALL).toFixed(2));
+        stick.setAttribute("x1", (down ? sx * 0.6 : tx).toFixed(2));
+        stick.setAttribute("y1", (down ? -0.25 : ty).toFixed(2));
         stick.setAttribute("x2", bx.toFixed(2));
         stick.setAttribute("y2", by.toFixed(2));
         const lie = down ? (sx >= 0 ? 80 : -80) : 0;
-        g.querySelector("[data-figure]").setAttribute("transform", lie ? `rotate(${lie})` : "");
+        g.querySelector("[data-figure]").setAttribute(
+          "transform",
+          lie ? `rotate(${lie})` : lean || sway || bob ? `translate(${sway.toFixed(3)} ${bob.toFixed(3)}) rotate(${lean.toFixed(1)})` : ""
+        );
         // Skating away up the screen, the back of the helmet shows instead.
         const away = sy < -0.55 && !down;
         const face = g.querySelector("[data-face]");
@@ -2311,7 +2389,14 @@
       alt = $("[data-overlay-alt]");
     const toast = $("[data-toast]"),
       live = $("[data-live]");
-    let game = lineUp(new Game());
+    // Three on three or five on five, remembered in this browser.
+    let size = 3;
+    try {
+      size = localStorage.getItem("hockey-size") === "5" ? 5 : 3;
+    } catch (e) {
+      // Three on three, then.
+    }
+    let game = lineUp(new Game({ size }));
     // ready, playing, paused, buzzer (a period has just ended), intermission
     // (the choice), resurfacing (the person drives the Kamboni), crew, over
     let state = "ready"; // and replay, a goal shown again
@@ -2336,11 +2421,32 @@
       // Normal, then.
     }
     game.level = level;
-    const levels = $("[data-levels]");
+    const levels = $("[data-levels]"),
+      sizes = $("[data-sizes]");
     function showLevels() {
-      levels.hidden = false;
+      levels.hidden = sizes.hidden = false;
       for (const b of levels.querySelectorAll("[data-level]")) b.setAttribute("aria-pressed", b.dataset.level === level);
+      for (const b of sizes.querySelectorAll("[data-size]")) b.setAttribute("aria-pressed", +b.dataset.size === size);
     }
+    const intro = () => `You are blue: ${lineUpText(game, "a")}. You attack the goal on the right.`;
+    const titled = () => (size === 5 ? "Five on five" : "Three on three");
+    sizes.addEventListener("click", (e) => {
+      const b = e.target.closest("[data-size]");
+      if (!b || +b.dataset.size === size) return;
+      size = +b.dataset.size;
+      try {
+        localStorage.setItem("hockey-size", String(size));
+      } catch (err) {
+        // Not remembered, which is fine.
+      }
+      // Before the first game, a new one at once, with its line-ups.
+      if (state === "ready") {
+        newGame();
+        draw(svg, game, { view, follow: true });
+        show(titled(), intro(), "play");
+      }
+      showLevels();
+    });
     levels.addEventListener("click", (e) => {
       const b = e.target.closest("[data-level]");
       if (!b) return;
@@ -2357,7 +2463,7 @@
     const touchy = () => rootEl.classList.contains("is-touch") || matchMedia("(pointer: coarse)").matches;
 
     function show(t, body, label, other) {
-      levels.hidden = true;
+      levels.hidden = sizes.hidden = true;
       title.textContent = t;
       text.textContent = body;
       button.textContent = label;
@@ -2459,7 +2565,7 @@
 
     // A new game, with new line-ups (drawn afresh: their numbers are on them).
     function newGame() {
-      game = lineUp(new Game({ level }));
+      game = lineUp(new Game({ level, size }));
       tape.length = 0;
       replayAt = 0;
       marks.clear();
@@ -2998,7 +3104,7 @@
     }
 
     hud();
-    show("Three on three", `You are blue: ${lineUpText(game, "a")}. You attack the goal on the right.`, "play");
+    show(titled(), intro(), "play");
     showLevels();
     requestAnimationFrame(frame);
   }

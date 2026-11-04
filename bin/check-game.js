@@ -54,9 +54,9 @@ function inside(o, r) {
   return Math.abs(o.x) <= 30 - r + 0.05 && Math.abs(o.y) <= 15 - r + 0.05;
 }
 
-function run(seed, mode, level = "normal") {
+function run(seed, mode, level = "normal", size = 3) {
   Math.random = mulberry32(seed * 7 + 1); // the scripted person's own dice
-  const game = new Game({ random: mulberry32(seed), human: mode !== "cpu", level });
+  const game = new Game({ random: mulberry32(seed), human: mode !== "cpu", level, size });
   const problems = [];
   let loose = 0,
     longestLoose = 0,
@@ -125,10 +125,18 @@ function kamboni(seed, how) {
 
 const games = +process.argv[2] || 12;
 let bad = 0;
-for (const mode of ["cpu", "idle", "script"]) {
+// Three on three, and five on five (without the person doing nothing).
+for (const [mode, size] of [
+  ["cpu", 3],
+  ["idle", 3],
+  ["script", 3],
+  ["cpu", 5],
+  ["script", 5],
+]) {
+  const label = size === 5 ? `${mode} 5v5` : mode;
   const totals = { goals: 0, shots: 0, a: 0, b: 0, saves: 0, blocks: 0, steals: 0, hits: 0, passes: 0, ot: 0 };
   for (let i = 1; i <= games; i++) {
-    const r = run(i, mode);
+    const r = run(i, mode, "normal", size);
     totals.goals += r.score.a + r.score.b;
     totals.a += r.score.a;
     totals.b += r.score.b;
@@ -141,12 +149,12 @@ for (const mode of ["cpu", "idle", "script"]) {
     totals.ot += r.overtime ? 1 : 0;
     if (r.problems.length) {
       bad++;
-      console.log(`${mode} game ${i}: ${r.problems.slice(0, 3).join("; ")}`);
+      console.log(`${label} game ${i}: ${r.problems.slice(0, 3).join("; ")}`);
     }
   }
   const per = (v) => (v / games).toFixed(1);
   console.log(
-    `${mode.padEnd(6)} goals/game ${per(totals.goals)} (blue ${per(totals.a)}, orange ${per(totals.b)}), shots ${per(totals.shots)}, saves ${per(totals.saves)}, blocks ${per(
+    `${label.padEnd(10)} goals/game ${per(totals.goals)} (blue ${per(totals.a)}, orange ${per(totals.b)}), shots ${per(totals.shots)}, saves ${per(totals.saves)}, blocks ${per(
       totals.blocks
     )}, steals ${per(totals.steals)}, hits ${per(totals.hits)}, passes ${per(totals.passes)}, overtime ${totals.ot}/${games}`
   );

@@ -280,7 +280,25 @@ only for the person ("nobody throws a hat" for the computer); own goals get
 their own line. Skating (`SKATE`): let go of the keys and a player coasts to a
 stop in about a second (it was 2.6 s and 10 m, too long to control); skate the
 other way and it is a hockey stop, braking hard with a spray of snow. The
-computer's skaters brake the same way. Goalies sit on an arc in front of the net and save with a chance that
+computer's skaters brake the same way. Top speed is 8.6 m/s (`maxSpeed()`, a
+real player's is 9 to 11) and passes go at 12 to 23 m/s: at 7.6 and 10 to 20
+Mertcan found the game slow (it ran at 60 frames a second: the pace, not the
+drawing). Faster shots too were tried and dropped: the goalies saved too few.
+
+**Skating, drawn** (`strideOf()`, page side): a stride's phase per player,
+quicker with speed; pushing, each skate pushes out to the side in turn while
+the other comes back lifted (`[data-leg]` in `standingSVG`), the body leans
+the way it goes, sways over the gliding skate and bobs, and the stick follows
+the top hand; coasting, the skates glide together; a hockey stop leans back on
+wide skates. From above the body swivels a little with each stride.
+
+**Five on five** (Mertcan's ask, a trial): "3 on 3" / "5 on 5" on the start
+and final screens, remembered (`hockey-size`), `opts.size` in the simulation.
+The extra two a side get the other wing and defender at faceoffs and two more
+places in `plan()` (the other point and the net front in attack, cover for the
+next two attackers in defence, wide outlets), after the three of three on
+three, which therefore plays exactly as before. The checker plays it too: no
+problems, about 4 to 5 goals a game, and many more passes and blocks. Goalies sit on an arc in front of the net and save with a chance that
 falls with shot speed, rebounds, close range and their own sideways motion;
 fast shots can also be blocked, or slip past a body. Against a person the
 computer's team is a little sharper (`sharp()`: as fast, keener pokes, better
