@@ -12,13 +12,16 @@
     W = 15,
     CORNER = 8.5,
     GOAL_X = 26; // goal lines, 4 m from the end boards
-  const NET_HALF = 0.9,
-    NET_DEPTH = 1.1; // as drawn by rinkSVG
+  const NET_HALF = 1.35,
+    NET_DEPTH = 1.6; // as drawn by drills.js: half as big again as regulation
   const PUCK_R = 0.35,
     SKATER_R = 1.0,
     GOALIE_R = 1.15,
     REACH = 1.3; // the stick, ahead of a skater's centre
   const STEP = 1 / 120; // simulation step, in seconds
+  // A body check: the burst's speed (m/s) and length (s), how long whoever it
+  // knocks down stays down, and the closing speed it takes to knock them down.
+  const CHECK = { speed: 10.5, time: 0.3, down: 1.2, hard: 3.5 };
   const DIR = { a: 1, b: -1 }; // the way each team attacks
 
   const hypot = Math.hypot;
@@ -146,7 +149,31 @@
     }
 
     player(team, role, slot) {
-      return { team, role, slot, x: 0, y: 0, vx: 0, vy: 0, fx: DIR[team], fy: 0, wx: 0, wy: 0, idle: false, noTouch: 0, cool: 0, tx: 0, ty: 0 };
+      return {
+        team,
+        role,
+        slot,
+        x: 0,
+        y: 0,
+        vx: 0,
+        vy: 0,
+        fx: DIR[team],
+        fy: 0,
+        wx: 0,
+        wy: 0,
+        idle: false,
+        noTouch: 0,
+        cool: 0,
+        tx: 0,
+        ty: 0,
+        down: 0, // seconds left on the ice after a check
+        dash: 0, // seconds left of a check's burst, at dashX, dashY
+        dashX: 0,
+        dashY: 0,
+        checkCool: 0,
+        oneTimer: 0, // seconds left to shoot a pass straight back
+        goals: 0,
+      };
     }
 
     goalieOf(team) {
@@ -171,7 +198,7 @@
         const s = DIR[p.team];
         if (p.role === "goalie") [p.x, p.y] = [-s * (GOAL_X - 1), 0];
         else [p.x, p.y] = [s * spots[p.slot][0], s * spots[p.slot][1]];
-        Object.assign(p, { vx: 0, vy: 0, fx: s, fy: 0, wx: 0, wy: 0, noTouch: 0, cool: 0 });
+        Object.assign(p, { vx: 0, vy: 0, fx: s, fy: 0, wx: 0, wy: 0, noTouch: 0, cool: 0, down: 0, dash: 0, checkCool: 0, oneTimer: 0 });
       }
       Object.assign(this.puck, { x: 0, y: 0, vx: 0, vy: 0, carrier: null, last: null, held: 0, beat: null, rebound: 0, trail: [] });
       if (this.human) this.controlled = this.players[0];
@@ -204,9 +231,19 @@
       const pk = this.puck;
       pk.rebound = Math.max(0, pk.rebound - dt);
       for (const team of ["a", "b"]) this.plan(team);
+      this.t = (this.t || 0) + dt;
       for (const p of this.players) {
         p.cool = Math.max(0, p.cool - dt);
         p.noTouch = Math.max(0, p.noTouch - dt);
+        p.checkCool = Math.max(0, p.checkCool - dt);
+        p.oneTimer = Math.max(0, p.oneTimer - dt);
+        p.dash = Math.max(0, p.dash - dt);
+        if (p.down > 0) {
+          // Knocked down: slides to a stop, then gets up.
+          p.down = Math.max(0, p.down - dt);
+          p.wx = p.wy = 0;
+          continue;
+        }
         if (p.role === "goalie") this.keepGoal(p, dt);
         else if (this.human && p === this.controlled) this.obey(p, input);
         else this.think(p, dt);
@@ -308,6 +345,13 @@
       const pk = this.puck,
         c = pk.carrier;
       if (c === p) return this.carry(p, dt);
+      // ...or line up a body check on a carrier close by.
+      if (c && c.team !== p.team && c.role === "skater" && p.checkCool <= 0) {
+        const d = dist(p, c);
+        if (d > 1.8 && d < 3.4 && this.random() < (this.sharp(p.team) ? 0.6 : 0.45) * dt) {
+          return this.check(p, c.x + c.vx * 0.15 - p.x, c.y + c.vy * 0.15 - p.y);
+        }
+      }
       if (c && c.team !== p.team && c.role === "skater" && p.cool <= 0) {
         if (Math.min(dist(this.stick(p), pk), dist(p, pk) - 0.8) < 1.4 && this.random() < 1.8 * dt)
           this.poke(p, this.sharp(p.team) ? 0.55 : 0.45, 1.4);
@@ -376,15 +420,50 @@
       p.wy = p.idle ? 0 : (iy / il) * max * Math.min(1, il);
       const pk = this.puck;
       if (input.shoot) {
-        if (pk.carrier === p) this.shoot(p, il > 0.3 && Math.abs(iy / il) > 0.35 ? Math.sign(iy) * 0.62 : null);
+        if (pk.carrier === p) this.shoot(p, il > 0.3 && Math.abs(iy / il) > 0.35 ? Math.sign(iy) * NET_HALF * 0.7 : null);
         else if (p.cool <= 0) this.poke(p, 0.5, 1.6);
       }
+      if (input.check) this.check(p, il > 0.3 ? ix : p.fx, il > 0.3 ? iy : p.fy);
       if (input.pass) {
         if (pk.carrier === p) {
           const mate = this.passTarget(p, il > 0.3 ? [ix / il, iy / il] : null);
           if (mate) this.pass(p, mate);
         } else this.switchPlayer();
       }
+    }
+
+    // A body check: a short burst along (dx, dy). Whoever it hits hard enough,
+    // with the puck or not, goes down (see move()).
+    check(p, dx, dy) {
+      if (p.checkCool > 0 || p.down > 0 || p.role === "goalie" || this.puck.carrier === p) return;
+      const l = hypot(dx, dy) || 1;
+      p.dash = CHECK.time;
+      p.dashX = (dx / l) * CHECK.speed;
+      p.dashY = (dy / l) * CHECK.speed;
+      p.checkCool = this.human && p === this.controlled ? 1.2 : 2.8;
+      this.events.push({ type: "lunge", team: p.team });
+    }
+
+    knock(hitter, victim, nx, ny, speed) {
+      const pk = this.puck;
+      victim.down = CHECK.down;
+      victim.noTouch = CHECK.down + 0.2;
+      victim.dash = 0;
+      victim.vx += nx * speed * 0.7;
+      victim.vy += ny * speed * 0.7;
+      hitter.dash = 0;
+      hitter.vx *= 0.35;
+      hitter.vy *= 0.35;
+      if (pk.carrier === victim) {
+        const a = Math.atan2(ny, nx) + (this.random() - 0.5) * 2;
+        pk.carrier = null;
+        pk.last = hitter;
+        pk.vx = victim.vx + Math.cos(a) * 4;
+        pk.vy = victim.vy + Math.sin(a) * 4;
+      }
+      const near = { x: victim.x, y: victim.y };
+      const boards = !!confine(near, SKATER_R + 2.2);
+      this.events.push({ type: "hit", team: hitter.team, boards, by: this.players.indexOf(hitter), on: this.players.indexOf(victim) });
     }
 
     switchPlayer() {
@@ -439,6 +518,7 @@
       pk.carrier = null;
       pk.last = p;
       pk.beat = null;
+      pk.oneTimer = false;
       p.noTouch = p.role === "goalie" ? 0.8 : 0.35;
       p.cool = 0.45;
     }
@@ -448,10 +528,12 @@
         s = DIR[p.team],
         gx = s * GOAL_X;
       const goalie = this.goalieOf(other(p.team));
-      let ty = aimY !== null ? aimY : goalie.y > 0 ? -0.62 : 0.62;
+      const corner = NET_HALF * 0.7;
+      let ty = aimY !== null ? aimY : goalie.y > 0 ? -corner : corner;
       const d = hypot(gx - pk.x, ty - pk.y);
       ty += (this.random() - 0.5) * 2 * (0.25 + d * 0.035);
-      const speed = 25 + this.random() * 5;
+      const quick = p.oneTimer > 0;
+      const speed = 25 + this.random() * 5 + (quick ? 4 : 0);
       const dx = gx - pk.x,
         dy = ty - pk.y,
         l = hypot(dx, dy) || 1;
@@ -459,8 +541,10 @@
       pk.vx = (dx / l) * speed;
       pk.vy = (dy / l) * speed;
       pk.from = { x: pk.x, y: pk.y };
+      pk.oneTimer = quick;
+      p.oneTimer = 0;
       this.shots[p.team]++;
-      this.events.push({ type: "shot", team: p.team });
+      this.events.push({ type: "shot", team: p.team, oneTimer: quick, you: this.human && p === this.controlled });
     }
 
     pass(p, m) {
@@ -477,6 +561,7 @@
       pk.vx = (dx / l) * speed;
       pk.vy = (dy / l) * speed;
       pk.from = null;
+      pk.passedAt = this.t;
       this.events.push({ type: "pass", team: p.team });
     }
 
@@ -516,9 +601,10 @@
 
     move(dt) {
       for (const p of this.players) {
+        if (p.dash > 0) [p.wx, p.wy] = [p.dashX, p.dashY];
         let dvx = p.wx - p.vx,
           dvy = p.wy - p.vy;
-        const acc = (p.role === "goalie" ? 20 : p.idle ? 3 : 13) * dt,
+        const acc = (p.dash > 0 ? 60 : p.down > 0 ? 6 : p.role === "goalie" ? 20 : p.idle ? 3 : 13) * dt,
           dl = hypot(dvx, dvy);
         if (dl > acc) [dvx, dvy] = [(dvx * acc) / dl, (dvy * acc) / dl];
         p.vx += dvx;
@@ -559,6 +645,14 @@
           b.x += nx * push;
           b.y += ny * push;
           const closing = (a.vx - b.vx) * nx + (a.vy - b.vy) * ny;
+          if (closing > CHECK.hard && a.team !== b.team && (a.dash > 0 || b.dash > 0)) {
+            const hitter = a.dash > 0 && (b.dash <= 0 || hypot(a.vx, a.vy) >= hypot(b.vx, b.vy)) ? a : b;
+            const victim = hitter === a ? b : a;
+            if (victim.role === "skater" && victim.down <= 0) {
+              this.knock(hitter, victim, hitter === a ? nx : -nx, hitter === a ? ny : -ny, closing);
+              continue;
+            }
+          }
           if (closing > 0) {
             a.vx -= nx * closing * 0.4;
             a.vy -= ny * closing * 0.4;
@@ -652,10 +746,17 @@
         }
         const s = DIR[g.team];
         const shotLength = pk.from ? hypot(pk.from.x + s * GOAL_X, pk.from.y) : 20;
-        let chance = 0.82 - Math.max(0, sp - 18) * 0.02 - Math.abs(g.vy) * 0.06 - (pk.rebound > 0 ? 0.18 : 0) - (shotLength < 6 ? 0.12 : 0);
+        let chance =
+          0.82 -
+          Math.max(0, sp - 18) * 0.02 -
+          Math.abs(g.vy) * 0.06 -
+          (pk.rebound > 0 ? 0.18 : 0) -
+          (shotLength < 6 ? 0.12 : 0) -
+          (pk.oneTimer ? 0.12 : 0);
         if (this.sharp(g.team)) chance += 0.1;
         chance = clamp(chance, 0.3, 0.95);
         if (this.random() < chance) {
+          pk.oneTimer = false;
           this.events.push({ type: "save", team: g.team });
           if (sp < 14 || this.random() < 0.3) this.cover(g);
           else {
@@ -693,6 +794,7 @@
             pk.vy = (pk.vy - 2 * into * ny) * 0.35;
             pk.last = p;
             pk.from = null;
+            pk.oneTimer = false;
             this.events.push({ type: "block", team: p.team });
             return true;
           }
@@ -723,6 +825,9 @@
     take(p) {
       const pk = this.puck,
         had = pk.last && pk.last.team;
+      const passed = pk.last && pk.last !== p && pk.last.team === p.team && this.t - (pk.passedAt ?? -9) < 1.6;
+      p.oneTimer = passed ? 0.45 : 0;
+      pk.oneTimer = false;
       pk.carrier = p;
       pk.last = p;
       pk.beat = null;
@@ -750,7 +855,18 @@
       this.phase = "goal";
       this.wait = 2.4;
       this.decided = this.overtime;
-      this.events.push({ type: "goal", team, score: { ...this.score }, overtime: this.overtime });
+      const by = pk.last,
+        own = !by || by.team !== team;
+      if (!own) by.goals++;
+      this.events.push({
+        type: "goal",
+        team,
+        score: { ...this.score },
+        overtime: this.overtime,
+        own,
+        hatTrick: !own && by.goals === 3,
+        oneTimer: !!pk.oneTimer,
+      });
     }
   }
 
@@ -779,9 +895,25 @@
     return e;
   };
 
-  function draw(svg, game) {
-    if (!svg.firstChild || !svg.querySelector("[data-players]")) {
+  // Stars that circle a player who has been knocked down.
+  const STARS = `<g data-stars visibility="hidden">${[0, 120, 240]
+    .map(
+      (a) =>
+        `<path transform="rotate(${a}) translate(0 -1.5)" d="M 0 -0.3 L 0.08 -0.08 L 0.3 0 L 0.08 0.08 L 0 0.3 L -0.08 0.08 L -0.3 0 L -0.08 -0.08 Z" fill="var(--rink-puck)"/>`
+    )
+    .join("")}</g>`;
+
+  // `fx` carries what only the page knows: the time, a lit goal lamp, hats.
+  function draw(svg, game, fx = {}) {
+    if (!svg.querySelector("[data-players]")) {
       svg.insertAdjacentHTML("afterbegin", root.rinkSVG ? root.rinkSVG() : "");
+      svg.insertAdjacentHTML(
+        "beforeend",
+        `<defs><radialGradient id="rink-lamp"><stop offset="0" stop-color="#ff3b30" stop-opacity="0.85"/><stop offset="1" stop-color="#ff3b30" stop-opacity="0"/></radialGradient></defs>`
+      );
+      for (const s of [1, -1])
+        el("circle", { "data-lamp": s, cx: s * (GOAL_X + NET_DEPTH * 0.6), cy: 0, r: 3.4, fill: "url(#rink-lamp)", opacity: 0 }, svg);
+      el("g", { "data-hats": "" }, svg);
       el(
         "polyline",
         { "data-trail": "", fill: "none", stroke: "var(--rink-shot)", "stroke-width": "0.35", "stroke-linecap": "round", opacity: ".45" },
@@ -792,10 +924,10 @@
         "circle",
         {
           "data-you": "",
-          r: "1.9",
+          r: "1.75",
           fill: "none",
           stroke: "var(--rink-team-a)",
-          "stroke-width": "0.22",
+          "stroke-width": "0.2",
           "stroke-dasharray": "0.7 0.45",
           opacity: ".8",
         },
@@ -804,44 +936,60 @@
       const layer = el("g", { "data-players": "" }, svg);
       game.players.forEach((p, i) => {
         const g = el("g", { "data-player": i }, layer);
-        el("line", { x1: 0, y1: 0, x2: 0, y2: 0, stroke: "var(--rink-stick)", "stroke-width": "0.3", "stroke-linecap": "round" }, g);
-        el(
-          "circle",
-          {
-            r: p.role === "goalie" ? 1.3 : 1.2,
-            fill: `var(--rink-team-${p.team})`,
-            stroke: p.role === "goalie" ? "var(--rink-pads)" : "none",
-            "stroke-width": "0.4",
-          },
-          g
-        );
-        for (const x of [-0.48, 0.48]) el("circle", { cx: x, cy: -0.1, r: 0.48, fill: "#fff" }, g);
-        for (const x of [-0.48, 0.48]) el("circle", { "data-pupil": x, cx: x, cy: -0.1, r: 0.23, fill: "#111" }, g);
+        g.insertAdjacentHTML("beforeend", root.helmetSVG(p.team, p.role === "goalie") + STARS);
       });
     }
-    const pk = game.puck;
+    const pk = game.puck,
+      now = fx.now || 0;
     const groups = svg.querySelectorAll("[data-player]");
     game.players.forEach((p, i) => {
       const g = groups[i];
       g.setAttribute("transform", `translate(${p.x.toFixed(2)} ${p.y.toFixed(2)})`);
-      const stick = g.firstChild;
-      stick.setAttribute("x2", (p.fx * 2).toFixed(2));
-      stick.setAttribute("y2", (p.fy * 2).toFixed(2));
-      // Everyone watches the puck, except whoever has it, who looks ahead.
-      let lx = pk.x - p.x,
-        ly = pk.y - p.y;
-      if (pk.carrier === p) [lx, ly] = [p.fx, p.fy];
-      const ll = hypot(lx, ly) || 1;
-      g.querySelectorAll("[data-pupil]").forEach((e) => {
-        e.setAttribute("cx", (+e.dataset.pupil + (0.22 * lx) / ll).toFixed(3));
-        e.setAttribute("cy", (-0.1 + (0.22 * ly) / ll).toFixed(3));
-      });
+      // Everyone watches the puck, except whoever has it, who looks ahead; a
+      // player knocked down lies turned, with crosses for eyes and stars.
+      const down = p.down > 0;
+      const [lx, ly] = pk.carrier === p ? [p.fx, p.fy] : [pk.x - p.x, pk.y - p.y];
+      root.helmetLook(g, Math.atan2(p.fy, p.fx) + (down ? 1.2 : 0), lx, ly, down);
+      const stars = g.querySelector("[data-stars]");
+      stars.setAttribute("visibility", down ? "visible" : "hidden");
+      if (down) stars.setAttribute("transform", `rotate(${((now / 4) % 360).toFixed(0)})`);
     });
     svg.querySelector("[data-puck]").setAttribute("transform", `translate(${pk.x.toFixed(2)} ${pk.y.toFixed(2)})`);
     svg.querySelector("[data-trail]").setAttribute("points", pk.trail.map((t) => t.map((v) => v.toFixed(2)).join(",")).join(" "));
     const you = svg.querySelector("[data-you]");
     you.style.display = game.human ? "" : "none";
     if (game.human) you.setAttribute("transform", `translate(${game.controlled.x.toFixed(2)} ${game.controlled.y.toFixed(2)})`);
+    for (const lamp of svg.querySelectorAll("[data-lamp]")) {
+      const on = fx.lamp && +lamp.dataset.lamp === fx.lamp.side && now < fx.lamp.until;
+      lamp.setAttribute("opacity", on ? (0.55 + 0.35 * Math.sin(now / 80)).toFixed(2) : "0");
+    }
+    // Hats fall onto the ice, spinning, stay a while and fade.
+    svg.querySelectorAll("[data-hat]").forEach((h) => {
+      const age = (now - +h.dataset.t0) / 1000;
+      if (age > 8) return h.remove();
+      const k = clamp(age / 0.9, 0, 1),
+        e = 1 - (1 - k) * (1 - k);
+      const y = -19 + (+h.dataset.y + 19) * e;
+      h.setAttribute("transform", `translate(${h.dataset.x} ${y.toFixed(2)}) rotate(${(+h.dataset.r + (1 - e) * 240).toFixed(0)})`);
+      h.setAttribute("opacity", age > 7 ? (8 - age).toFixed(2) : "1");
+    });
+  }
+
+  const HAT_COLOURS = ["var(--rink-team-a)", "var(--rink-team-b)", "#2b2f36", "#c9ced4", "#b3261e", "#3d7a4f"];
+  function throwHats(svg, now) {
+    const layer = svg.querySelector("[data-hats]");
+    for (let i = 0; i < 18; i++) {
+      const c = HAT_COLOURS[i % HAT_COLOURS.length];
+      const x = (Math.random() * 52 - 26).toFixed(1),
+        y = (Math.random() * 24 - 12).toFixed(1),
+        r = Math.floor(Math.random() * 360);
+      layer.insertAdjacentHTML(
+        "beforeend",
+        `<g data-hat data-x="${x}" data-y="${y}" data-r="${r}" data-t0="${Math.round(now + i * 70)}" transform="translate(0 -19)">
+          <ellipse cx="0.55" rx="0.5" ry="0.36" fill="${c}"/><circle r="0.6" fill="${c}" stroke="var(--rink-helmet-edge)" stroke-width="0.06"/>
+          <circle r="0.12" fill="#fff" opacity="0.6"/></g>`
+      );
+    }
   }
 
   // The home page's piece: the computer against itself, a few seconds in,
@@ -863,6 +1011,8 @@
       live = $("[data-live]");
     let game = new Game();
     let state = "ready"; // ready, playing, paused, over
+    // The running game, for tests and the console.
+    rootEl.hockey = { game: () => game };
     draw(svg, game);
 
     function show(t, body, label) {
@@ -918,8 +1068,23 @@
     // first touch shows those, for touch screens the media query misses.
     window.addEventListener("pointerdown", (e) => e.pointerType === "touch" && rootEl.classList.add("is-touch"));
     const keys = new Set();
-    const presses = { shoot: false, pass: false };
-    const GAME_KEYS = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "KeyW", "KeyA", "KeyS", "KeyD", "Space", "KeyX", "KeyK", "KeyJ"];
+    const presses = { shoot: false, pass: false, check: false };
+    const GAME_KEYS = [
+      "ArrowUp",
+      "ArrowDown",
+      "ArrowLeft",
+      "ArrowRight",
+      "KeyW",
+      "KeyA",
+      "KeyS",
+      "KeyD",
+      "Space",
+      "KeyX",
+      "KeyK",
+      "KeyJ",
+      "KeyC",
+      "KeyL",
+    ];
     window.addEventListener("keydown", (e) => {
       if (e.target.closest && e.target.closest("input, textarea, select")) return;
       if (state === "playing" && GAME_KEYS.includes(e.code)) e.preventDefault();
@@ -932,6 +1097,7 @@
       keys.add(e.code);
       if (e.code === "Space" || e.code === "KeyJ") presses.shoot = true;
       if (e.code === "KeyX" || e.code === "KeyK") presses.pass = true;
+      if (e.code === "KeyC" || e.code === "KeyL") presses.check = true;
     });
     window.addEventListener("keyup", (e) => keys.delete(e.code));
     window.addEventListener("blur", () => keys.clear());
@@ -968,7 +1134,7 @@
     };
     stickPad.addEventListener("pointerup", letGo);
     stickPad.addEventListener("pointercancel", letGo);
-    for (const name of ["shoot", "pass"]) {
+    for (const name of ["shoot", "pass", "check"]) {
       $(`[data-${name}]`).addEventListener("pointerdown", (e) => {
         e.preventDefault();
         if (state === "playing") presses[name] = true;
@@ -985,8 +1151,8 @@
       if (keys.has("ArrowDown") || keys.has("KeyS")) y += 1;
       const l = hypot(x, y);
       if (l > 1) [x, y] = [x / l, y / l];
-      const out = { x, y, shoot: presses.shoot, pass: presses.pass };
-      presses.shoot = presses.pass = false;
+      const out = { x, y, shoot: presses.shoot, pass: presses.pass, check: presses.check };
+      presses.shoot = presses.pass = presses.check = false;
       return out;
     }
 
@@ -1007,9 +1173,22 @@
         first = false;
         spare -= STEP;
       }
+      const you = game.players.indexOf(game.controlled);
       for (const ev of game.events.splice(0)) {
-        if (ev.type === "goal")
-          say(ev.overtime ? (ev.team === "a" ? "Overtime winner! " : "Overtime goal. ") + pick(QUIPS[ev.team]) : pick(QUIPS[ev.team]), 2.3);
+        if (ev.type === "goal") {
+          lamp = { side: ev.team === "a" ? 1 : -1, until: now + 2400 };
+          let msg = pick(QUIPS[ev.team]);
+          if (ev.hatTrick && ev.team === "a") {
+            msg = "Hat trick! Hats on the ice.";
+            throwHats(svg, now);
+          } else if (ev.hatTrick) msg = "Hat trick for the computer. Nobody throws a hat.";
+          else if (ev.own) msg = ev.team === "a" ? "Goal! Off a computer skate." : "Own goal. It happens.";
+          else if (ev.oneTimer && ev.team === "a") msg = "One-timer goal!";
+          say(ev.overtime ? (ev.team === "a" ? "Overtime winner! " : "Overtime goal. ") + msg : msg, 2.3);
+        } else if (ev.type === "hit") {
+          if (ev.by === you) say(ev.boards ? "Into the boards!" : "Checked!", 1);
+          else if (ev.on === you) say(ev.boards ? "Into the boards. Ouch." : "Ouch.", 1);
+        } else if (ev.type === "shot" && ev.oneTimer && ev.you) say("One-timer!", 0.8);
         else if (ev.type === "post") say("Off the post!", 1);
         else if (ev.type === "overtime") say("Tied. Next goal wins.", 2.5);
         else if (ev.type === "final") {
@@ -1019,9 +1198,10 @@
           show(`You ${a}, computer ${b}`, verdict, "play again");
         }
       }
-      draw(svg, game);
+      draw(svg, game, { now, lamp });
       hud();
     }
+    let lamp = null;
     hud();
     show("Three on three", "You are blue and attack the goal on the right. Most goals in three minutes wins.", "play");
     requestAnimationFrame(frame);

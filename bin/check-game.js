@@ -35,7 +35,8 @@ function scripted(game) {
   const dx = pk.x - p.x,
     dy = pk.y - p.y,
     d = Math.hypot(dx, dy) || 1;
-  return { x: dx / d, y: dy / d, shoot: d < 1.8 && Math.random() < 0.1, pass: d > 15 && Math.random() < 0.02 };
+  const check = pk.carrier && pk.carrier.team === "b" && d < 3.2 && d > 1.8 && Math.random() < 0.03;
+  return { x: dx / d, y: dy / d, shoot: d < 1.8 && Math.random() < 0.1, pass: d > 15 && Math.random() < 0.02, check };
 }
 
 function inside(o, r) {
@@ -52,7 +53,7 @@ function run(seed, mode) {
   let loose = 0,
     longestLoose = 0,
     t = 0;
-  const counts = { save: 0, post: 0, steal: 0, block: 0, pass: 0 };
+  const counts = { save: 0, post: 0, steal: 0, block: 0, pass: 0, hit: 0 };
   while (game.phase !== "over" && t < 600) {
     const input = mode === "script" ? scripted(game) : {};
     game.step(STEP, input);
@@ -65,6 +66,7 @@ function run(seed, mode) {
     if (!inside(pk, 0.3)) problems.push(`puck outside the rink at ${t.toFixed(1)} s (${pk.x.toFixed(2)}, ${pk.y.toFixed(2)})`);
     for (const p of game.players) {
       if (!inside(p, 0.9)) problems.push(`${p.team}${p.slot} outside the rink at ${t.toFixed(1)} s`);
+      if (p.down > 1.25) problems.push(`${p.team}${p.slot} down for too long at ${t.toFixed(1)} s`);
     }
     if (game.phase === "play" && !pk.carrier && Math.hypot(pk.vx, pk.vy) < 0.5) {
       loose += STEP;
@@ -81,7 +83,7 @@ function run(seed, mode) {
 const games = +process.argv[2] || 12;
 let bad = 0;
 for (const mode of ["cpu", "idle", "script"]) {
-  const totals = { goals: 0, shots: 0, a: 0, b: 0, saves: 0, blocks: 0, steals: 0, passes: 0, ot: 0 };
+  const totals = { goals: 0, shots: 0, a: 0, b: 0, saves: 0, blocks: 0, steals: 0, hits: 0, passes: 0, ot: 0 };
   for (let i = 1; i <= games; i++) {
     const r = run(i, mode);
     totals.goals += r.score.a + r.score.b;
@@ -90,6 +92,7 @@ for (const mode of ["cpu", "idle", "script"]) {
     totals.shots += r.shots.a + r.shots.b;
     totals.saves += r.counts.save;
     totals.blocks += r.counts.block;
+    totals.hits += r.counts.hit;
     totals.steals += r.counts.steal;
     totals.passes += r.counts.pass;
     totals.ot += r.overtime ? 1 : 0;
@@ -102,7 +105,7 @@ for (const mode of ["cpu", "idle", "script"]) {
   console.log(
     `${mode.padEnd(6)} goals/game ${per(totals.goals)} (blue ${per(totals.a)}, orange ${per(totals.b)}), shots ${per(totals.shots)}, saves ${per(totals.saves)}, blocks ${per(
       totals.blocks
-    )}, steals ${per(totals.steals)}, passes ${per(totals.passes)}, overtime ${totals.ot}/${games}`
+    )}, steals ${per(totals.steals)}, hits ${per(totals.hits)}, passes ${per(totals.passes)}, overtime ${totals.ot}/${games}`
   );
   const avg = totals.goals / games;
   if (mode === "cpu" && (avg < 2 || avg > 14)) {

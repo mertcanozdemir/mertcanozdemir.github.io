@@ -62,16 +62,70 @@
       [5, -7],
       [5, 7],
     ].forEach(([x, y]) => p.push(`<circle cx="${x}" cy="${y}" r="0.3" fill="var(--rink-red)"/>`));
-    [-1, 1].forEach((s) => {
-      p.push(`<path d="M ${s * goal} -1.8 A 1.8 1.8 0 0 ${s > 0 ? 0 : 1} ${s * goal} 1.8"
-        fill="var(--rink-crease)" stroke="var(--rink-red)" stroke-width="0.1"/>`);
-      p.push(`<rect x="${s > 0 ? goal : -goal - 1.1}" y="-0.9" width="1.1" height="1.8"
-        fill="none" stroke="var(--rink-red)" stroke-width="0.12"/>`);
-    });
+    p.push(netSVG(-goal, 0, 0), netSVG(goal, 0, 180));
     return p.join("");
   }
-  // The game (game.js) plays on the same rink.
+
+  // Nets and creases are drawn half as big again as regulation (1.83 m): the
+  // players are drawn several times life size, and beside them a true-scale net
+  // looked too small. game.js plays with nets of the same size.
+  const NET = { half: 1.35, depth: 1.6, crease: 2.7 };
+
+  // A net with its crease; angle 0 has the mouth facing +x, like the left-hand goal.
+  function netSVG(x, y, angle) {
+    const { half, depth, crease } = NET;
+    return `<g transform="translate(${x} ${y}) rotate(${angle || 0})">
+      <path d="M 0 ${-crease} A ${crease} ${crease} 0 0 1 0 ${crease}" fill="var(--rink-crease)" stroke="var(--rink-red)" stroke-width="0.1"/>
+      <rect x="${-depth}" y="${-half}" width="${depth}" height="${2 * half}" rx="0.45"
+        fill="var(--rink-net)" stroke="var(--rink-red)" stroke-width="0.16"/></g>`;
+  }
+
+  // A player seen from above, facing +x: a helmet in the team's colour with a
+  // dark visor at the front and two eyes looking out of it, and a stick. A
+  // goalie wears a light mask with a cage. helmetLook() turns it and moves the
+  // eyes; `out` crosses them, for a player knocked down.
+  function helmetSVG(team, goalie) {
+    const shell = goalie ? "var(--rink-mask)" : `var(--rink-team-${team})`;
+    const stripe = goalie ? `var(--rink-team-${team})` : "#fff";
+    const eye = (s) =>
+      `<circle cx="0.66" cy="${s * 0.31}" r="0.25" fill="#fff"/>
+      <circle data-pupil="${s}" cx="0.66" cy="${s * 0.31}" r="0.13" fill="#111"/>
+      <path data-out d="M 0.52 ${s * 0.31 - 0.14} l 0.28 0.28 m 0 -0.28 l -0.28 0.28" stroke="#111" stroke-width="0.08" stroke-linecap="round" visibility="hidden"/>`;
+    const cage = goalie ? `<path d="M 0.5 -0.66 V 0.66 M 0.84 -0.6 V 0.6 M 0.3 0 H 1.15" stroke="var(--rink-mask)" stroke-width="0.07"/>` : "";
+    return `<g data-helmet>
+      <path d="M 0.05 0.85 L 1.45 0.28 M 1.45 0.28 L 1.52 -0.12" stroke="var(--rink-stick)" stroke-width="${goalie ? 0.3 : 0.2}" stroke-linecap="round" fill="none"/>
+      <ellipse rx="1.12" ry="0.98" fill="${shell}" stroke="var(--rink-helmet-edge)" stroke-width="0.09"/>
+      <ellipse cx="0.12" cy="-0.9" rx="0.3" ry="0.15" fill="var(--rink-helmet-edge)"/>
+      <ellipse cx="0.12" cy="0.9" rx="0.3" ry="0.15" fill="var(--rink-helmet-edge)"/>
+      <rect x="-1.02" y="-0.12" width="1.12" height="0.24" rx="0.12" fill="${stripe}" opacity="${goalie ? 0.95 : 0.45}"/>
+      <ellipse cx="-0.38" cy="-0.38" rx="0.36" ry="0.17" fill="#fff" opacity="0.25"/>
+      <path d="M 0.28 -0.7 C 0.8 -0.76 1.12 -0.48 1.14 0 C 1.12 0.48 0.8 0.76 0.28 0.7 C 0.38 0.26 0.38 -0.26 0.28 -0.7 Z" fill="var(--rink-visor)"/>
+      ${eye(-1)}${eye(1)}${cage}</g>`;
+  }
+
+  // Turns a helmet to `angle` (radians, 0 = +x) and points its eyes along
+  // (lx, ly), in rink coordinates.
+  function helmetLook(g, angle, lx, ly, out) {
+    const h = g.querySelector("[data-helmet]");
+    h.setAttribute("transform", `rotate(${((angle * 180) / Math.PI).toFixed(1)})`);
+    const c = Math.cos(angle),
+      s = Math.sin(angle);
+    let x = lx * c + ly * s,
+      y = ly * c - lx * s;
+    const l = Math.hypot(x, y) || 1;
+    [x, y] = [(x / l) * 0.11, (y / l) * 0.11];
+    h.querySelectorAll("[data-pupil]").forEach((p) => {
+      p.setAttribute("cx", (0.66 + x).toFixed(3));
+      p.setAttribute("cy", (+p.dataset.pupil * 0.31 + y).toFixed(3));
+      p.setAttribute("visibility", out ? "hidden" : "visible");
+    });
+    h.querySelectorAll("[data-out]").forEach((p) => p.setAttribute("visibility", out ? "visible" : "hidden"));
+  }
+  // The game (game.js) plays on the same rink, with the same players.
   window.rinkSVG = rinkSVG;
+  window.helmetSVG = (...a) => helmetSVG(...a);
+  window.helmetLook = (...a) => helmetLook(...a);
+  window.RINK_NET = NET;
 
   // A point on the Catmull-Rom curve through k, between k[i] and k[i + 1].
   function curvePoint(k, i, u) {
@@ -246,14 +300,7 @@
 
     // Extra nets some drills use, as [x, y, angle]: angle 0 has the mouth
     // facing +x, like the left-hand goal.
-    (drill.nets || []).forEach(([x, y, angle]) =>
-      gT.insertAdjacentHTML(
-        "beforeend",
-        `<g transform="translate(${x} ${y}) rotate(${angle || 0})">
-          <path d="M 0 -1.8 A 1.8 1.8 0 0 1 0 1.8" fill="var(--rink-crease)" stroke="var(--rink-red)" stroke-width="0.1"/>
-          <rect x="-1.1" y="-0.9" width="1.1" height="1.8" fill="none" stroke="var(--rink-red)" stroke-width="0.12"/></g>`
-      )
-    );
+    (drill.nets || []).forEach(([x, y, angle]) => gT.insertAdjacentHTML("beforeend", netSVG(x, y, angle)));
 
     (drill.cones || []).forEach(([x, y]) =>
       gT.insertAdjacentHTML(
@@ -285,22 +332,20 @@
     );
     const puckEls = [...gA.querySelectorAll("[data-puck]")];
 
-    // A preview (the home page) gives its players faces instead of labels: two
-    // eyes that look where the player is going, or at the puck when it stands.
+    // A preview (the home page) draws its players as helmets instead of
+    // numbered discs, as the game does: they face where they skate (goalies
+    // and anyone standing face the puck) and watch the puck. The first circle
+    // is the ring a carrier gets either way.
     const faces = card.hasAttribute("data-preview");
-    const face = `<circle cx="-0.48" cy="-0.1" r="0.48" fill="#fff"/><circle cx="0.48" cy="-0.1" r="0.48" fill="#fff"/>
-      <circle data-pupil cx="-0.48" cy="-0.1" r="0.23" fill="#111"/><circle data-pupil cx="0.48" cy="-0.1" r="0.23" fill="#111"/>`;
     drill.actors.forEach((a) =>
       gA.insertAdjacentHTML(
         "beforeend",
-        `<g data-actor="${a.id}">
+        faces
+          ? `<g data-actor="${a.id}"><circle r="1.4" fill="none" stroke="var(--rink-puck)" stroke-width="0"/>${helmetSVG(a.team, a.label === "G")}</g>`
+          : `<g data-actor="${a.id}">
           <circle r="1.25" fill="var(--rink-team-${a.team})" stroke="var(--rink-puck)" stroke-width="0"/>
-          ${
-            faces
-              ? face
-              : `<text y="0.42" text-anchor="middle" font-size="1.1" fill="#fff"
-            font-weight="600">${a.label}</text>`
-          }</g>`
+          <text y="0.42" text-anchor="middle" font-size="1.1" fill="#fff"
+            font-weight="600">${a.label}</text></g>`
       )
     );
 
@@ -310,14 +355,12 @@
         [x0, y0] = along(a, Math.max(0, t - 0.03));
       let dx = x1 - x0,
         dy = y1 - y0;
-      if (Math.hypot(dx, dy) < 0.2 && pucks.length) {
-        [dx, dy] = [pucks[0].pos[0] - x, pucks[0].pos[1] - y];
-      }
-      const d = Math.hypot(dx, dy) || 1;
-      gA.querySelectorAll(`[data-actor="${a.id}"] [data-pupil]`).forEach((p, i) => {
-        p.setAttribute("cx", (i ? 0.48 : -0.48) + (0.22 * dx) / d);
-        p.setAttribute("cy", -0.1 + (0.22 * dy) / d);
-      });
+      const toPuck = pucks.length ? [pucks[0].pos[0] - x, pucks[0].pos[1] - y] : [dx, dy];
+      if (a.label === "G" || Math.hypot(dx, dy) < 0.2) [dx, dy] = toPuck;
+      const angle = Math.hypot(dx, dy) > 1e-6 ? Math.atan2(dy, dx) : a._angle || 0;
+      a._angle = angle;
+      const [lx, ly] = pucks.some((p) => p.carrier === a) ? [Math.cos(angle), Math.sin(angle)] : toPuck;
+      helmetLook(gA.querySelector(`[data-actor="${a.id}"]`), angle, lx, ly, false);
     }
 
     function frame(t) {

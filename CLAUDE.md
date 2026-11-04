@@ -133,9 +133,10 @@ A "coming soon" placeholder was tried and dropped: a piece goes up when it works
   computer playing itself, a few seconds in, different on every visit.
 - **Hockey drills**: one real drill, the 2-on-1 Give and Go, loops through
   `drills.js` in preview mode (`data-preview`: no controls, plays only while on
-  screen, a still frame for reduced motion). In preview the players have eyes
-  instead of numbers, looking where they skate, or at the puck when they stand;
-  the drills page keeps its numbers, which the steps refer to.
+  screen, a still frame for reduced motion). In preview the players are the
+  game's helmets instead of numbered discs, facing where they skate (goalies and
+  anyone standing face the puck) and watching the puck; the drills page keeps
+  its numbers, which the steps refer to.
 
 ### The comparison graph moved to the lab's site
 
@@ -173,9 +174,21 @@ mouth acting as a wall, defenders pushing a carrier along instead of reaching
 the puck, carriers parking in the slot, and an asymmetric collision that made
 one computer team three times as good as the other.
 
+The players are helmets seen from above (`helmetSVG` and `helmetLook` in
+drills.js, shared with the home page's drill): a shell in the team's colour with
+a dark visor the eyes look out of, and a stick; goalies wear a light mask with a
+cage. They turn to face where they skate and watch the puck. They replaced plain
+discs with eyes, on request ("like helmets, without changing the theme much").
+
 How it plays: the person controls one skater (the dashed ring) and takes over
 whoever on their team gets the puck; Space shoots or pokes, X passes or
-switches. Goalies sit on an arc in front of the net and save with a chance that
+switches, C body checks: a short burst that knocks down an opponent it hits
+hard enough (`CHECK`), who drops the puck and lies there for a second with
+crosses for eyes and stars; the computer checks too. A shot straight off a
+pass is a one-timer: harder, and harder to save. A goal lights the lamp behind
+the net; a hat trick (`goals` per player) brings hats down onto the ice, but
+only for the person ("nobody throws a hat" for the computer); own goals get
+their own line. Goalies sit on an arc in front of the net and save with a chance that
 falls with shot speed, rebounds, close range and their own sideways motion;
 fast shots can also be blocked, or slip past a body. Against a person the
 computer's team is a little sharper (`sharp()`: as fast, keener pokes, better
@@ -186,7 +199,10 @@ stick and two buttons, shown by `(pointer: coarse)` or after the first touch.
 
 The page at `_pages/drills.md` animates each drill from `_data/drills.yml` using
 `assets/js/drills.js`, which draws an IIHF rink to scale (60×30 m, centred at
-0,0) as inline SVG. Styles live under "drill diagrams" in
+0,0) as inline SVG — except the nets and creases, drawn half as big again as
+regulation (`NET`), because beside players drawn several times life size a
+true-scale net looked too small (Mertcan noticed). The game plays with the same
+nets. Styles live under "drill diagrams" in
 `assets/css/_custom.scss`. The layout follows the IIHF coaching pad (a copy is
 in `docs/iihf-drills/`, gitignored): each drill is the rink with a narrow steps
 column beside it, two drills a row from 90rem, one below, stacked on a phone.

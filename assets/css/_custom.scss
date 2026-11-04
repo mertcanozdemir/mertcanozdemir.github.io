@@ -42,6 +42,7 @@
   --rink-cone-edge: #b3641f;
   --rink-pass: #e8b93a;
   --rink-shot: #e05555;
+  --rink-net: rgba(211, 51, 51, 0.1);
 }
 
 html[data-theme="dark"] {
@@ -54,6 +55,7 @@ html[data-theme="dark"] {
   --rink-team-a: #4a9aef;
   --rink-team-b: #ef7a4a;
   --rink-team-n: #6c757e;
+  --rink-net: rgba(224, 85, 85, 0.16);
 }
 
 // Key to the diagrams, above the drills: a small sample of each mark.
@@ -1239,15 +1241,21 @@ a.piece:hover .piece-more {
 
 // The game (/play/, game.js): the scoreboard, the rink with an overlay for
 // the start, pauses and the final score, and touch controls on touch screens.
+// The players' helmets (drawn by drills.js) are here too: the home page's
+// drill uses them as well.
 :root {
   --rink-stick: #3b3f44;
-  --rink-pads: #ffffff;
+  --rink-mask: #f2f4f6;
+  --rink-visor: #1d2430;
+  --rink-helmet-edge: rgba(0, 0, 0, 0.28);
   --game-veil: rgba(255, 255, 255, 0.82);
 }
 
 html[data-theme="dark"] {
   --rink-stick: #c9cdd2;
-  --rink-pads: #aab2ba;
+  --rink-mask: #d3d8dd;
+  --rink-visor: #0f1318;
+  --rink-helmet-edge: rgba(0, 0, 0, 0.5);
   --game-veil: rgba(22, 24, 26, 0.85);
 }
 
@@ -1478,8 +1486,9 @@ html[data-theme="dark"] {
 
 .game-stick {
   position: relative;
-  width: 8.5rem;
-  height: 8.5rem;
+  flex: none;
+  width: 7.6rem;
+  height: 7.6rem;
   border: 1px solid var(--global-divider-color);
   border-radius: 50%;
   background: var(--global-card-bg-color);
@@ -1499,11 +1508,11 @@ html[data-theme="dark"] {
 
 .game-pads {
   display: flex;
-  gap: 0.8rem;
+  gap: 0.5rem;
 
   button {
-    width: 4.8rem;
-    height: 4.8rem;
+    width: 4.1rem;
+    height: 4.1rem;
     padding: 0;
     border-radius: 50%;
     font-weight: 600;
