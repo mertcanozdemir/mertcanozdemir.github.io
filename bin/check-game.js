@@ -10,7 +10,7 @@
 //
 // Exits non-zero when something is off.
 
-const { Game, Resurfacer, RZ, STEP, GOAL_X } = require("../assets/js/game.js");
+const { Game, Resurfacer, RZ, LEVELS, STEP, GOAL_X } = require("../assets/js/game.js");
 
 function mulberry32(seed) {
   return function () {
@@ -25,6 +25,11 @@ function mulberry32(seed) {
 // A person who skates at the puck, and with it straight for the net, shooting
 // from close in. Not clever, but it should be able to score.
 function scripted(game) {
+  // At a faceoff, the stick comes down a little after the puck lands.
+  if (game.phase === "faceoff") {
+    const f = game.drop;
+    return { pass: f.you === null && f.t >= f.land + 0.12 };
+  }
   const p = game.controlled,
     pk = game.puck;
   if (pk.carrier === p) {
@@ -48,23 +53,27 @@ function inside(o, r) {
   return Math.abs(o.x) <= 30 - r + 0.05 && Math.abs(o.y) <= 15 - r + 0.05;
 }
 
-function run(seed, mode) {
+function run(seed, mode, level = "normal") {
   Math.random = mulberry32(seed * 7 + 1); // the scripted person's own dice
-  const game = new Game({ random: mulberry32(seed), human: mode !== "cpu" });
+  const game = new Game({ random: mulberry32(seed), human: mode !== "cpu", level });
   const problems = [];
   let loose = 0,
     longestLoose = 0,
     t = 0;
-  const counts = { save: 0, post: 0, steal: 0, block: 0, pass: 0, hit: 0 };
+  const counts = { save: 0, post: 0, steal: 0, block: 0, pass: 0, hit: 0 },
+    draws = { a: 0, b: 0 };
   while (game.phase !== "over" && t < 600) {
     // Between periods everyone skates off, then the next one starts.
     if (game.phase === "intermission" && game.benched) game.nextPeriod();
     const input = mode === "script" ? scripted(game) : {};
     game.step(STEP, input);
     t += STEP;
-    for (const ev of game.events.splice(0)) if (ev.type in counts) counts[ev.type]++;
+    for (const ev of game.events.splice(0)) {
+      if (ev.type in counts) counts[ev.type]++;
+      if (ev.type === "draw") draws[ev.team]++;
+    }
     const pk = game.puck;
-    for (const o of [pk, ...game.players]) {
+    for (const o of [pk, ...game.players, game.ref]) {
       if (![o.x, o.y, o.vx, o.vy].every(Number.isFinite)) problems.push(`NaN at ${t.toFixed(1)} s`);
     }
     if (!inside(pk, 0.3)) problems.push(`puck outside the rink at ${t.toFixed(1)} s (${pk.x.toFixed(2)}, ${pk.y.toFixed(2)})`);
@@ -81,7 +90,7 @@ function run(seed, mode) {
   if (longestLoose > 6) problems.push(`the puck sat loose for ${longestLoose.toFixed(1)} s`);
   // A person who does nothing can hold the puck for ever; that is their call.
   if (game.phase !== "over" && mode !== "idle") problems.push("the game never ended");
-  return { score: game.score, shots: game.shots, counts, longestLoose, problems, overtime: game.overtime, t };
+  return { score: game.score, shots: game.shots, counts, draws, longestLoose, problems, overtime: game.overtime, t };
 }
 
 // The Kamboni: the crew's way (rows along the rink), or anyhow: steering a
@@ -148,6 +157,36 @@ for (const mode of ["cpu", "idle", "script"]) {
   if (mode === "script" && totals.a === 0) {
     bad++;
     console.log("  the scripted person never scored");
+  }
+}
+// The levels: the scripted person should do better on easy than on hard.
+{
+  const margin = {};
+  for (const level of Object.keys(LEVELS)) {
+    let a = 0,
+      b = 0,
+      won = 0,
+      draws = 0;
+    for (let i = 1; i <= games; i++) {
+      const r = run(i, "script", level);
+      a += r.score.a;
+      b += r.score.b;
+      won += r.draws.a;
+      draws += r.draws.a + r.draws.b;
+      if (r.problems.length) {
+        bad++;
+        console.log(`script on ${level} game ${i}: ${r.problems.slice(0, 3).join("; ")}`);
+      }
+    }
+    margin[level] = (a - b) / games;
+    console.log(
+      `level ${level.padEnd(6)} scripted person ${(a / games).toFixed(1)}, computer ${(b / games).toFixed(1)}, faceoffs won ${((100 * won) / (draws || 1)).toFixed(0)}%`
+    );
+  }
+  // (A few games are too few to tell normal from hard.)
+  if (games >= 8 && !(margin.easy > margin.normal && margin.normal > margin.hard)) {
+    bad++;
+    console.log("  the levels are not in order: easy should be easiest");
   }
 }
 {

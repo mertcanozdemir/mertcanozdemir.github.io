@@ -230,6 +230,40 @@ control has their name over the arrow; goals, hits, the intro and the final
 ("star of the game") use the names. Only names: the players are the game's own
 drawings. Commercial games license real names, so this was raised with him.
 
+**Faceoffs** (Mertcan's rule): a referee (striped shirt, orange armbands; only
+drawn, `game.ref`, who then follows play along the far boards) holds the puck
+over the dot and drops it at a moment of its own (`dropPuck()`). Whoever's
+stick is down first once it lands wins the draw and draws it back to a
+teammate: the person by pressing pass (X, or the touch pass button) as it
+lands, more than 0.1 s early being a loss ("the puck must be down"); the
+computer's centre reacts in `REACTION` seconds for the level. Computer against
+computer it is a toss-up. The checker's scripted person presses 0.12 s after
+landing and wins about 100%, 80% and 30% of draws on easy, normal and hard.
+
+**Levels**: easy, normal, hard, chosen on the start and final screens and
+remembered (`hockey-level`). `sharp()` is how far the computer's team is ahead
+(`LEVELS`: −0.5, 1, 1.6; 1 is how it played before levels): speed, keener
+checks and pokes, aim, the goalie. The checker plays the scripted person at
+each level and wants easy easier than normal easier than hard (with 8 games or
+more: fewer are too noisy).
+
+**Full screen**: pressing play makes the game fill the window (`fullScreen()`,
+`fit()` sizing the rink to the height left and the scoreboard to 37% of the
+rink); × or Esc leave and pause. On a touch screen the browser goes truly full
+screen where it allows and the stick and buttons sit see-through over the
+rink's corners. Before this the rink did not fit a laptop's window (its bottom
+100–170 px below the edge, and the arrow keys cannot scroll during play) nor a
+phone held sideways.
+
+**Sound** (`sounds()`): WebAudio, no files: puck off a stick, the post, saves,
+checks and boards, the goal horn (a low chord) and the crowd, the buzzer, the
+Kamboni's horn. "mute" in the HUD, remembered (`hockey-sound`). Browsers start
+it only after a click or a key, so `wake()` runs on those.
+
+**Replay**: the last 3.5 s are kept frame by frame (`record()`); 1.5 s after a
+goal they are shown again at half speed with a REPLAY badge, then play carries
+on (the faceoff, or the end). Any key or a tap skips it.
+
 The end of a period (`phase` "intermission") is not a sudden menu (Mertcan
 found the first version abrupt): the green lights come on behind both nets (in
 a real arena the green light means time is up), the clock blinks, and the

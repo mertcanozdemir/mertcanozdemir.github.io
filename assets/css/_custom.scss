@@ -1406,6 +1406,8 @@ html[data-theme="dark"] {
 
 .game-buttons {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 0.5rem;
 
   button {
@@ -1457,6 +1459,7 @@ html[data-theme="dark"] {
   // Between periods only the Kamboni is on the ice: the crew has taken the
   // nets off too.
   svg.is-resurfacing {
+    [data-ref],
     [data-rink-net],
     [data-player],
     [data-puck],
@@ -1535,6 +1538,147 @@ html[data-theme="dark"] {
   flex-wrap: wrap;
   justify-content: center;
   gap: 0.5rem;
+}
+
+// The level, on the start and final screens.
+.game-overlay .game-levels {
+  display: flex;
+  justify-content: center;
+  gap: 0.35rem;
+
+  &[hidden] {
+    display: none;
+  }
+
+  button {
+    padding: 0.2rem 0.85rem;
+    border: 1px solid var(--global-divider-color);
+    background: var(--global-bg-color);
+    color: var(--global-text-color);
+    font-weight: 400;
+
+    &:hover {
+      color: var(--global-theme-color);
+      filter: none;
+    }
+
+    &[aria-pressed="true"] {
+      border-color: var(--rink-team-a);
+      color: var(--rink-team-a);
+      font-weight: 700;
+    }
+  }
+}
+
+// A goal shown again, as on television.
+.game-replay {
+  position: absolute;
+  z-index: 1;
+  top: 5%;
+  left: 2%;
+  margin: 0;
+  padding: 0.15rem 0.65rem 0.15rem 1.35rem;
+  border-radius: 4px;
+  background: #b3261e;
+  color: #fff;
+  font-size: 0.85rem;
+  font-style: italic;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  pointer-events: none;
+
+  &::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 0.5rem;
+    width: 0.45rem;
+    height: 0.45rem;
+    margin-top: -0.225rem;
+    border-radius: 50%;
+    background: #fff;
+    animation: game-blink 1s steps(2, jump-none) infinite;
+  }
+
+  &[hidden] {
+    display: none;
+  }
+}
+
+// Full screen while it is played (game.js sizes the rink to fit).
+html.game-full {
+  overflow: hidden;
+}
+
+.game-exit {
+  display: none;
+}
+
+.game.is-full {
+  position: fixed;
+  z-index: 50;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  max-width: none;
+  margin: 0;
+  padding: 0.6rem 0.75rem;
+  overflow: hidden;
+  background: var(--global-bg-color);
+
+  .game-hud,
+  .game-stage {
+    width: 100%;
+    margin-right: auto;
+    margin-left: auto;
+  }
+
+  .game-hud {
+    margin-bottom: 0;
+  }
+
+  .game-rotate {
+    display: none;
+  }
+
+  .game-keys {
+    margin: 0;
+    text-align: center;
+  }
+
+  .game-exit {
+    display: inline-block;
+    font-size: 1.1rem;
+    line-height: 1;
+  }
+}
+
+// Full screen on a short screen (a phone held sideways): a smaller top row.
+@media (max-height: 30rem) {
+  .game.is-full {
+    gap: 0.3rem;
+    padding: 0.35rem 0.6rem;
+
+    .game-buttons {
+      gap: 0.3rem;
+
+      button {
+        padding: 0.15rem 0.55rem;
+        font-size: 0.78rem;
+      }
+    }
+  }
+}
+
+// Full screen on a phone held upright: still the hint to turn it.
+@media (max-width: 40rem) and (orientation: portrait) {
+  .game.is-full .game-rotate {
+    display: block;
+    text-align: center;
+  }
 }
 
 .game-toast {
@@ -1632,7 +1776,8 @@ html[data-theme="dark"] {
   white-space: nowrap;
 }
 
-// On a touch screen: a stick on the left, pass and shoot on the right.
+// On a touch screen: a stick on the left, pass and shoot on the right; in
+// full screen, over the rink's lower corners and see-through.
 @mixin game-touch {
   .game-touch {
     display: flex;
@@ -1655,6 +1800,42 @@ html[data-theme="dark"] {
 
 .game.is-touch {
   @include game-touch;
+}
+
+@mixin game-touch-full {
+  position: absolute;
+  z-index: 2;
+  right: 0.9rem;
+  bottom: 0.9rem;
+  left: 0.9rem;
+  margin: 0;
+  opacity: 0.72;
+  pointer-events: none;
+
+  > * {
+    pointer-events: auto;
+  }
+
+  .game-stick {
+    width: 6.2rem;
+    height: 6.2rem;
+  }
+
+  .game-pads button {
+    width: 3.5rem;
+    height: 3.5rem;
+    font-size: 0.85rem;
+  }
+}
+
+@media (pointer: coarse) {
+  .game.is-full .game-touch {
+    @include game-touch-full;
+  }
+}
+
+.game.is-touch.is-full .game-touch {
+  @include game-touch-full;
 }
 
 .game-rotate {

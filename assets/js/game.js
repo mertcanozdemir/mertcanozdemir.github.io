@@ -134,6 +134,11 @@
     return null;
   }
 
+  // How much the computer's team is ahead of the person's at each level, and
+  // how soon after the puck lands at a faceoff its centre's stick comes down (s).
+  const LEVELS = { easy: -0.5, normal: 1, hard: 1.6 };
+  const REACTION = { easy: [0.2, 0.42], normal: [0.1, 0.28], hard: [0.03, 0.17] };
+
   class Game {
     constructor(opts = {}) {
       this.random = opts.random || Math.random;
@@ -142,6 +147,7 @@
       // resurfaces the ice there; nextPeriod() carries on).
       this.periods = opts.periods || 3;
       this.periodLength = opts.periodLength || 60;
+      this.level = opts.level || "normal"; // easy, normal or hard: see sharp()
       this.reset();
     }
 
@@ -157,7 +163,10 @@
         for (let slot = 0; slot < 3; slot++) this.players.push(this.player(team, "skater", slot));
         this.players.push(this.player(team, "goalie", 3));
       }
-      this.puck = { x: 0, y: 0, vx: 0, vy: 0, carrier: null, last: null, held: 0, beat: null, rebound: 0, from: null, trail: [] };
+      this.puck = { x: 0, y: 0, h: 0, vx: 0, vy: 0, carrier: null, last: null, held: 0, beat: null, rebound: 0, from: null, trail: [] };
+      // The referee: only drawn, never in the way.
+      this.ref = { x: 0, y: -0.9, vx: 0, vy: 0, fx: 0, fy: 1, arm: 0 };
+      this.draws = 0;
       this.controlled = this.players[0];
       this.faceoff();
     }
@@ -214,11 +223,16 @@
         else [p.x, p.y] = [s * spots[p.slot][0], s * spots[p.slot][1]];
         Object.assign(p, { vx: 0, vy: 0, fx: s, fy: 0, wx: 0, wy: 0, noTouch: 0, cool: 0, down: 0, dash: 0, checkCool: 0, oneTimer: 0, off: false });
       }
-      Object.assign(this.puck, { x: 0, y: 0, vx: 0, vy: 0, carrier: null, last: null, held: 0, beat: null, rebound: 0, trail: [] });
+      // The referee holds the puck over the dot, between the centres, and
+      // drops it at a moment of its own: see dropPuck().
+      Object.assign(this.puck, { x: 0, y: 0, h: 1.3, vx: 0, vy: 0, carrier: null, last: null, held: 0, beat: null, rebound: 0, trail: [] });
+      Object.assign(this.ref, { x: 0, y: -0.9, vx: 0, vy: 0, fx: 0, fy: 1, arm: 1 });
+      const release = 0.7 + this.random() * 0.9,
+        [lo, hi] = REACTION[this.level] || REACTION.normal;
+      this.drop = { t: 0, release, land: release + 0.22, you: null, cpu: lo + this.random() * (hi - lo) };
       if (this.human) this.controlled = this.players[0];
       this.phase = "faceoff";
-      this.wait = 1.1;
-      this.events.push({ type: "faceoff" });
+      this.events.push({ type: "faceoff", n: ++this.draws });
     }
 
     // One simulation step. `input` is the person's: {x, y} to skate, and
@@ -226,9 +240,13 @@
     step(dt, input = {}) {
       if (this.phase === "over") return;
       if (this.phase === "intermission") return this.leave(dt);
+      if (this.phase === "faceoff") return this.dropPuck(dt, input);
       if (this.phase !== "play") {
         this.wait -= dt;
-        if (this.phase === "goal") this.glide(dt);
+        if (this.phase === "goal") {
+          this.glide(dt);
+          this.moveRef(dt);
+        }
         if (this.wait > 0) return;
         if (this.phase === "goal") return this.decided ? this.finish() : this.faceoff();
         this.phase = "play";
@@ -274,6 +292,7 @@
       }
       this.move(dt);
       this.movePuck(dt);
+      this.moveRef(dt);
     }
 
     // The end of a period: everyone skates off to the bench (on the near side,
@@ -281,6 +300,7 @@
     // are off, or after a few seconds, `benched`.
     leave(dt) {
       this.wait += dt;
+      this.moveRef(dt, 0, -(W - 1.4));
       for (const p of this.players) {
         if (p.off) continue;
         const tx = -DIR[p.team] * (3.4 + p.slot * 2.3),
@@ -324,6 +344,65 @@
       }
     }
 
+    // A faceoff: the puck falls from the referee's hand, and whoever has their
+    // stick down first once it lands wins the draw. For the person that is
+    // pressing pass as it lands (more than a moment early is a loss: the rule
+    // is that the puck must be down); the computer's stick comes down quicker
+    // the harder the level. Between two computer teams it is a toss-up.
+    dropPuck(dt, input) {
+      const f = this.drop,
+        pk = this.puck;
+      f.t += dt;
+      const fall = clamp((f.t - f.release) / (f.land - f.release), 0, 1);
+      pk.h = 1.3 * (1 - fall * fall);
+      this.ref.arm = f.t < f.release ? 1 : Math.max(0, 1 - (f.t - f.release) * 3);
+      if (this.human && input.pass && f.you === null) f.you = f.t - f.land;
+      if (f.t < f.land) return;
+      if (!this.human) return this.wonDraw(this.random() < 0.5 ? "a" : "b");
+      if (f.you !== null && f.you < -0.1) return this.wonDraw("b", "early");
+      if (f.you !== null && f.you <= f.cpu) return this.wonDraw("a");
+      if (f.t - f.land >= f.cpu) return this.wonDraw("b", f.you === null ? "late" : "slow");
+    }
+    // The winner's centre draws it back to a teammate.
+    wonDraw(team, why = "") {
+      const pk = this.puck,
+        mine = (slot) => this.players.find((p) => p.team === team && p.slot === slot),
+        centre = mine(0),
+        back = mine(1),
+        loser = this.players.find((p) => p.team !== team && p.slot === 0);
+      const dx = back.x - pk.x,
+        dy = back.y - pk.y,
+        d = hypot(dx, dy) || 1;
+      Object.assign(pk, { h: 0, carrier: null, last: centre, vx: (dx / d) * 9, vy: (dy / d) * 9 });
+      centre.noTouch = 0.5;
+      loser.noTouch = 0.45;
+      this.events.push({ type: "draw", team, why });
+      this.phase = "play";
+      this.dropped = this.t || 0;
+    }
+
+    // The referee keeps out of the way: along the far boards, level with the
+    // play, and off to the side between periods.
+    moveRef(dt, tx = clamp(this.puck.x * 0.7, -18, 18), ty = -(W - 1.6)) {
+      const r = this.ref,
+        dx = tx - r.x,
+        dy = ty - r.y,
+        d = hypot(dx, dy);
+      const want = Math.min(5, d * 1.5),
+        ax = (d ? (dx / d) * want : 0) - r.vx,
+        ay = (d ? (dy / d) * want : 0) - r.vy,
+        al = hypot(ax, ay) || 1,
+        acc = Math.min(al, 7 * dt);
+      r.vx += (ax / al) * acc;
+      r.vy += (ay / al) * acc;
+      r.x += r.vx * dt;
+      r.y += r.vy * dt;
+      const sp = hypot(r.vx, r.vy);
+      if (sp > 0.6) [r.fx, r.fy] = [r.vx / sp, r.vy / sp];
+      r.arm = 0;
+      confine(r, SKATER_R);
+    }
+
     nextPeriod() {
       if (this.phase !== "intermission") return;
       this.benched = false;
@@ -349,16 +428,18 @@
       }
     }
 
-    // Against a person, the computer's team plays a little better than the
-    // person's own teammates: a step quicker than the person, keener with the
-    // stick and to check, and a sharper goalie.
+    // Against a person, how much better the computer's team plays than the
+    // person's own teammates (0 for them): at normal a step quicker than the
+    // person, keener with the stick and to check, and a sharper goalie; less
+    // than that on easy, a little behind even, and more on hard.
     sharp(team) {
-      return this.human && team === "b";
+      return this.human && team === "b" ? (LEVELS[this.level] ?? 1) : 0;
     }
 
     maxSpeed(p) {
       if (p.role === "goalie") return 5;
-      const base = this.sharp(p.team) ? 8.3 : this.human && p === this.controlled ? 7.8 : 7.6;
+      const s = this.sharp(p.team);
+      const base = s ? 7.6 + 0.7 * s : this.human && p === this.controlled ? 7.8 : 7.6;
       return this.puck.carrier === p ? base * 0.9 : base;
     }
 
@@ -434,13 +515,13 @@
       // ...or line up a body check on a carrier close by.
       if (c && c.team !== p.team && c.role === "skater" && p.checkCool <= 0 && (this.t || 0) - (this.dropped || 0) > 1.2) {
         const d = dist(p, c);
-        if (d > 1.8 && d < 3.4 && this.random() < (this.sharp(p.team) ? 1 : 0.45) * dt) {
+        if (d > 1.8 && d < 3.4 && this.random() < Math.max(0.1, 0.45 + 0.55 * this.sharp(p.team)) * dt) {
           return this.check(p, c.x + c.vx * 0.15 - p.x, c.y + c.vy * 0.15 - p.y);
         }
       }
       if (c && c.team !== p.team && c.role === "skater" && p.cool <= 0) {
         if (Math.min(dist(this.stick(p), pk), dist(p, pk) - 0.8) < 1.4 && this.random() < 1.8 * dt)
-          this.poke(p, this.sharp(p.team) ? 0.6 : 0.45, 1.4);
+          this.poke(p, 0.45 + 0.15 * this.sharp(p.team), 1.4);
       }
       this.steer(p, p.tx, p.ty);
     }
@@ -623,7 +704,7 @@
       const corner = NET_HALF * 0.7;
       let ty = aimY !== null ? aimY : goalie.y > 0 ? -corner : corner;
       const d = hypot(gx - pk.x, ty - pk.y);
-      ty += (this.random() - 0.5) * 2 * (0.25 + d * 0.035) * (this.sharp(p.team) ? 0.7 : 1);
+      ty += (this.random() - 0.5) * 2 * (0.25 + d * 0.035) * Math.max(0.4, 1 - 0.3 * this.sharp(p.team));
       const quick = p.oneTimer > 0;
       const speed = 25 + this.random() * 5 + (quick ? 4 : 0);
       const dx = gx - pk.x,
@@ -691,7 +772,7 @@
       const c = pk.carrier;
       if (c && c.team !== g.team && c.role === "skater" && g.cool <= 0 && dist(g, pk) < 2.6) {
         g.cool = 0.6;
-        if (this.random() < (this.sharp(g.team) ? 0.7 : 0.45)) {
+        if (this.random() < 0.45 + 0.25 * this.sharp(g.team)) {
           const away = Math.atan2(pk.y - g.y, pk.x - g.x) + (this.random() - 0.5) * 1.4;
           pk.carrier = null;
           pk.last = g;
@@ -864,7 +945,7 @@
           (shotLength < 6 && !wide ? 0.12 : 0) +
           (wide ? 0.15 : 0) -
           (pk.oneTimer ? 0.12 : 0);
-        if (this.sharp(g.team)) chance += 0.15;
+        chance += 0.15 * this.sharp(g.team);
         chance = clamp(chance, 0.3, 0.95);
         if (this.random() < chance) {
           pk.oneTimer = false;
@@ -1116,7 +1197,7 @@
     }
   }
 
-  const api = { Game, Resurfacer, RZ, STEP, GOAL_X };
+  const api = { Game, Resurfacer, RZ, LEVELS, STEP, GOAL_X };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   root.HockeyGame = api;
 
@@ -1511,6 +1592,32 @@
     return skins[(i * 3) % skins.length];
   };
 
+  // ——— The referee ———
+  // From above, facing +x: a striped shirt, orange armbands, a black helmet.
+  const REF_TOP = `<clipPath id="rink-ref-clip"><ellipse rx="0.62" ry="0.88"/></clipPath>
+    <ellipse rx="0.62" ry="0.88" fill="#f4f4f2" stroke="#1d1f22" stroke-width="0.07"/>
+    <path clip-path="url(#rink-ref-clip)" d="M -1 -0.55 H 1 M -1 -0.18 H 1 M -1 0.18 H 1 M -1 0.55 H 1" stroke="#1d1f22" stroke-width="0.16"/>
+    <circle cy="-0.8" r="0.14" fill="#f26b1d"/><circle cy="0.8" r="0.14" fill="#f26b1d"/>
+    <circle r="0.36" fill="#1d1f22"/><circle cx="0.3" r="0.11" fill="#e8b896"/>`;
+  // Standing, facing the camera; its right arm holds the puck out at a
+  // faceoff (draw() moves the hand).
+  const REF_STAND = `<g transform="scale(${TALL})">
+    <ellipse rx="0.8" ry="${(0.8 * SQUASH).toFixed(2)}" fill="var(--rink-shadow)"/>
+    <rect x="-0.34" y="-0.2" width="0.3" height="0.18" rx="0.06" fill="var(--rink-boot)"/>
+    <rect x="0.06" y="-0.2" width="0.3" height="0.18" rx="0.06" fill="var(--rink-boot)"/>
+    <path d="M -0.36 0.01 H -0.02 M 0.04 0.01 H 0.38" stroke="var(--rink-blade)" stroke-width="0.05" stroke-linecap="round"/>
+    <path d="M -0.42 -1.2 H 0.42 L 0.4 -0.18 H 0.06 L 0 -0.7 L -0.06 -0.18 H -0.4 Z" fill="#1d1f22"/>
+    <path d="M -0.74 -2 Q -0.76 -2.2 -0.5 -2.2 H 0.5 Q 0.76 -2.2 0.74 -2 L 0.56 -1.16 H -0.56 Z" fill="#f4f4f2" stroke="#1d1f22" stroke-width="0.05"/>
+    <path d="M -0.4 -2.18 V -1.18 M -0.13 -2.2 V -1.16 M 0.13 -2.2 V -1.16 M 0.4 -2.18 V -1.18" stroke="#1d1f22" stroke-width="0.12"/>
+    <line x1="-0.6" y1="-1.95" x2="-0.74" y2="-1.25" stroke="#f4f4f2" stroke-width="0.24" stroke-linecap="round"/>
+    <line data-ref-arm x1="0.6" y1="-1.95" x2="0.74" y2="-1.25" stroke="#f4f4f2" stroke-width="0.24" stroke-linecap="round"/>
+    <circle cx="-0.62" cy="-1.86" r="0.12" fill="#f26b1d"/><circle cx="0.62" cy="-1.86" r="0.12" fill="#f26b1d"/>
+    <g transform="translate(0 -2.52)">
+      <circle cy="0.04" r="0.32" fill="#e8b896"/>
+      <path d="M -0.38 0 Q -0.4 -0.4 0 -0.42 Q 0.4 -0.4 0.38 0 L 0.28 -0.06 Q 0 -0.22 -0.28 -0.06 Z" fill="#1d1f22"/>
+      <circle cx="-0.11" cy="0.04" r="0.05" fill="#111"/><circle cx="0.11" cy="0.04" r="0.05" fill="#111"/>
+    </g></g>`;
+
   // ——— The Kamboni, from above ———
   // Facing +x, to size: the towel trailing on the ice, the conditioner, the
   // wheels, the snow tank with the name on it, the driver up front on the left
@@ -1595,6 +1702,7 @@
       el("polyline", trail, plane);
       el("circle", { "data-puck": "", r: "0.45", fill: "var(--rink-puck)", stroke: "var(--rink-puck-edge)", "stroke-width": "0.1" }, plane);
       el("circle", ring, plane);
+      plane.insertAdjacentHTML("beforeend", `<g data-ref>${REF_TOP}</g>`);
       const layer = el("g", { "data-players": "" }, plane);
       game.players.forEach((p, i) => {
         el("g", { "data-player": i }, layer).insertAdjacentHTML(
@@ -1631,6 +1739,7 @@
     el("g", { "data-hats": "" }, svg);
     const things = el("g", { "data-things": "" }, svg);
     for (const s of [1, -1]) things.insertAdjacentHTML("beforeend", net3SVG(s));
+    things.insertAdjacentHTML("beforeend", `<g data-ref data-depth="0">${REF_STAND}</g>`);
     things.insertAdjacentHTML(
       "beforeend",
       `<g data-puck><ellipse cy="0.08" rx="0.45" ry="${(0.45 * SQUASH).toFixed(2)}" fill="var(--rink-puck-edge)"/><ellipse rx="0.45" ry="${(0.45 * SQUASH).toFixed(2)}" fill="var(--rink-puck)"/></g>`
@@ -1714,9 +1823,23 @@
         stars.setAttribute("visibility", down ? "visible" : "hidden");
         if (down) stars.setAttribute("transform", `rotate(${((now / 4) % 360).toFixed(0)})`);
       });
-      svg.querySelector("[data-puck]").setAttribute("transform", `translate(${pk.x.toFixed(2)} ${pk.y.toFixed(2)})`);
+      svg
+        .querySelector("[data-puck]")
+        .setAttribute("transform", `translate(${pk.x.toFixed(2)} ${pk.y.toFixed(2)})${pk.h ? ` scale(${(1 + pk.h * 0.3).toFixed(2)})` : ""}`);
+      const r = game.ref;
+      svg
+        .querySelector("[data-ref]")
+        .setAttribute("transform", `translate(${r.x.toFixed(2)} ${r.y.toFixed(2)}) rotate(${((Math.atan2(r.fy, r.fx) * 180) / Math.PI).toFixed(0)})`);
     } else {
-      const [px, py] = TILT.at(pk.x, pk.y);
+      const [px, py] = TILT.at(pk.x, pk.y, pk.h || 0);
+      const ref = svg.querySelector("[data-ref]"),
+        [rx, ry] = TILT.at(game.ref.x, game.ref.y),
+        up = game.ref.arm || 0;
+      ref.setAttribute("transform", `translate(${rx.toFixed(2)} ${ry.toFixed(2)})`);
+      ref.dataset.depth = ry;
+      const arm = ref.querySelector("[data-ref-arm]");
+      arm.setAttribute("x2", (0.74 + ((px - rx) / TALL - 0.74) * up).toFixed(2));
+      arm.setAttribute("y2", (-1.25 + ((py - ry) / TALL + 1.25) * up).toFixed(2));
       game.players.forEach((p, i) => {
         const g = groups[i];
         g.style.display = p.off ? "none" : "";
@@ -1788,7 +1911,7 @@
       });
       const puck = svg.querySelector("[data-puck]");
       puck.setAttribute("transform", `translate(${px.toFixed(2)} ${py.toFixed(2)})`);
-      puck.dataset.depth = py;
+      puck.dataset.depth = TILT.at(pk.x, pk.y)[1];
       svg.querySelector("[data-puck-ghost]").setAttribute("transform", `translate(${px.toFixed(2)} ${py.toFixed(2)})`);
       const arrow = svg.querySelector("[data-you-arrow]");
       const here = game.human && !game.controlled.off;
@@ -1983,6 +2106,116 @@
     draw(rootEl.querySelector("svg"), game, { view: "top" });
   }
 
+  // ——— Sound: made in the browser, no files ———
+  // A puck off a stick, the post, a save, a check and the boards, the goal
+  // horn and the crowd, the end-of-period buzzer, the Kamboni's horn. Off when
+  // muted (remembered); browsers only start sound after a click or a key.
+  function sounds() {
+    let ctx = null,
+      master = null,
+      noiseBuf = null,
+      on = true;
+    try {
+      on = localStorage.getItem("hockey-sound") !== "off";
+    } catch (e) {
+      // On, then.
+    }
+    function wake() {
+      if (!on) return;
+      if (!ctx) {
+        const Ctx = root.AudioContext || root.webkitAudioContext;
+        if (!Ctx) return;
+        ctx = new Ctx();
+        master = ctx.createGain();
+        master.gain.value = 0.5;
+        master.connect(ctx.destination);
+        noiseBuf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
+        const d = noiseBuf.getChannelData(0);
+        for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+      }
+      if (ctx.state === "suspended") ctx.resume();
+    }
+    const env = (t, peak, attack, dur) => {
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(peak, t + attack);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      g.connect(master);
+      return g;
+    };
+    function noise(t, dur, freq, q, peak, type = "bandpass", attack = 0.003) {
+      const src = ctx.createBufferSource(),
+        f = ctx.createBiquadFilter();
+      src.buffer = noiseBuf;
+      f.type = type;
+      f.frequency.value = freq;
+      f.Q.value = q;
+      src.connect(f);
+      f.connect(env(t, peak, attack, dur));
+      src.start(t, Math.random() * 0.5);
+      src.stop(t + dur + 0.05);
+    }
+    function tone(t, dur, freq, type, peak, attack = 0.005, to = 0, out = null) {
+      const o = ctx.createOscillator();
+      o.type = type;
+      o.frequency.setValueAtTime(freq, t);
+      if (to) o.frequency.exponentialRampToValueAtTime(to, t + dur);
+      o.connect(out || env(t, peak, attack, dur));
+      o.start(t);
+      o.stop(t + dur + 0.05);
+    }
+    const SOUND = {
+      stick: (t, hard) => noise(t, hard ? 0.08 : 0.05, hard ? 2600 : 1900, 1.4, hard ? 0.9 : 0.45),
+      post: (t) => {
+        tone(t, 0.7, 1320, "sine", 0.3);
+        tone(t, 0.5, 2650, "sine", 0.12);
+      },
+      pad: (t) => noise(t, 0.1, 700, 0.7, 0.7, "lowpass"),
+      thud: (t, hard) => {
+        noise(t, 0.2, 260, 0.7, hard ? 1 : 0.6, "lowpass");
+        tone(t, 0.18, 95, "sine", hard ? 0.55 : 0.35, 0.004, 50);
+      },
+      // An arena's goal horn: a low chord, through a filter.
+      horn: (t) => {
+        const f = ctx.createBiquadFilter();
+        f.type = "lowpass";
+        f.frequency.value = 900;
+        f.connect(env(t, 0.5, 0.08, 1.8));
+        for (const hz of [110, 138.6, 165]) tone(t, 1.8, hz, "sawtooth", 0, 0, 0, f);
+      },
+      cheer: (t) => noise(t, 2.4, 1100, 0.6, 0.35, "bandpass", 0.35),
+      buzzer: (t) => tone(t, 1.1, 196, "square", 0.12, 0.01),
+      beep: (t) => {
+        tone(t, 0.14, 440, "square", 0.12);
+        tone(t + 0.2, 0.14, 440, "square", 0.12);
+      },
+    };
+    return {
+      get on() {
+        return on;
+      },
+      wake,
+      toggle() {
+        on = !on;
+        try {
+          localStorage.setItem("hockey-sound", on ? "on" : "off");
+        } catch (e) {
+          // Not remembered, which is fine.
+        }
+        if (on) wake();
+        else if (ctx) ctx.suspend();
+      },
+      play(name, arg) {
+        if (!on || !ctx || ctx.state !== "running") return;
+        try {
+          SOUND[name](ctx.currentTime + 0.01, arg);
+        } catch (e) {
+          // No sound, then.
+        }
+      },
+    };
+  }
+
   function play(rootEl) {
     const svg = rootEl.querySelector("svg");
     const $ = (sel) => rootEl.querySelector(sel);
@@ -1996,7 +2229,7 @@
     let game = lineUp(new Game());
     // ready, playing, paused, buzzer (a period has just ended), intermission
     // (the choice), resurfacing (the person drives the Kamboni), crew, over
-    let state = "ready";
+    let state = "ready"; // and replay, a goal shown again
     let view = chosenView();
     let lamp = null,
       buzzed = 0,
@@ -2008,10 +2241,38 @@
     rootEl.hockey = { game: () => game, rz: () => rz, view: () => (rz ? rzView : view), state: () => state };
     draw(svg, game, { view, follow: true });
     const marks = skateMarks(svg);
+    const sound = sounds();
+    // The level, remembered in this browser; chosen on the start and final screens.
+    let level = "normal";
+    try {
+      const v = localStorage.getItem("hockey-level");
+      if (v in LEVELS) level = v;
+    } catch (e) {
+      // Normal, then.
+    }
+    game.level = level;
+    const levels = $("[data-levels]");
+    function showLevels() {
+      levels.hidden = false;
+      for (const b of levels.querySelectorAll("[data-level]")) b.setAttribute("aria-pressed", b.dataset.level === level);
+    }
+    levels.addEventListener("click", (e) => {
+      const b = e.target.closest("[data-level]");
+      if (!b) return;
+      level = b.dataset.level;
+      try {
+        localStorage.setItem("hockey-level", level);
+      } catch (err) {
+        // Not remembered, which is fine.
+      }
+      if (state === "ready") game.level = level;
+      showLevels();
+    });
     const ordinal = (n) => ["first", "second"][n - 1] || "last";
     const touchy = () => rootEl.classList.contains("is-touch") || matchMedia("(pointer: coarse)").matches;
 
     function show(t, body, label, other) {
+      levels.hidden = true;
       title.textContent = t;
       text.textContent = body;
       button.textContent = label;
@@ -2019,8 +2280,13 @@
       alt.hidden = !other;
       overlay.hidden = false;
     }
-    let toastTimer = 0;
-    function say(msg, seconds = 1.6) {
+    let toastTimer = 0,
+      toastSoft = false;
+    // `soft`: a faceoff's words, which wait for anything else being said
+    // ("Fresh ice", say), though not for each other.
+    function say(msg, seconds = 1.6, soft = false) {
+      if (soft && !toastSoft && toastTimer > 0.4) return;
+      toastSoft = soft;
       toast.textContent = msg;
       toast.hidden = false;
       toastTimer = seconds;
@@ -2048,6 +2314,7 @@
         goal: lit ? (lamp.side === 1 ? "a" : "b") : null,
         label: `You ${game.score.a}, computer ${game.score.b}. ${game.overtime ? "Overtime" : `Period ${game.period}, ${minutes(Math.ceil(game.clock))}`}.`,
       });
+      $("[data-sound]").textContent = sound.on ? "mute" : "unmute";
       const pauseButton = $("[data-pause]"),
         viewButton = $("[data-view]");
       pauseButton.textContent = { paused: "resume", resurfacing: "let the crew finish", crew: "skip" }[state] || "pause";
@@ -2072,6 +2339,7 @@
       if (cab) cab.show(inCab);
       rootEl.classList.toggle("is-cab", inCab);
       if (!inCab) draw(svg, game, { view: "top", now, rz });
+      fit();
     }
     const controls = () =>
       rzView === "cab"
@@ -2097,12 +2365,15 @@
         // Not remembered, which is fine.
       }
       draw(svg, game, { view, follow: true, lamp, now: performance.now() });
+      fit();
       hud();
     });
 
     // A new game, with new line-ups (drawn afresh: their numbers are on them).
     function newGame() {
-      game = lineUp(new Game());
+      game = lineUp(new Game({ level }));
+      tape.length = 0;
+      replayAt = 0;
       marks.clear();
       svg.dataset.view = "";
     }
@@ -2112,7 +2383,125 @@
       state = "playing";
       overlay.hidden = true;
       last = null;
+      sound.wake();
+      fullScreen(true);
       svg.focus({ preventScroll: true });
+    }
+
+    // Full screen while it is played: the game fills the window, the rink as
+    // big as fits with the scoreboard over it as wide; on a touch screen the
+    // stick and buttons sit over the rink's lower corners (in the styles), and
+    // the browser goes full screen where a page may ask. × or Esc leave.
+    let full = false,
+      wentFull = false;
+    function fullScreen(on) {
+      if (full !== on) {
+        full = on;
+        rootEl.classList.toggle("is-full", on);
+        document.documentElement.classList.toggle("game-full", on);
+        if (on && touchy() && document.fullscreenEnabled && !document.fullscreenElement && rootEl.requestFullscreen) {
+          rootEl
+            .requestFullscreen()
+            .then(() => {
+              wentFull = true;
+              if (screen.orientation && screen.orientation.lock) screen.orientation.lock("landscape").catch(() => {});
+            })
+            .catch(() => {});
+        }
+        if (!on && document.fullscreenElement) {
+          wentFull = false;
+          document.exitFullscreen().catch(() => {});
+        }
+      }
+      fit();
+    }
+    // The rink as big as the window lets it, the scoreboard still a share of
+    // the rink's width (the buttons beside it may use the window's).
+    function fit() {
+      const stage = $(".game-stage"),
+        hudEl = $(".game-hud"),
+        boardEl = $("[data-board]");
+      if (!full) {
+        stage.style.maxWidth = boardEl.style.width = "";
+        return;
+      }
+      const box = svg.viewBox.baseVal,
+        aspect = box && box.height ? box.width / box.height : 2,
+        keys = touchy() ? 0 : $(".game-keys").offsetHeight + 8;
+      // Twice: the scoreboard's height follows its width.
+      for (let i = 0; i < 2; i++) {
+        const room = innerHeight - hudEl.offsetHeight - keys - 32,
+          w = Math.max(240, Math.min(innerWidth - 24, room * aspect));
+        stage.style.maxWidth = `${Math.floor(w)}px`;
+        boardEl.style.width = `${Math.max(144, Math.floor(w * 0.37))}px`;
+      }
+    }
+    window.addEventListener("resize", fit);
+    document.addEventListener("fullscreenchange", () => {
+      // Left by the browser (the back button, say): leave it here too.
+      if (!document.fullscreenElement && wentFull && full) {
+        wentFull = false;
+        if (state === "playing") pause();
+        fullScreen(false);
+      } else fit();
+    });
+    $("[data-exit]").addEventListener("click", () => {
+      if (state === "playing") pause();
+      fullScreen(false);
+    });
+    $("[data-sound]").addEventListener("click", () => {
+      sound.toggle();
+      hud();
+    });
+
+    // The replay: the last seconds of play, kept frame by frame, shown again
+    // after a goal (once the lamp has had a moment) at half speed, then the
+    // game carries on. A key or a tap skips it.
+    const tape = [],
+      badge = $("[data-replay]");
+    let replayAt = 0,
+      goalAt = 0,
+      replay = null;
+    function record(now) {
+      tape.push({
+        now,
+        players: game.players.map((p) => ({ ...p })),
+        puck: { ...game.puck, trail: game.puck.trail.slice(), carrier: game.players.indexOf(game.puck.carrier) },
+        controlled: game.players.indexOf(game.controlled),
+        ref: { ...game.ref },
+      });
+      while (tape.length && now - tape[0].now > 3500) tape.shift();
+    }
+    function startReplay(now) {
+      replayAt = 0;
+      if (tape.length < 10) return;
+      state = "replay";
+      replay = { from: Math.max(tape[0].now, goalAt - 2200), to: goalAt + 250, at: now, i: 0 };
+      badge.hidden = false;
+    }
+    function endReplay() {
+      state = "playing";
+      replay = null;
+      badge.hidden = true;
+      last = null;
+    }
+    function showReplay(now) {
+      const t = replay.from + (now - replay.at) * 0.5;
+      if (t >= replay.to) return endReplay();
+      while (replay.i < tape.length - 1 && tape[replay.i + 1].now <= t) replay.i++;
+      const snap = tape[replay.i],
+        players = snap.players;
+      draw(
+        svg,
+        {
+          players,
+          puck: { ...snap.puck, carrier: players[snap.puck.carrier] || null },
+          human: game.human,
+          controlled: players[snap.controlled] || players[0],
+          ref: snap.ref,
+        },
+        { view, now, follow: true }
+      );
     }
     function pause() {
       if (state !== "playing") return;
@@ -2201,6 +2590,7 @@
       overlay.hidden = true;
       last = null;
       draw(svg, game, { view, follow: true, now: performance.now() });
+      fit();
       say(msg, 2.6);
       hud();
     }
@@ -2212,11 +2602,17 @@
       }
       // Space (or shoot) is the horn.
       const inp = input(false);
-      if (inp.shoot) say("Beep beep.", 0.7);
+      if (inp.shoot) {
+        say("Beep beep.", 0.7);
+        sound.play("beep");
+      }
       if (!rz.started && !inp.x && !inp.y) return;
       rz.started = true;
       rz.step(dt, rzView === "cab" ? { drive: true, steer: inp.x, throttle: -inp.y } : inp);
-      if (rz.bonk) say("Bonk.", 0.7);
+      if (rz.bonk) {
+        say("Bonk.", 0.7);
+        sound.play("thud", true);
+      }
       if (rz.done) endResurfacing(false);
     }
     $("[data-pause]").addEventListener("click", () =>
@@ -2224,6 +2620,8 @@
     );
     $("[data-restart]").addEventListener("click", () => {
       newGame();
+      replay = null;
+      badge.hidden = true;
       rz = null;
       lamp = null;
       if (cab) cab.show(false);
@@ -2236,7 +2634,7 @@
       hud();
     });
     document.addEventListener("visibilitychange", () => document.hidden && pause());
-    $(".game-stage").addEventListener("pointerdown", () => state === "crew" && endResurfacing(true));
+    $(".game-stage").addEventListener("pointerdown", () => (state === "crew" ? endResurfacing(true) : state === "replay" ? endReplay() : null));
 
     // Input: the keyboard, and on touch screens a stick and two buttons. The
     // first touch shows those, for touch screens the media query misses.
@@ -2261,10 +2659,20 @@
     ];
     window.addEventListener("keydown", (e) => {
       if (e.target.closest && e.target.closest("input, textarea, select")) return;
-      const busy = state === "playing" || state === "buzzer" || state === "resurfacing" || state === "crew";
+      sound.wake();
+      const busy = state === "playing" || state === "buzzer" || state === "resurfacing" || state === "crew" || state === "replay";
       if (busy && GAME_KEYS.includes(e.code)) e.preventDefault();
       // The crew at work: any key skips to the end.
       if (state === "crew" && !e.repeat && (GAME_KEYS.includes(e.code) || e.code === "Enter" || e.code === "Escape")) return endResurfacing(true);
+      // A goal shown again: any key skips it.
+      if (state === "replay" && !e.repeat && (GAME_KEYS.includes(e.code) || e.code === "Enter" || e.code === "Escape")) {
+        e.preventDefault();
+        return endReplay();
+      }
+      if (e.code === "Escape" && full) {
+        if (state === "playing") pause();
+        return fullScreen(false);
+      }
       if (e.code === "KeyP" || e.code === "Escape") return state === "playing" ? pause() : state === "paused" ? start() : null;
       // Enter or Space take the overlay's first button, unless a button has
       // the focus (it then takes the key itself).
@@ -2322,8 +2730,10 @@
     for (const name of ["shoot", "pass", "check"]) {
       $(`[data-${name}]`).addEventListener("pointerdown", (e) => {
         e.preventDefault();
+        sound.wake();
         if (state === "playing" || state === "resurfacing") presses[name] = true;
         else if (state === "crew") endResurfacing(true);
+        else if (state === "replay") endReplay();
         else if (state === "intermission") resurface();
         else if (state !== "buzzer") start();
       });
@@ -2366,6 +2776,11 @@
           return;
         }
       }
+      if (state === "replay") return showReplay(now);
+      if (state === "playing" && replayAt && now >= replayAt) {
+        startReplay(now);
+        if (state === "replay") return showReplay(now);
+      }
       // Once the players are off and the lights have had their moment, the choice.
       if (state === "buzzer" && game.benched && now - buzzed > 2600) intermission();
       if (state !== "playing" && state !== "buzzer") return;
@@ -2378,10 +2793,13 @@
         first = false;
         spare -= STEP;
       }
+      if (state === "playing") record(now);
       const you = game.players.indexOf(game.controlled);
       for (const ev of game.events.splice(0)) {
+        sfx(ev);
         if (ev.type === "goal") {
           lamp = { side: ev.team === "a" ? 1 : -1, until: now + 2400 };
+          [goalAt, replayAt] = [now, now + 1500];
           const name = (game.players[ev.by] || {}).name;
           let msg = name ? pick(QUIPS[ev.team]).replace("%", name) : ev.team === "a" ? "Goal!" : "The computer scores.";
           if (ev.hatTrick && ev.team === "a") {
@@ -2400,6 +2818,14 @@
         } else if (ev.type === "shot" && ev.oneTimer && ev.you) say("One-timer!", 0.8);
         else if (ev.type === "post") say("Off the post!", 1);
         else if (ev.type === "overtime") say("Tied. Next goal wins.", 2.5);
+        else if (ev.type === "faceoff" && ev.n <= 2)
+          say(touchy() ? "Faceoff: tap pass as the puck lands." : "Faceoff: press X as the puck lands.", 2.2, true);
+        else if (ev.type === "draw")
+          say(
+            ev.team === "a" ? "You win the draw." : ev.why === "early" ? "Too early: the puck must be down." : "The computer wins the draw.",
+            1.3,
+            true
+          );
         else if (ev.type === "intermission") buzzer(ev, now);
         else if (ev.type === "final") {
           state = "over";
@@ -2411,14 +2837,29 @@
             verdict + (star ? ` Star of the game: ${star.name}, ${star.goals} goal${star.goals > 1 ? "s" : ""}.` : ""),
             "play again"
           );
+          showLevels();
         }
       }
       marks.update(game, now);
       draw(svg, game, { now, lamp, view, follow: true });
       hud();
     }
+    // What each event sounds like.
+    function sfx(ev) {
+      if (ev.type === "pass" || ev.type === "draw") sound.play("stick", false);
+      else if (ev.type === "shot") sound.play("stick", true);
+      else if (ev.type === "post") sound.play("post");
+      else if (ev.type === "save" || ev.type === "block") sound.play("pad");
+      else if (ev.type === "hit") sound.play("thud", ev.boards);
+      else if (ev.type === "goal") {
+        sound.play("horn");
+        if (ev.team === "a") sound.play("cheer");
+      } else if (ev.type === "intermission" || ev.type === "final") sound.play("buzzer");
+    }
+
     hud();
     show("Three on three", `You are blue: ${lineUpText(game, "a")}. You attack the goal on the right.`, "play");
+    showLevels();
     requestAnimationFrame(frame);
   }
 

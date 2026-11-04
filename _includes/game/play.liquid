@@ -10,15 +10,23 @@
       <button type="button" data-pause>pause</button>
       <button type="button" data-view>view from above</button>
       <button type="button" data-restart>start again</button>
+      <button type="button" data-sound>mute</button>
+      <button type="button" class="game-exit" data-exit aria-label="Leave full screen">×</button>
     </p>
   </div>
 
   <div class="game-stage">
     <svg viewBox="-30.6 -16.8 61.2 34.2" role="img" aria-label="The rink, seen from above" tabindex="-1"></svg>
     <p class="game-toast" data-toast hidden></p>
+    <p class="game-replay" data-replay hidden>Replay</p>
     <div class="game-overlay" data-overlay hidden>
       <h2 data-overlay-title></h2>
       <p data-overlay-text></p>
+      <p class="game-levels" data-levels hidden>
+        <button type="button" data-level="easy">easy</button>
+        <button type="button" data-level="normal">normal</button>
+        <button type="button" data-level="hard">hard</button>
+      </p>
       <p class="game-overlay-buttons">
         <button type="button" data-overlay-button></button>
         <button type="button" class="is-quiet" data-overlay-alt hidden></button>
@@ -39,7 +47,7 @@
 
   <p class="game-keys">
     <kbd>←</kbd><kbd>↑</kbd><kbd>↓</kbd><kbd>→</kbd> or <kbd>WASD</kbd> to skate · <kbd>Space</kbd> to shoot, or to poke the puck loose ·
-    <kbd>X</kbd> to pass, or to switch skater · <kbd>C</kbd> to body check · <kbd>P</kbd> to pause
+    <kbd>X</kbd> to pass, to switch skater, or to win a faceoff · <kbd>C</kbd> to body check · <kbd>P</kbd> to pause
   </p>
   <p class="game-live" data-live aria-live="polite"></p>
 </div>
