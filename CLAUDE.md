@@ -298,13 +298,28 @@ The extra two a side get the other wing and defender at faceoffs and two more
 places in `plan()` (the other point and the net front in attack, cover for the
 next two attackers in defence, wide outlets), after the three of three on
 three, which therefore plays exactly as before. The checker plays it too: no
-problems, about 4 to 5 goals a game, and many more passes and blocks. Goalies sit on an arc in front of the net and save with a chance that
-falls with shot speed, rebounds, close range and their own sideways motion;
-fast shots can also be blocked, or slip past a body. Against a person the
-computer's team is a little sharper (`sharp()`: as fast, keener pokes, better
-goalie). Three periods of a minute, then sudden-death overtime if tied. Touch
-screens get a stick and three buttons (pass, check, shoot), shown by
-`(pointer: coarse)` or after the first touch. (The stick is found as
+problems, about 4 to 5 goals a game, and many more passes and blocks.
+
+**Goalies** take position as an attacker comes (Mertcan asked; `keepGoal()`,
+after goaltending coaches' guides): on the line from the puck to the middle of
+the net, square to it, at the top of the crease for a puck far out, further out
+against a carrier with nobody to pass to (a breakaway), backing in as the puck
+comes close and on wide angles, and deeper with a pass across on. They see the
+puck a moment late (`seen`, 0.16 s), so a quick pass across the slot finds them
+off their angle, as it does real goalies. Three stances (`stance`), drawn in
+both views: ready; the butterfly, pads flat across the ice, for a shot on its
+way to the net or a loose puck in front (`kneel`, 0.45 s at least); and on the
+post, one pad down along the goal line toward the net (reverse-VH), when the
+puck is at or behind the goal line. A save's chance falls with shot speed, the
+goalie's sideways motion, how far it is off its angle (not against a shot from
+the side of a post it has sealed), rebounds, close range and one-timers; over
+48 games a side the checker's goal rates came out the same as before. Fast
+shots can also be blocked, or slip past a body.
+
+Against a person the computer's team is a little sharper (`sharp()`: as fast,
+keener pokes, better goalie). Three periods of a minute, then sudden-death
+overtime if tied. Touch screens get a stick and three buttons (pass, check,
+shoot), shown by `(pointer: coarse)` or after the first touch. (The stick is found as
 `.game-touch [data-stick]`: the players' sticks in the SVG are `data-stick` too,
 and a bare `[data-stick]` picked one of those and broke the touch stick.)
 

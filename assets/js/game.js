@@ -798,10 +798,10 @@
         gx = -s * GOAL_X;
       if (pk.carrier === g) {
         pk.held -= dt;
-        if (pk.held <= 0) {
-          const mate = this.passTarget(g, null) || this.skaters(g.team).sort((a, b) => dist(a, g) - dist(b, g))[0];
-          this.pass(g, mate);
-        }
+        g.stance = pk.held > 0.35 ? "butterfly" : "ready";
+        if (pk.held > 0) return this.steer(g, g.x, g.y, 2);
+        const mate = this.passTarget(g, null) || this.skaters(g.team).sort((a, b) => dist(a, g) - dist(b, g))[0];
+        this.pass(g, mate);
       }
       // A carrier who comes in close gets the goalie's stick: a poke check.
       const c = pk.carrier;
@@ -818,8 +818,48 @@
           this.events.push({ type: "poke", team: g.team });
         }
       }
-      const ang = clamp(Math.atan2(pk.y, (pk.x - gx) * s), -1.25, 1.25);
-      this.steer(g, gx + s * Math.cos(ang) * 1.3, Math.sin(ang) * 1.3, 5);
+      // Where to stand, as goaltending coaches teach it: on the line from the
+      // puck to the middle of the net, square to it, at a depth that follows
+      // the play. The goalie sees the puck a moment late (`seen`), so a quick
+      // pass across finds it off its angle, as passes across the slot beat
+      // real goalies (about 30% of such shots go in, against 8.5%).
+      const lag = 0.16 * (1 - 0.2 * Math.max(0, this.sharp(g.team))),
+        k = 1 - Math.exp(-dt / lag);
+      g.seen = g.seen || { x: pk.x, y: pk.y };
+      g.seen.x += (pk.x - g.seen.x) * k;
+      g.seen.y += (pk.y - g.seen.y) * k;
+      const px = g.seen.x,
+        py = g.seen.y,
+        out = (px - gx) * s,
+        r = hypot(px - gx, py);
+      // On the post, one pad down along the goal line (reverse-VH): the puck
+      // near the goal line and wide, or behind the net.
+      g.kneel = Math.max(0, (g.kneel || 0) - dt);
+      if (out < 1.5 && (Math.abs(py) > NET_HALF * 0.7 || out < 0)) {
+        g.stance = "post";
+        g.kneel = 0;
+        const side = Math.sign(py) || Math.sign(pk.vy) || 1;
+        return this.steer(g, gx + s * 0.6, side * (NET_HALF - 0.2), 5.5);
+      }
+      const ang = clamp(Math.atan2(py, Math.max(0.3, out)), -1.25, 1.25);
+      // Depth: the top of the crease for a puck far out; further out, to
+      // challenge, against a carrier with nobody to pass to; backing in as it
+      // comes close, and deeper on wide angles, or with a pass across on.
+      const them = this.skaters(other(g.team)),
+        alone = c && c.team !== g.team && !them.some((m) => m !== c && hypot(m.x - gx, m.y) < r + 3 && Math.abs(m.y - c.y) > 3),
+        across = them.some((m) => m !== c && Math.sign(m.y) !== Math.sign(py) && Math.abs(m.y) > 2 && hypot(m.x - gx, m.y) < 11);
+      let depth = alone && r > 8 && r < 18 ? 3.1 : 2.3;
+      if (r < 9) depth = Math.min(depth, 1.2 + Math.max(0, r - 3) * 0.2);
+      depth *= 1 - 0.4 * (ang / 1.25) ** 2;
+      if (across) depth -= 0.4;
+      depth = clamp(depth, 0.9, 3.2);
+      // Down in the butterfly, pads flat across the ice, for a shot on its way
+      // to the net or a loose puck in front of it; up again a moment later.
+      const t = pk.vx ? (gx - pk.x) / pk.vx : -1,
+        onNet = !c && t > 0 && t < 1 && hypot(pk.vx, pk.vy) > 12 && Math.abs(pk.y + pk.vy * t) < NET_HALF + 0.6;
+      if (onNet || ((!c || c.team !== g.team) && r < 3.5 && Math.abs(ang) < 0.9)) g.kneel = Math.max(g.kneel, 0.45);
+      g.stance = g.kneel > 0 ? "butterfly" : "ready";
+      this.steer(g, gx + s * Math.cos(ang) * depth, Math.sin(ang) * depth, g.kneel > 0 ? 3.5 : 6);
     }
 
     move(dt) {
@@ -972,14 +1012,24 @@
         // From the side (more than about 50° off the middle) the goalie has the
         // post covered; close in from the front is the hard one.
         const wide = pk.from ? Math.abs(pk.from.y) / (shotLength || 1) > 0.77 : false;
+        // How far off its angle the goalie is: between where it stands and the
+        // line from where the shot came from to the middle of the net.
+        const gx = -s * GOAL_X,
+          sealed = g.stance === "post" && pk.from && Math.sign(pk.from.y) === Math.sign(g.y),
+          off =
+            pk.from && !sealed
+              ? Math.abs(Math.atan2(g.y, Math.max(0.3, (g.x - gx) * s)) - Math.atan2(pk.from.y, Math.max(0.3, (pk.from.x - gx) * s)))
+              : 0;
         let chance =
-          0.82 -
+          0.84 -
           Math.max(0, sp - 18) * 0.02 -
-          Math.abs(g.vy) * 0.06 -
+          Math.abs(g.vy) * 0.05 -
+          Math.min(0.15, off * 0.35) -
           (pk.rebound > 0 ? 0.18 : 0) -
           (shotLength < 6 && !wide ? 0.12 : 0) +
-          (wide ? 0.15 : 0) -
-          (pk.oneTimer ? 0.12 : 0);
+          (wide ? 0.15 : 0) +
+          (g.stance === "butterfly" ? 0.03 : 0) -
+          (pk.oneTimer ? 0.1 : 0);
         chance += 0.15 * this.sharp(g.team);
         chance = clamp(chance, 0.3, 0.95);
         if (this.random() < chance) {
@@ -1564,12 +1614,21 @@
       const pad = (x) =>
         `<rect x="${x}" y="-1.05" width="0.6" height="1.02" rx="0.2" fill="var(--rink-mask)" ${edge}/>
         <rect x="${x}" y="-0.8" width="0.6" height="0.08" fill="${shirt}"/><rect x="${x}" y="-0.45" width="0.6" height="0.08" fill="${shirt}"/>`;
+      // A pad flat on the ice, knee in the middle and toe out to the side
+      // (`side` -1 left, 1 right), as in the butterfly.
+      const flat = (side) =>
+        `<g transform="scale(${side} 1) rotate(-9 0.04 -0.02)">
+        <rect x="0.04" y="-0.6" width="1.36" height="0.58" rx="0.2" fill="var(--rink-mask)" ${edge}/>
+        <rect x="0.38" y="-0.6" width="0.08" height="0.58" fill="${shirt}"/><rect x="0.86" y="-0.6" width="0.08" height="0.58" fill="${shirt}"/>
+        <rect x="1.34" y="-0.42" width="0.24" height="0.32" rx="0.08" fill="var(--rink-boot)"/></g>`;
       return `<line data-stick stroke="var(--rink-stick)" stroke-width="0.24" stroke-linecap="round"/>
       <g transform="scale(${TALL})">
       <ellipse rx="1.1" ry="${(1.1 * SQUASH).toFixed(2)}" fill="var(--rink-shadow)"/>
       <g data-figure>
-        ${skate(-0.62)}${skate(0.32)}
-        ${pad(-0.68)}${pad(0.08)}
+        <g data-stance="ready">${skate(-0.62)}${skate(0.32)}${pad(-0.68)}${pad(0.08)}</g>
+        <g data-stance="butterfly" visibility="hidden">${flat(-1)}${flat(1)}</g>
+        <g data-stance="post" visibility="hidden">${flat(-1)}${skate(0.32)}${pad(0.08)}</g>
+        <g data-upper>
         <path d="M -0.7 -1.45 H 0.7 L 0.74 -1.05 H -0.74 Z" fill="var(--rink-pants)"/>
         <path d="M -1.02 -2 Q -1.05 -2.3 -0.7 -2.3 H 0.7 Q 1.05 -2.3 1.02 -2 L 0.86 -1.4 H -0.86 Z" fill="${shirt}" ${edge}/>
         <rect x="-0.86" y="-1.62" width="1.72" height="0.09" fill="#fff" opacity="0.8"/>
@@ -1586,6 +1645,7 @@
             ${eye(-0.11)}${eye(0.11)}
             <path d="M -0.3 0 H 0.3 M -0.28 0.16 H 0.28 M -0.12 -0.14 V 0.32 M 0.12 -0.14 V 0.32" stroke="var(--rink-cage)" stroke-width="0.04"/>
           </g>
+        </g>
         </g>
       </g>
       ${starsSVG(1)}</g>`;
@@ -1620,6 +1680,30 @@
         </g>
       </g>
       ${starsSVG(0.9)}</g>`;
+  }
+
+  // A goalie's stance (`stance` in the simulation) on its drawing: standing
+  // ready, down in the butterfly, or on the post with one pad down along the
+  // goal line, toward the net. Returns where the upper body has gone.
+  function poseGoalie(g, p, tv) {
+    const stance = p.stance || "ready",
+      s = DIR[p.team],
+      key = tv ? stance + s : stance === "butterfly" ? stance : "ready";
+    if (g.dataset.pose !== key) {
+      g.dataset.pose = key;
+      g.querySelectorAll("[data-stance]").forEach((e) => {
+        const on = e.dataset.stance === (tv ? stance : key);
+        e.setAttribute("visibility", on ? "visible" : "hidden");
+        if (on && e.dataset.stance === "post") e.setAttribute("transform", `scale(${s} 1)`);
+      });
+      const upper = g.querySelector("[data-upper]");
+      if (upper)
+        upper.setAttribute(
+          "transform",
+          stance === "butterfly" ? "translate(0 0.6)" : stance === "post" ? `translate(${-0.1 * s} 0.3) rotate(${-6 * s} 0 -1.1)` : ""
+        );
+    }
+    return stance === "butterfly" ? [0, 0.6] : stance === "post" ? [-0.1 * s, 0.3] : [0, 0];
   }
 
   const skinOf = (i) => {
@@ -1927,6 +2011,7 @@
                 return 0.12 * Math.sin(phase) * amp;
               })();
         root.helmetLook(g, Math.atan2(p.fy, p.fx) + (down ? 1.2 : 0) + turn, lx, ly, down);
+        if (p.role === "goalie") poseGoalie(g, p, false);
         const stars = g.querySelector("[data-stars]");
         stars.setAttribute("visibility", down ? "visible" : "hidden");
         if (down) stars.setAttribute("transform", `rotate(${((now / 4) % 360).toFixed(0)})`);
@@ -1966,8 +2051,9 @@
         // shooting left and half right, a little toward where it faces; a
         // goalie's stick comes from the blocker.
         const goalie = p.role === "goalie",
-          hand = i % 2 ? 1 : -1;
-        const top = goalie ? [0.95, -1.55] : [hand * 0.46 + sx * 0.22, -1.58],
+          hand = i % 2 ? 1 : -1,
+          [ux, uy] = goalie ? poseGoalie(g, p, true) : [0, 0];
+        const top = goalie ? [0.95 + ux, -1.55 + uy] : [hand * 0.46 + sx * 0.22, -1.58],
           low = goalie ? top : [hand * 0.66 + sx * 0.3, -1.24];
         if (!goalie) {
           for (const [s, [hx, hy]] of [

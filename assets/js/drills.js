@@ -99,9 +99,14 @@
     if (goalie) {
       return `<g data-helmet>
       <path d="M 0.1 1.05 L 1.3 0.55 L 1.42 -0.3" stroke="var(--rink-stick)" stroke-width="0.34" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+      <g data-stance="ready">
       <rect x="0.3" y="-0.98" width="0.7" height="0.86" rx="0.26" fill="var(--rink-mask)" ${edge}/>
       <rect x="0.3" y="0.12" width="0.7" height="0.86" rx="0.26" fill="var(--rink-mask)" ${edge}/>
-      <path d="M 0.62 -0.98 V -0.12 M 0.62 0.12 V 0.98" stroke="${jersey}" stroke-width="0.12"/>
+      <path d="M 0.62 -0.98 V -0.12 M 0.62 0.12 V 0.98" stroke="${jersey}" stroke-width="0.12"/></g>
+      <g data-stance="butterfly" visibility="hidden">
+      <rect x="0.32" y="-1.62" width="0.56" height="1.56" rx="0.24" fill="var(--rink-mask)" ${edge}/>
+      <rect x="0.32" y="0.06" width="0.56" height="1.56" rx="0.24" fill="var(--rink-mask)" ${edge}/>
+      <path d="M 0.32 -1.2 H 0.88 M 0.32 -0.62 H 0.88 M 0.32 0.62 H 0.88 M 0.32 1.2 H 0.88" stroke="${jersey}" stroke-width="0.12"/></g>
       <ellipse cx="-0.1" rx="0.78" ry="1.32" fill="${jersey}" ${edge}/>
       <rect x="0.1" y="0.88" width="0.6" height="0.44" rx="0.1" fill="var(--rink-mask)" ${edge}/>
       <circle cx="0.3" cy="-1.12" r="0.42" fill="var(--rink-mask)" ${edge}/>
