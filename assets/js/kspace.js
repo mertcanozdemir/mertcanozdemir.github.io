@@ -1,20 +1,24 @@
-// The k-space demo on the home page: why an MRI takes so long. The patient (a
-// cat) is taken to k-space with an FFT, and the visitor chooses a scan: every
-// line, top to bottom or from the centre out; every fourth line; or only the
-// centre. The scanner then measures the lines itself, one a TR (shown SPEED
-// times as fast), and the image is rebuilt from the lines measured so far
-// (zero-filled inverse FFT).
+// The k-space demo on the home page: why an MRI takes so long, and how
+// scanners go faster. The patient (a cat) is taken to k-space with an FFT,
+// and the visitor chooses a scan: every line, every fourth or every eighth.
+// The scanner measures the lines itself, one a TR (shown SPEED times as
+// fast), with its noise, and the image is rebuilt from the lines measured so
+// far (zero-filled inverse FFT).
 //
-// The catch: the cat keeps still for PATIENCE seconds of scanning, then moves.
-// Lines measured after that come from the cat in its new pose (orange in
-// k-space), so a full scan has motion ghosts. A quick scan is over before the
-// cat moves, but skipping lines folds the cat over itself, and measuring only
-// the centre loses the whiskers. After the every-fourth-line scan the image
-// can be unfolded with eight receiver coils (simulated), as fast scans do
-// (SENSE).
+// Every line takes over a minute, and the cat keeps still for PATIENCE
+// seconds of scanning only: lines measured after it moves come from the cat
+// in its new pose (orange in k-space), and the image has motion ghosts. A
+// quick scan is over before the cat moves, but skipping lines folds the cat
+// over itself. After a quick scan the lines skipped can be filled in: by eight
+// receiver coils (simulated: SENSE, a least-squares solve for each pixel),
+// which run out of help at eight times as fast; or, as today's fastest scans
+// do, by the coils and then a small neural network, a U-Net taught on drawn
+// cats (bin/catnet in the repository), which cleans up what the coils leave
+// with what cats look like. Either way the lines that were measured are kept
+// as measured, and the lines filled in show in blue in k-space.
 //
 // `data-image` on the piece (any picture, such as a real MR slice) replaces the
-// cat; it moves the same way.
+// cat; it moves the same way. (The network has only ever seen cats.)
 (function () {
   "use strict";
 
@@ -24,42 +28,40 @@
   const PATIENCE = 30; // seconds of scanning the cat keeps still for
   const RESTLESS = 22; // and when it starts to fidget
   const MOVED = { dx: 0.06, dy: -0.035, angle: 0.3 }; // the new pose, in fields of view and radians
-  const R = 4; // the quick scan measures every R-th line
   const COILS = 8; // receiver coils round the patient, for the unfolding
+  const NOISE = 1.9; // the scanner's noise in k-space: 1.5% of full brightness in a full scan
+  const COIL_NOISE = 0.12; // and in each coil, which hears the cat more faintly
+  const NET_URL = new URL("../models/catnet.bin", document.currentScript ? document.currentScript.src : location.href).href;
 
-  // The scans to choose from: the k-space rows each measures, in order (ky,
-  // unshifted, so 0 is the centre), and how it went.
-  const at = (s) => (s + N) % N; // ky from −N/2 … N/2 − 1 to its row
-  const topDown = (keep) => {
-    const rows = [];
-    for (let s = -N / 2; s < N / 2; s++) if (keep(s)) rows.push(at(s));
-    return rows;
-  };
-  const centreOut = () => {
-    const rows = [0];
-    for (let d = 1; d < N / 2; d++) rows.push(at(d), at(-d));
-    return rows.concat(at(-N / 2));
-  };
+  // The scans to choose from: R, every R-th k-space row measured, from the
+  // top of the panel down, and how it went.
   const PLANS = {
-    linear: {
-      lines: topDown(() => true),
-      said: "The cat moved at 0:30, and every line after that came from a moved cat: ghosts.",
-    },
-    centric: {
-      lines: centreOut(),
-      said: "The cat moved at 0:30 here too, but the centre of k-space was measured by then: the cat holds, its edges ghost.",
+    full: {
+      R: 1,
+      said: "The whole scan took over a minute, and at 0:30 the cat moved: every line after that came from a moved cat, so it ghosts.",
     },
     fourth: {
-      lines: topDown((s) => s % R === 0),
-      said: "Over before the cat moved, but with a quarter of the lines the cat folds over itself.",
+      R: 4,
+      said: "Four times as fast, and over before the cat moved. But from every fourth line alone, the cat folds over itself.",
     },
-    centre: {
-      lines: topDown((s) => s >= -16 && s < 16),
-      said: "Over before the cat moved, but the fine detail is in the edges of k-space: no whiskers.",
+    eighth: {
+      R: 8,
+      said: "Eight times as fast, but every eighth line folds the cat eight times over.",
     },
   };
-  const UNFOLDED = "Fast scans do this: eight receiver coils see the copies in different places, which is enough to unfold them.";
+  for (const plan of Object.values(PLANS)) {
+    plan.lines = [];
+    for (let s = -N / 2; s < N / 2; s++) if (s % plan.R === 0) plan.lines.push((s + N) % N);
+  }
+  const SAID = {
+    coils4:
+      "The scanner listens with eight coils round the head, each hearing best the part nearest it. Each coil hears the folded copies differently, which is enough to pull them apart.",
+    coils8: "Eight coils, eight copies to pull apart: too many for them, and the copies do not quite come apart.",
+    net: "Today's fastest scans do both: the coils pull the copies apart as far as they can, and a network that has looked at 15,744 drawn cats cleans up the rest with what cats look like.",
+  };
   const clockOf = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
+  // Gaussian noise, by Box and Muller.
+  const gauss = () => Math.sqrt(-2 * Math.log(1 - Math.random())) * Math.cos(2 * Math.PI * Math.random());
 
   // Radix-2 FFT, in place, on N-point arrays.
   const BITS = Math.log2(N);
@@ -213,6 +215,48 @@
     }
   }
 
+  // Another patient: a dog, drawn the same way, with floppy ears, a muzzle
+  // and a big nose, and no whiskers. The network has never seen one.
+  function drawDog(g) {
+    const fill = (v) => (g.fillStyle = grey(v));
+    const oval = (x, y, rx, ry, turn = 0) => {
+      g.beginPath();
+      g.ellipse(x, y, rx, ry, turn, 0, 2 * Math.PI);
+      g.fill();
+    };
+    fill(0.34);
+    oval(79.7, 280.8, 50, 115, 0.314);
+    oval(432.3, 280.8, 50, 115, -0.314);
+    fill(0.42);
+    oval(256, 260, 135, 140);
+    g.strokeStyle = grey(0.78);
+    g.lineWidth = 9;
+    g.stroke();
+    fill(0.24);
+    oval(256, 190, 80, 40);
+    for (const side of [-1, 1]) {
+      fill(0.85);
+      oval(256 + side * 62, 262, 24, 24);
+      fill(0.06);
+      oval(256 + side * 62, 262, 13, 13);
+    }
+    fill(0.58);
+    oval(256, 365, 80, 65);
+    fill(0.08);
+    oval(256, 339, 34, 21);
+    g.strokeStyle = grey(0.1);
+    g.lineWidth = 6;
+    g.beginPath();
+    g.moveTo(256, 360);
+    g.lineTo(256, 392);
+    g.stroke();
+    for (const x of [231, 281]) {
+      g.beginPath();
+      g.ellipse(x, 380, 25, 30, 0, (20 * Math.PI) / 180, (160 * Math.PI) / 180);
+      g.stroke();
+    }
+  }
+
   // The patient at N×N in greyscale: drawn at 4× in the given pose (or sitting
   // still), then scaled down, which smooths its edges.
   function render(patient, pose) {
@@ -328,6 +372,170 @@
     }
   }
 
+  // ——— The network ———
+  // The U-Net of bin/catnet/train.py, run in a worker so the page does not
+  // stop while it thinks (half a billion multiplications). Its weights are
+  // half floats, layer after layer, each as [out][in][ky][kx] then biases.
+  // It is given what the coils made of the scan and how many lines were
+  // skipped, and gives back the cat as a correction to that.
+  function network() {
+    const C = [16, 32, 48, 64, 64];
+    let layers = null;
+    const half = (h) => {
+      const s = h & 0x8000 ? -1 : 1,
+        e = (h >> 10) & 31,
+        f = h & 1023;
+      return e === 0 ? s * f * 2 ** -24 : e === 31 ? s * Infinity : s * (1 + f / 1024) * 2 ** (e - 15);
+    };
+    function read(buffer) {
+      const h = new Uint16Array(buffer);
+      let at = 0;
+      const take = (n) => {
+        const a = new Float32Array(n);
+        for (let i = 0; i < n; i++) a[i] = half(h[at++]);
+        return a;
+      };
+      const layer = (k, cin, cout) => ({ k, cin, cout, w: take(cout * cin * k * k), b: take(cout) });
+      const L = {};
+      let cin = 2;
+      C.forEach((c, i) => {
+        L[`e${i}a`] = layer(3, cin, c);
+        L[`e${i}b`] = layer(3, c, c);
+        cin = c;
+      });
+      for (let i = C.length - 2; i >= 0; i--) {
+        L[`u${i}`] = layer(1, cin, C[i]);
+        L[`d${i}a`] = layer(3, 2 * C[i], C[i]);
+        if (i > 0) L[`d${i}b`] = layer(3, C[i], C[i]);
+        cin = C[i];
+      }
+      L.out = layer(1, C[0], 1);
+      if (at !== h.length) throw new Error("the network's weights do not fit");
+      return L;
+    }
+    // A convolution of x (planes of n × n), zero beyond the edges, then ReLU.
+    function conv(x, n, { k, cin, cout, w, b }, relu = true) {
+      const nn = n * n,
+        y = new Float32Array(cout * nn);
+      if (k === 1) {
+        for (let o = 0; o < cout; o++) {
+          const yo = o * nn;
+          y.fill(b[o], yo, yo + nn);
+          for (let i = 0; i < cin; i++) {
+            const wv = w[o * cin + i],
+              xi = i * nn;
+            for (let p = 0; p < nn; p++) y[yo + p] += wv * x[xi + p];
+          }
+        }
+      } else {
+        const m = n + 2,
+          mm = m * m,
+          pad = new Float32Array(cin * mm);
+        for (let i = 0; i < cin; i++) for (let r = 0; r < n; r++) pad.set(x.subarray(i * nn + r * n, i * nn + r * n + n), i * mm + (r + 1) * m + 1);
+        for (let o = 0; o < cout; o++) {
+          const yo = o * nn;
+          y.fill(b[o], yo, yo + nn);
+          for (let i = 0; i < cin; i++)
+            for (let dy = 0; dy < 3; dy++)
+              for (let dx = 0; dx < 3; dx++) {
+                const wv = w[((o * cin + i) * 3 + dy) * 3 + dx];
+                for (let r = 0; r < n; r++) {
+                  const s = i * mm + (r + dy) * m + dx,
+                    d = yo + r * n;
+                  for (let c = 0; c < n; c++) y[d + c] += wv * pad[s + c];
+                }
+              }
+        }
+      }
+      if (relu) for (let p = 0; p < y.length; p++) if (y[p] < 0) y[p] = 0;
+      return y;
+    }
+    function pool(x, c, n) {
+      const h = n / 2,
+        y = new Float32Array(c * h * h);
+      for (let i = 0; i < c; i++)
+        for (let r = 0; r < h; r++)
+          for (let q = 0; q < h; q++) {
+            const a = i * n * n + 2 * r * n + 2 * q;
+            y[i * h * h + r * h + q] = Math.max(x[a], x[a + 1], x[a + n], x[a + n + 1]);
+          }
+      return y;
+    }
+    function up(x, c, n) {
+      const m = 2 * n,
+        y = new Float32Array(c * m * m);
+      for (let i = 0; i < c; i++)
+        for (let r = 0; r < m; r++) for (let q = 0; q < m; q++) y[i * m * m + r * m + q] = x[i * n * n + (r >> 1) * n + (q >> 1)];
+      return y;
+    }
+    function run(folded, R) {
+      const L = layers,
+        size = folded.length,
+        N = Math.sqrt(size);
+      let n = N,
+        h = new Float32Array(2 * size);
+      h.set(folded);
+      h.fill(R / 8, size);
+      const skips = [];
+      C.forEach((c, i) => {
+        h = conv(conv(h, n, L[`e${i}a`]), n, L[`e${i}b`]);
+        if (i < C.length - 1) {
+          skips[i] = h;
+          h = pool(h, c, n);
+          n /= 2;
+        }
+      });
+      for (let i = C.length - 2; i >= 0; i--) {
+        h = up(conv(h, n, L[`u${i}`]), C[i], n);
+        n *= 2;
+        const both = new Float32Array(2 * C[i] * n * n);
+        both.set(h);
+        both.set(skips[i], C[i] * n * n);
+        h = conv(both, n, L[`d${i}a`]);
+        if (i > 0) h = conv(h, n, L[`d${i}b`]);
+      }
+      const out = conv(h, n, L.out, false);
+      for (let p = 0; p < size; p++) out[p] += folded[p];
+      return out;
+    }
+    return async ({ url, folded, R }) => {
+      if (!layers) layers = read(await (await fetch(url)).arrayBuffer());
+      return run(folded, R);
+    };
+  }
+  // In a worker where there can be one; otherwise here, on the page.
+  let thinker = null;
+  function think(message) {
+    if (!thinker) {
+      try {
+        const worker = new Worker(
+          URL.createObjectURL(
+            new Blob(
+              [
+                `const think = (${network})(); onmessage = (e) => think(e.data).then((out) => postMessage({ out }), (err) => postMessage({ err: String(err) }));`,
+              ],
+              {
+                type: "text/javascript",
+              }
+            )
+          )
+        );
+        let waiting = null;
+        worker.onmessage = (e) => {
+          const w = waiting;
+          waiting = null;
+          if (e.data.err) w.reject(new Error(e.data.err));
+          else w.resolve(e.data.out);
+        };
+        thinker = (m) => new Promise((resolve, reject) => ((waiting = { resolve, reject }), worker.postMessage(m)));
+      } catch (e) {
+        const here = network();
+        thinker = (m) => here(m);
+      }
+    }
+    return thinker(message);
+  }
+
   function build(root, patient) {
     const $ = (s) => root.querySelector(s);
     const kCanvas = $("[data-k]"),
@@ -335,41 +543,48 @@
       clock = $("[data-clock]"),
       status = $("[data-status]"),
       caption = $("[data-caption]"),
-      unfoldButton = $("[data-unfold]"),
-      planButtons = [...root.querySelectorAll("[data-plan]")];
+      coilsButton = $("[data-coils]"),
+      netButton = $("[data-net]"),
+      planButtons = [...root.querySelectorAll("[data-plan]")],
+      patientButtons = [...root.querySelectorAll("[data-patient]")];
     const kCtx = kCanvas.getContext("2d"),
       iCtx = iCanvas.getContext("2d");
     kCanvas.width = kCanvas.height = iCanvas.width = iCanvas.height = N;
     const kPix = kCtx.createImageData(N, N),
       iPix = iCtx.createImageData(N, N);
 
-    const images = [render(patient), render(patient, MOVED)],
-      poses = images.map(kspaceOf);
-    let peak = 0;
-    for (let i = 0; i < N * N; i++) peak = Math.max(peak, images[0][i]);
-
     // Log magnitude for display, normalised, with the centre (DC) shifted to
     // the middle of the panel. k-space is kept unshifted: row = ky, column = kx.
-    const shown = poses.map(({ re, im }) => {
-      const s = new Float64Array(N * N);
-      for (let i = 0; i < N * N; i++) s[i] = Math.log1p(Math.hypot(re[i], im[i]));
-      return s;
-    });
-    let top = 0;
-    for (const s of shown) for (let i = 0; i < N * N; i++) top = Math.max(top, s[i]);
+    const logOf = (re, im, out = new Float64Array(N * N)) => {
+      for (let i = 0; i < N * N; i++) out[i] = Math.log1p(Math.hypot(re[i], im[i]));
+      return out;
+    };
+    // The patient, sitting still and moved, its k-space and how bright it is.
+    let images, poses, shown, peak, top, who;
+    function admit(drawing) {
+      images = [render(drawing), render(drawing, MOVED)];
+      poses = images.map(kspaceOf);
+      shown = poses.map(({ re, im }) => logOf(re, im));
+      peak = top = 0;
+      for (let i = 0; i < N * N; i++) peak = Math.max(peak, images[0][i]);
+      for (const s of shown) for (let i = 0; i < N * N; i++) top = Math.max(top, s[i]);
+    }
+    admit(patient);
+    who = patient === drawDog ? "dog" : "cat";
     const ky = (r) => (r + N / 2) % N; // panel row → ky
 
-    // Which pose each line was measured in: 0 not yet, 1 still, 2 moved.
-    const source = new Uint8Array(N);
     const A = () => new Float64Array(N * N);
+    // Which pose each line was measured in: 0 not yet, 1 still, 2 moved; and
+    // the scanner's noise on this scan's lines.
+    const source = new Uint8Array(N),
+      noise = [A(), A()];
     const zero = [A(), A()],
       mag = A();
 
     // The image from the measured lines alone, each line from the pose it was
-    // measured in. Each line is weighted by how sparsely its neighbourhood
-    // was measured (density compensation, over windows of 2R lines), so the
-    // brightness holds both where every fourth line is missing and where
-    // the centre is complete.
+    // measured in, with its noise. Each line is weighted by how sparsely its
+    // neighbourhood was measured (density compensation, over 8 lines), so the
+    // brightness holds however many lines are missing.
     function zeroFilled([re, im]) {
       re.fill(0);
       im.fill(0);
@@ -377,25 +592,23 @@
         const k = ky(r);
         if (!source[k]) continue;
         let near = 0;
-        for (let q = r - R; q < r + R; q++) if (source[ky((q + N) % N)]) near++;
-        const w = (2 * R) / near / (N * N),
+        for (let q = r - 4; q < r + 4; q++) if (source[ky((q + N) % N)]) near++;
+        const w = 8 / near / (N * N),
           from = poses[source[k] - 1];
         for (let c = k * N; c < (k + 1) * N; c++) {
-          re[c] = w * from.re[c];
-          im[c] = w * from.im[c];
+          re[c] = w * (from.re[c] + noise[0][c]);
+          im[c] = w * (from.im[c] + noise[1][c]);
         }
       }
       fft2(re, im, true, source);
     }
-    // Where folded copies overlap they add up, so the display is windowed
-    // to the brightest pixel, as a scanner's viewer would.
+    // The display is windowed to the brightest pixels, as a scanner's
+    // viewer would (folded copies add up), ignoring the odd speck of noise.
+    const sample = new Float64Array(N * N);
     function show([re, im]) {
-      let brightest = 0;
-      for (let i = 0; i < N * N; i++) {
-        mag[i] = Math.hypot(re[i], im[i]) / peak;
-        brightest = Math.max(brightest, mag[i]);
-      }
-      const gain = 1 / Math.max(1, 0.92 * brightest);
+      for (let i = 0; i < N * N; i++) sample[i] = mag[i] = Math.hypot(re[i], im[i]) / peak;
+      sample.sort();
+      const gain = 1 / Math.max(1, 0.92 * sample[Math.floor(0.997 * (N * N - 1))]);
       for (let i = 0; i < N * N; i++) {
         const v = Math.round(255 * Math.min(1, gain * mag[i]));
         iPix.data[4 * i] = iPix.data[4 * i + 1] = iPix.data[4 * i + 2] = v;
@@ -405,15 +618,17 @@
     }
 
     // k-space as measured so far: what is still to come faintly, the lines
-    // from the moved cat in orange, the line being measured in blue.
-    let current = -1;
+    // from the moved cat in orange, the line being measured in white-blue,
+    // and once lines have been filled in, those in blue.
+    let current = -1,
+      filled = null;
     function drawK() {
       const d = kPix.data;
       for (let r = 0; r < N; r++) {
         const k = ky(r),
           from = source[k],
-          s = shown[from === 2 ? 1 : 0],
-          dim = from ? 1 : 0.1,
+          s = !from && filled ? filled : shown[from === 2 ? 1 : 0],
+          dim = from || filled ? 1 : 0.1,
           now = k === current;
         for (let c = 0; c < N; c++) {
           const v = 255 * dim * Math.pow(s[k * N + ((c + N / 2) % N)] / top, 1.15),
@@ -426,6 +641,10 @@
             d[p] = v + 45;
             d[p + 1] = v * 0.62 + 12;
             d[p + 2] = v * 0.4;
+          } else if (!from && filled) {
+            d[p] = v * 0.35;
+            d[p + 1] = v * 0.75 + 10;
+            d[p + 2] = v + 40;
           } else d[p] = d[p + 1] = d[p + 2] = v;
           d[p + 3] = 255;
         }
@@ -433,21 +652,41 @@
       kCtx.putImageData(kPix, 0, 0);
     }
 
-    // ——— Unfolding with the coils (SENSE) ———
-    // Every coil sees the cat folded into R copies, but each copy weighted by
-    // that coil's sensitivity where it came from, so the copies fall
-    // differently in every coil's view. For each pixel of the folded image,
-    // the R places that folded onto it are then solved for from the eight
-    // coils (least squares: eight equations, R unknowns). Made once, when
-    // first wanted, from the cat as it sat for the quick scan.
-    let unfolded = null,
-      fading = 0;
-    function unfoldImage() {
-      if (unfolded) return unfolded;
-      const maps = coilMaps(),
-        M = N / R,
-        rows = new Uint8Array(N);
-      for (let k = 0; k < N; k += R) rows[k] = 1;
+    // ——— Filling in the missing lines ———
+    // Whatever fills them in, the lines that were measured are put back as
+    // they were measured: only the missing ones are its guess.
+    function keepMeasured([re, im]) {
+      const K = [Float64Array.from(re), Float64Array.from(im)];
+      fft2(K[0], K[1], false);
+      for (let k = 0; k < N; k++) {
+        if (!source[k]) continue;
+        const from = poses[source[k] - 1];
+        for (let c = k * N; c < (k + 1) * N; c++) {
+          K[0][c] = from.re[c] + noise[0][c];
+          K[1][c] = from.im[c] + noise[1][c];
+        }
+      }
+      filled = logOf(K[0], K[1]);
+      fft2(K[0], K[1], true);
+      for (let i = 0; i < N * N; i++) {
+        K[0][i] /= N * N;
+        K[1][i] /= N * N;
+      }
+      return K;
+    }
+
+    // The coils (SENSE). Every coil sees the cat folded into R copies, but
+    // each copy weighted by that coil's sensitivity where it came from, so
+    // the copies fall differently in every coil's view. For each pixel of
+    // the folded image, the R places that folded onto it are solved for from
+    // the eight coils: eight equations, R unknowns, least squares, with a
+    // little regularisation. With R = 8 there is just one equation for every
+    // unknown, and the noise is magnified many times.
+    let maps = null;
+    function unfoldWithCoils() {
+      maps = maps || coilMaps();
+      const R = PLANS[plan].R,
+        M = N / R;
       const folded = maps.map(([sr, si]) => {
         const re = A(),
           im = A();
@@ -457,11 +696,16 @@
         }
         fft2(re, im, false);
         for (let k = 0; k < N; k++)
-          if (!rows[k]) {
+          if (source[k]) {
+            for (let c = k * N; c < (k + 1) * N; c++) {
+              re[c] += COIL_NOISE * gauss();
+              im[c] += COIL_NOISE * gauss();
+            }
+          } else {
             re.fill(0, k * N, k * N + N);
             im.fill(0, k * N, k * N + N);
           }
-        fft2(re, im, true, rows);
+        fft2(re, im, true, source);
         for (let i = 0; i < N * N; i++) {
           re[i] /= N * N;
           im[i] /= N * N;
@@ -473,8 +717,6 @@
         b = new Float64Array(2 * R);
       for (let y = 0; y < M; y++)
         for (let x = 0; x < N; x++) {
-          // Coil c sees, at (x, y), the sum over j of S_c at (x, y + jM)
-          // times the cat there, over R: G = BᴴB and b = Bᴴa for that B.
           G.fill(0);
           b.fill(0);
           for (let c = 0; c < COILS; c++) {
@@ -498,7 +740,7 @@
           }
           let trace = 0;
           for (let j = 0; j < R; j++) trace += G[2 * (j * R + j)];
-          for (let j = 0; j < R; j++) G[2 * (j * R + j)] += 1e-9 * trace;
+          for (let j = 0; j < R; j++) G[2 * (j * R + j)] += 1e-4 * trace;
           solve(G, b, R);
           for (let j = 0; j < R; j++) {
             const p = (y + j * M) * N + x;
@@ -506,32 +748,67 @@
             out[1][p] = b[2 * j + 1];
           }
         }
-      return (unfolded = out);
+      return out;
     }
-    // The folded cat fades into the unfolded one.
-    const blend = [A(), A()];
-    function unfold(on) {
-      cancelAnimationFrame(fading);
-      fading = 0;
-      unfoldButton.setAttribute("aria-pressed", String(on));
-      caption.textContent = "the cat";
-      zeroFilled(zero);
-      if (!on) return show(zero);
-      const u = unfoldImage(),
-        t0 = performance.now();
-      caption.textContent = "the cat, unfolding…";
-      const step = (now) => {
-        const a = Math.min(1, (now - t0) / 700),
-          e = a * a * (3 - 2 * a);
-        for (let i = 0; i < N * N; i++) {
-          blend[0][i] = (1 - e) * zero[0][i] + e * u[0][i];
-          blend[1][i] = (1 - e) * zero[1][i] + e * u[1][i];
-        }
-        show(blend);
-        if (a < 1) fading = requestAnimationFrame(step);
-        else caption.textContent = `the cat, unfolded with ${COILS} coils`;
-      };
-      fading = requestAnimationFrame(step);
+
+    // ——— What is shown: as measured, or filled in ———
+    let mode = "measured",
+      results = {},
+      thinking = false;
+    function setMode(next) {
+      if (thinking) return;
+      mode = mode === next ? "measured" : next;
+      coilsButton.setAttribute("aria-pressed", String(mode === "coils"));
+      netButton.setAttribute("aria-pressed", String(mode === "net"));
+      if (mode === "measured") {
+        filled = null;
+        label("the cat");
+        say(PLANS[plan].said);
+        zeroFilled(zero);
+        show(zero);
+        drawK();
+      } else if (mode === "coils") {
+        results.sense = results.sense || unfoldWithCoils();
+        results.coils = results.coils || keepMeasured(results.sense);
+        showResult(results.coils, `the cat, unfolded with ${COILS} coils`, PLANS[plan].R === 8 ? SAID.coils8 : SAID.coils4);
+      } else if (results.net) showResult(results.net, "the cat, from the coils and a network", SAID.net);
+      else {
+        thinking = true;
+        label("the cat, the network is thinking…");
+        netButton.disabled = coilsButton.disabled = true;
+        results.sense = results.sense || unfoldWithCoils();
+        const folded = Float32Array.from(results.sense[0]),
+          asked = plan;
+        think({ url: NET_URL, folded, R: PLANS[plan].R })
+          .then((out) => {
+            if (asked !== plan || mode !== "net") return;
+            results.net = keepMeasured([Float64Array.from(out), A()]);
+            showResult(results.net, "the cat, from the coils and a network", SAID.net);
+          })
+          .catch(() => {
+            mode = "measured";
+            netButton.setAttribute("aria-pressed", "false");
+            label("the cat");
+            say("The network could not be loaded just now.");
+          })
+          .finally(() => {
+            thinking = false;
+            netButton.disabled = coilsButton.disabled = false;
+          });
+      }
+    }
+    function showResult(result, text, said) {
+      filled = logOf(...fftOf(result));
+      label(text);
+      say(said);
+      show(result);
+      drawK();
+    }
+    // The k-space of an image, for showing the lines filled in.
+    function fftOf([re, im]) {
+      const K = [Float64Array.from(re), Float64Array.from(im)];
+      fft2(K[0], K[1], false);
+      return K;
     }
 
     // ——— The scan ———
@@ -543,9 +820,15 @@
       running = 0,
       mood = "";
     const length = () => PLANS[plan].lines.length * TR;
+    // The words, about whichever patient it is.
+    const named = (text) => text.replace(/\bcat\b(?!s)/g, who);
     const say = (text) => {
+      text = named(text);
       if (text !== mood) status.textContent = mood = text;
     };
+    function label(text) {
+      caption.textContent = named(text);
+    }
     function measureTo(t) {
       const lines = PLANS[plan].lines,
         due = Math.min(lines.length, Math.floor(t / TR));
@@ -560,7 +843,7 @@
       clock.textContent = over ? clockOf(length()) : `${clockOf(t)} of ${clockOf(length())}`;
       say(over ? PLANS[plan].said : t >= PATIENCE ? "the cat moved" : t >= RESTLESS ? "the cat is getting restless" : "the cat is calm");
       root.classList.toggle("is-moved", t >= PATIENCE);
-      unfoldButton.hidden = !(over && plan === "fourth");
+      coilsButton.hidden = netButton.hidden = !(over && PLANS[plan].R > 1);
     }
     function tick(now) {
       const t = Math.min(length(), ((now - began) / 1000) * SPEED);
@@ -573,7 +856,13 @@
       plan = name;
       done = 0;
       source.fill(0);
-      unfold(false);
+      for (const v of noise) for (let i = 0; i < N * N; i++) v[i] = NOISE * gauss();
+      mode = "measured";
+      results = {};
+      filled = null;
+      label("the cat");
+      coilsButton.setAttribute("aria-pressed", "false");
+      netButton.setAttribute("aria-pressed", "false");
       planButtons.forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.plan === name)));
       if (instantly) {
         measureTo(length());
@@ -588,13 +877,19 @@
 
     for (const b of planButtons) {
       b.querySelector("[data-time]").textContent = clockOf(PLANS[b.dataset.plan].lines.length * TR);
-      b.addEventListener("click", () => scan(b.dataset.plan));
+      b.addEventListener("click", () => !thinking && scan(b.dataset.plan));
     }
-    unfoldButton.addEventListener("click", () => {
-      const on = unfoldButton.getAttribute("aria-pressed") !== "true";
-      unfold(on);
-      say(on ? UNFOLDED : PLANS[plan].said);
-    });
+    coilsButton.addEventListener("click", () => setMode("coils"));
+    netButton.addEventListener("click", () => setMode("net"));
+
+    for (const b of patientButtons)
+      b.addEventListener("click", () => {
+        if (thinking || b.dataset.patient === who) return;
+        who = b.dataset.patient;
+        admit(who === "dog" ? drawDog : patient);
+        patientButtons.forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+        scan(plan, true);
+      });
 
     // It opens on a quick scan, done: every fourth line, the cat folded.
     scan("fourth", true);

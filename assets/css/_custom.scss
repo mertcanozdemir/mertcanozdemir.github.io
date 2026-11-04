@@ -1150,7 +1150,8 @@ a.piece:hover .piece-more {
 }
 
 // The k-space demo (kspace.js): k-space and the image rebuilt from it, and
-// under them the scans to choose from and how the last one went.
+// under them the scans to choose from, how the last one went and the ways to
+// fill in the lines a quick scan skips.
 .kspace {
   --kspace-moved: #c2410c; // the cat's move, in the status line
   display: grid;
@@ -1244,6 +1245,23 @@ html[data-theme="dark"] .kspace {
     margin-left: 0.2rem;
     opacity: 0.7;
     font-variant-numeric: tabular-nums;
+  }
+}
+
+.kspace-patients {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.4rem;
+}
+
+.kspace-fill {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+
+  &:not(:has(button:not([hidden]))) {
+    display: none;
   }
 }
 

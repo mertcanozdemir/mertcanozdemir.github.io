@@ -115,34 +115,59 @@ markup is in `_includes/home/pieces.liquid` (prettier flattens HTML nested in
 the Markdown page), the styles under "Home page" in `assets/css/_custom.scss`.
 A "coming soon" placeholder was tried and dropped: a piece goes up when it works.
 
-- **Why does an MRI take so long?** (`assets/js/kspace.js`): the patient is a
-  cat, drawn in code as an MR scan might show it. k-space sits beside the image
-  rebuilt from the lines measured so far (zero-filled inverse FFT, 128×128, in
-  the browser, each line density compensated, the display windowed to the
-  brightest pixel). The visitor chooses one of four scans and the scanner
-  measures it on its own, a line a TR (0.5 s, as in a T1 spin echo, shown eight
-  times as fast: `SPEED`), the line being measured in blue: every line top to
-  bottom or centre first (1:04 each), every fourth line or only the centre
-  (0:16 each). The cat keeps still for 30 s of scanning (`PATIENCE`), then
-  moves; lines measured after that come from the moved cat (orange in k-space),
-  so both full scans have motion ghosts: top to bottom the centre comes after
-  the move and the whole cat ghosts, centre first only its edges do. The quick
-  scans are over before the cat moves, but every fourth line folds the cat over
-  itself, which "unfold with 8 coils" undoes (SENSE: eight simulated receiver
-  coils, a least-squares solve for each pixel, faded in), and the centre alone
-  loses the whiskers. It opens on the every-fourth-line scan, done. An earlier
-  version had the visitor measure lines by moving over k-space, the cat moving
-  after 84 of them: Mertcan found the move read as caused by his own moving, not
-  by the time it took, and asked whether k-space really fills like that (a
-  scanner sets the order beforehand and measures on its own). A version with the
-  hockey game's ideas (an LED scan clock like its scoreboard, scanner sounds, a
-  shake when the cat moved) was dropped: "buz hokeyi ayrı, MRI ayrı", the game
-  and the MRI piece are kept apart. `data-image` on the piece swaps in any
-  picture, such as a real MR slice; it moves the same way. (The old
-  `mybrain.gif` in git history is a rotating 3D surface render, not a slice.) A
-  Shepp–Logan phantom was tried first and was too sober. It no longer links to
-  the comparison graph on the lab's site: the site is independent of the lab's
-  (Mertcan). A page of its own, for the piece to lead to, is being planned.
+- **Why does an MRI take so long?** (`assets/js/kspace.js`): popular science
+  about fast MRI. The patient is a cat (or, from a button, a dog), drawn in code
+  as an MR scan might show it. k-space sits beside the image rebuilt from the
+  lines measured so far (zero-filled inverse FFT, 128×128, in the browser, each
+  line density compensated, the display windowed to the brightest pixels). The
+  visitor chooses one of three scans and the scanner measures it on its own, a
+  line a TR (0.5 s, as in a T1 spin echo, shown eight times as fast: `SPEED`),
+  with its noise (`NOISE`), the line being measured in white-blue: every line
+  (1:04), every fourth (0:16) or every eighth (0:08). The cat keeps still for
+  30 s of scanning (`PATIENCE`), then moves; lines measured after that come from
+  the moved cat (orange in k-space), so the full scan has motion ghosts. The
+  quick scans are over before it moves, but fold it over itself. Then two ways
+  to fill in the lines skipped, the filled-in lines blue in k-space and the
+  measured ones kept as measured:
+  - **"unfold with 8 coils"**: SENSE with eight simulated receiver coils
+    (`coilMaps()`, `COIL_NOISE`), a least-squares solve for each pixel with a
+    little regularisation (1e-4 of the trace). Clean at 4×; at 8× the copies do
+    not quite come apart.
+  - **"coils and a network"**, as today's fastest scans do: a U-Net cleans up
+    what the coils leave. 404,417 weights in half floats
+    (`assets/models/catnet.bin`, 809 KB, fetched on the first click and run in a
+    worker, about a second), taught on 15,744 drawn cats with JAX
+    (`bin/catnet/`: `cats.py` draws them varied, `train.py` scans them with the
+    page's coils and teaches the network, `export.py` writes the weights in the
+    order `network()` reads them). It has only ever seen cats, which the dog is
+    there to show.
+
+  Mertcan asked where the deep learning was (the point is fast MRI), and for it
+  to read as popular science. Earlier versions: the visitor measured lines by
+  moving over k-space, the cat moving after 84 of them, which read as caused by
+  the visitor, not by time; then four scans including top to bottom against
+  centre first, an order that told nothing about speed; and one with the hockey
+  game's ideas (an LED clock like its scoreboard, scanner sounds, a shake when
+  the cat moved), dropped: "buz hokeyi ayrı, MRI ayrı".
+
+  To teach the network again (in a cloud session download.pytorch.org is closed
+  but PyPI is open, so JAX; its large wheels may need fetching with curl), with
+  `DIR` a scratch directory:
+
+  ```bash
+  python3 -m venv --system-site-packages venv && venv/bin/pip install jax
+  for i in 1 2 3 4; do venv/bin/python bin/catnet/cats.py DIR/cats-$i.npy 4000 $i; done
+  venv/bin/python bin/catnet/train.py DIR 3000  # about 20 minutes on four CPU cores
+  venv/bin/python bin/catnet/export.py DIR/params.pkl assets/models/catnet.bin
+  ```
+
+  Keep the coils, the noise and the regularisation the same in `train.py` and
+  `kspace.js`. `data-image` on the piece swaps in any picture, such as a real MR
+  slice. A Shepp–Logan phantom was tried first and was too sober. It no longer
+  links to the comparison graph on the lab's site: the site is independent of
+  the lab's (Mertcan). A page of its own, for the piece to lead to, is being
+  planned.
+
 - **Three on three** links to the game (below); its picture is one frame of the
   computer playing itself, a few seconds in, different on every visit, always
   drawn from above (Mertcan asked), whatever view the game was last played in.

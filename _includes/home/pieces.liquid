@@ -19,16 +19,23 @@
           <figcaption data-caption>the cat</figcaption>
         </figure>
         <div class="kspace-controls">
+          <p class="kspace-patients" role="group" aria-label="Patient">
+            patient:
+            <button type="button" data-patient="cat" aria-pressed="true">the cat</button>
+            <button type="button" data-patient="dog" aria-pressed="false">a dog</button>
+          </p>
           <p class="kspace-plans" role="group" aria-label="Scan">
-            <button type="button" data-plan="linear">every line, top to bottom <span data-time></span></button>
-            <button type="button" data-plan="centric">every line, centre first <span data-time></span></button>
+            <button type="button" data-plan="full">every line <span data-time></span></button>
             <button type="button" data-plan="fourth">every fourth line <span data-time></span></button>
-            <button type="button" data-plan="centre">only the centre <span data-time></span></button>
+            <button type="button" data-plan="eighth">every eighth line <span data-time></span></button>
           </p>
           <p class="kspace-status">
             <span data-clock></span>
             <span data-status aria-live="polite"></span>
-            <button type="button" data-unfold aria-pressed="false" hidden>unfold with 8 coils</button>
+          </p>
+          <p class="kspace-fill" role="group" aria-label="Fill in the missing lines">
+            <button type="button" data-coils aria-pressed="false" hidden>unfold with 8 coils</button>
+            <button type="button" data-net aria-pressed="false" hidden>coils and a network</button>
           </p>
         </div>
       </div>
@@ -36,8 +43,9 @@
         <h2 class="piece-title" id="piece-kspace">Why does an MRI take so long?</h2>
         <p class="piece-desc">
           A scanner does not take a picture: it measures k‑space, the image's frequencies, one line at a time, and each line takes half a second (here
-          they go eight times as fast). Today's patient is a cat, and it keeps still for about half a minute. Scan every line and it takes over a
-          minute; scan fewer and see what it costs.
+          they go eight times as fast). Today's patient is a cat, which keeps still for about half a minute. Scan every line and it takes over a
+          minute. Scan fewer and the cat folds over itself, unless something fills in the missing lines: the scanner's coils, or a neural network that
+          has learned what cats look like.
         </p>
       </div>
     </section>
