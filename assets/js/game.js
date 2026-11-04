@@ -1435,8 +1435,7 @@
   // that turn with the player (face, arms, stick) are set by draw().
   function standingSVG(team, goalie, skin, number = "") {
     const shirt = `var(--rink-team-${team})`;
-    const digits = (y) =>
-      `<text y="${y}" font-size="0.48" font-weight="800" text-anchor="middle" fill="#fff" stroke="var(--rink-helmet-edge)" stroke-width="0.05" paint-order="stroke">${number}</text>`;
+    const digits = (y) => `<text y="${y}" font-size="0.48" font-weight="800" text-anchor="middle" fill="#fff">${number}</text>`;
     const edge = `stroke="var(--rink-helmet-edge)" stroke-width="0.05"`;
     const eye = (x) =>
       `<circle cx="${x}" cy="0.03" r="0.1" fill="#fff"/>
@@ -1672,6 +1671,7 @@
   // `is-resurfacing`). From the cab it is kamboni.js that draws it.
   function drawResurfacer(svg, view, rz, now) {
     const out = !!rz && view === "top";
+    if (!out && !svg.classList.contains("is-resurfacing")) return; // nothing to undo
     svg.classList.toggle("is-resurfacing", out);
     for (const e of svg.querySelectorAll("[data-rz], [data-resurface]")) e.style.display = out ? "" : "none";
     const marks = svg.querySelector("[data-marks]");
@@ -1847,7 +1847,8 @@
     for (const lamp of svg.querySelectorAll("[data-lamp]")) {
       const l = fx.lamp,
         on = l && (!l.side || +lamp.dataset.lamp === l.side) && now < l.until;
-      lamp.setAttribute("fill", l && l.green ? "url(#rink-lamp-green)" : "url(#rink-lamp)");
+      const fill = l && l.green ? "url(#rink-lamp-green)" : "url(#rink-lamp)";
+      if (lamp.getAttribute("fill") !== fill) lamp.setAttribute("fill", fill);
       lamp.setAttribute("opacity", on ? (l.green ? 0.75 + 0.2 * Math.sin(now / 240) : 0.55 + 0.35 * Math.sin(now / 80)).toFixed(2) : "0");
     }
     // Hats fall onto the ice, spinning, stay a while and fade: from beyond the
@@ -2417,11 +2418,7 @@
       hud();
     }
     hud();
-    show(
-      "Three on three",
-      `You are blue: ${lineUpText(game, "a")}. The computer has ${lineUpText(game, "b")}. You attack the goal on the right; three periods of a minute.`,
-      "play"
-    );
+    show("Three on three", `You are blue: ${lineUpText(game, "a")}. You attack the goal on the right.`, "play");
     requestAnimationFrame(frame);
   }
 
