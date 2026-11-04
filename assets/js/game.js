@@ -280,15 +280,15 @@
     }
 
     // Against a person, the computer's team plays a little better than the
-    // person's own teammates: as fast as the person, keener with the stick,
-    // and a sharper goalie.
+    // person's own teammates: a step quicker than the person, keener with the
+    // stick and to check, and a sharper goalie.
     sharp(team) {
       return this.human && team === "b";
     }
 
     maxSpeed(p) {
       if (p.role === "goalie") return 5;
-      const base = (this.human && p === this.controlled) || this.sharp(p.team) ? 7.8 : 7.6;
+      const base = this.sharp(p.team) ? 8.3 : this.human && p === this.controlled ? 7.8 : 7.6;
       return this.puck.carrier === p ? base * 0.9 : base;
     }
 
@@ -305,7 +305,9 @@
       if (c && c.team === team && c.role === "goalie") {
         spots.push([own + s * 9, 7], [own + s * 9, -7], [own + s * 17, 0]);
       } else if (c && c.team === team) {
-        spots.push([opp - s * 7, c.y > 0 ? -6 : 6], [c.x - s * 8, c.y * 0.3], [opp - s * 12, c.y > 0 ? 3 : -3]);
+        // The far post, for a pass across and a one-timer; a trailer; the point.
+        const deep = s * (opp - c.x) < 18;
+        spots.push([opp - s * (deep ? 4.5 : 7), c.y > 0 ? -3.5 : 3.5], [c.x - s * 8, c.y * 0.3], [opp - s * 12, c.y > 0 ? 3 : -3]);
       } else if (c && c.role === "goalie") {
         spots.push([opp - s * 9, 5], [opp - s * 9, -5], [opp - s * 18, 0]);
       } else if (c) {
@@ -319,7 +321,10 @@
           .sort((a, b) => Math.abs(a.x - own) - Math.abs(b.x - own))[0];
         spots.push([ahead.x, ahead.y]);
         if (threat) spots.push([threat.x + (own - threat.x) * 0.12, threat.y * 0.85]);
-        spots.push([own + s * 6, clamp(pk.y * 0.35, -3, 3)]);
+        // The last defender minds the slot, and when the carrier comes into it,
+        // steps into the line between the carrier and the net.
+        const close = hypot(own - c.x, c.y) < 11;
+        spots.push(close ? [c.x + (own - c.x) * 0.35, c.y * 0.65] : [own + s * 6, clamp(pk.y * 0.35, -3, 3)]);
       } else {
         const lead = { x: pk.x + pk.vx * 0.3, y: pk.y + pk.vy * 0.3 };
         spots.push([lead.x, lead.y], [pk.x - s * 7, pk.y * 0.5], [own + s * 7, pk.y * 0.3]);
@@ -359,13 +364,13 @@
       // ...or line up a body check on a carrier close by.
       if (c && c.team !== p.team && c.role === "skater" && p.checkCool <= 0) {
         const d = dist(p, c);
-        if (d > 1.8 && d < 3.4 && this.random() < (this.sharp(p.team) ? 0.6 : 0.45) * dt) {
+        if (d > 1.8 && d < 3.4 && this.random() < (this.sharp(p.team) ? 1 : 0.45) * dt) {
           return this.check(p, c.x + c.vx * 0.15 - p.x, c.y + c.vy * 0.15 - p.y);
         }
       }
       if (c && c.team !== p.team && c.role === "skater" && p.cool <= 0) {
         if (Math.min(dist(this.stick(p), pk), dist(p, pk) - 0.8) < 1.4 && this.random() < 1.8 * dt)
-          this.poke(p, this.sharp(p.team) ? 0.55 : 0.45, 1.4);
+          this.poke(p, this.sharp(p.team) ? 0.6 : 0.45, 1.4);
       }
       this.steer(p, p.tx, p.ty);
     }
@@ -380,6 +385,10 @@
       const front = s * (opp - p.x);
       const toGoal = hypot(opp - p.x, p.y);
       const urge = 1 + Math.max(0, p.held - 3) * 0.6;
+      // A pass just in, in front of the net: shoot it straight back, a one-timer.
+      if (p.oneTimer > 0 && front > 1.5 && toGoal < 15 && Math.abs(p.y) < front * 1.3 + 2 && this.random() < 14 * dt) {
+        return this.shoot(p, null);
+      }
       if (p.cool <= 0 && front > 1.5 && toGoal < 18 && Math.abs(p.y) < front * 1.3 + 2) {
         const open = !this.blocked(p, { x: opp, y: 0 }, 1.0);
         const rate = (open ? (toGoal < 9 ? 3.5 : 1.4) : 0.5) * urge;
@@ -387,10 +396,10 @@
       }
       const near = this.nearestOpponent(p);
       const pressed = near && dist(near, p) < 2.8;
-      if (p.cool <= 0 && this.random() < (pressed ? 1 : 0.15) * urge * dt) {
-        const mate = this.passTarget(p, null);
-        if (mate) return this.pass(p, mate);
-      }
+      // A teammate open in front of the net, well closer to it: give it to them.
+      const mate = p.cool <= 0 ? this.passTarget(p, null) : null;
+      const better = mate && s * (opp - mate.x) > 1.5 && hypot(opp - mate.x, mate.y) < Math.min(10, toGoal - 4);
+      if (mate && this.random() < (better ? 2.5 : pressed ? 1 : 0.15) * urge * dt) return this.pass(p, mate);
       let tx, ty;
       if (front > 14) [tx, ty] = [opp - s * 10, clamp(p.y * 0.6, -5, 5)];
       else if (front < 1.5) [tx, ty] = [opp - s * 6, p.y > 0 ? 4 : -4];
@@ -517,7 +526,8 @@
         if (m === p) continue;
         const d = dist(m, p);
         if (d < 3 || d > 32) continue;
-        let score = (s * (m.x - p.x)) / 10 - d / 30;
+        const slot = hypot(s * GOAL_X - m.x, m.y);
+        let score = (s * (m.x - p.x)) / 10 - d / 30 + (slot < 10 && s * (s * GOAL_X - m.x) > 1.5 ? (10 - slot) / 6 : 0);
         if (this.blocked(p, m, 1.3)) score -= toward ? 1.5 : 100;
         if (toward) score += 4 * (((m.x - p.x) * toward[0] + (m.y - p.y) * toward[1]) / d);
         if (score > bestScore) [best, bestScore] = [m, score];
@@ -543,7 +553,7 @@
       const corner = NET_HALF * 0.7;
       let ty = aimY !== null ? aimY : goalie.y > 0 ? -corner : corner;
       const d = hypot(gx - pk.x, ty - pk.y);
-      ty += (this.random() - 0.5) * 2 * (0.25 + d * 0.035);
+      ty += (this.random() - 0.5) * 2 * (0.25 + d * 0.035) * (this.sharp(p.team) ? 0.7 : 1);
       const quick = p.oneTimer > 0;
       const speed = 25 + this.random() * 5 + (quick ? 4 : 0);
       const dx = gx - pk.x,
@@ -605,6 +615,21 @@
         if (pk.held <= 0) {
           const mate = this.passTarget(g, null) || this.skaters(g.team).sort((a, b) => dist(a, g) - dist(b, g))[0];
           this.pass(g, mate);
+        }
+      }
+      // A carrier who comes in close gets the goalie's stick: a poke check.
+      const c = pk.carrier;
+      if (c && c.team !== g.team && c.role === "skater" && g.cool <= 0 && dist(g, pk) < 2.6) {
+        g.cool = 0.6;
+        if (this.random() < (this.sharp(g.team) ? 0.7 : 0.45)) {
+          const away = Math.atan2(pk.y - g.y, pk.x - g.x) + (this.random() - 0.5) * 1.4;
+          pk.carrier = null;
+          pk.last = g;
+          pk.vx = Math.cos(away) * 6 + s * 3;
+          pk.vy = Math.sin(away) * 6;
+          c.noTouch = 0.5;
+          g.noTouch = 0.4;
+          this.events.push({ type: "poke", team: g.team });
         }
       }
       const ang = clamp(Math.atan2(pk.y, (pk.x - gx) * s), -1.25, 1.25);
@@ -758,14 +783,18 @@
         }
         const s = DIR[g.team];
         const shotLength = pk.from ? hypot(pk.from.x + s * GOAL_X, pk.from.y) : 20;
+        // From the side (more than about 50° off the middle) the goalie has the
+        // post covered; close in from the front is the hard one.
+        const wide = pk.from ? Math.abs(pk.from.y) / (shotLength || 1) > 0.77 : false;
         let chance =
           0.82 -
           Math.max(0, sp - 18) * 0.02 -
           Math.abs(g.vy) * 0.06 -
           (pk.rebound > 0 ? 0.18 : 0) -
-          (shotLength < 6 ? 0.12 : 0) -
+          (shotLength < 6 && !wide ? 0.12 : 0) +
+          (wide ? 0.15 : 0) -
           (pk.oneTimer ? 0.12 : 0);
-        if (this.sharp(g.team)) chance += 0.1;
+        if (this.sharp(g.team)) chance += 0.15;
         chance = clamp(chance, 0.3, 0.95);
         if (this.random() < chance) {
           pk.oneTimer = false;
