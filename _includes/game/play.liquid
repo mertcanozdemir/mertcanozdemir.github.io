@@ -19,6 +19,15 @@
     <svg viewBox="-30.6 -16.8 61.2 34.2" role="img" aria-label="The rink, seen from above" tabindex="-1"></svg>
     <p class="game-toast" data-toast hidden></p>
     <p class="game-replay" data-replay hidden>Replay</p>
+    <div class="game-fight" data-fight hidden>
+      <p class="game-fight-side">
+        <span data-fight-name="a"></span><span class="game-fight-bar"><i data-fight-bar="a"></i></span>
+      </p>
+      <p class="game-fight-keys" data-fight-keys></p>
+      <p class="game-fight-side is-b">
+        <span data-fight-name="b"></span><span class="game-fight-bar"><i data-fight-bar="b"></i></span>
+      </p>
+    </div>
     <div class="game-call" data-call hidden>
       <svg class="game-call-sign" viewBox="-1.75 -3.25 3.5 3.4" aria-hidden="true" data-call-sign></svg>
       <div>
@@ -60,7 +69,8 @@
 
   <p class="game-keys">
     <kbd>←</kbd><kbd>↑</kbd><kbd>↓</kbd><kbd>→</kbd> or <kbd>WASD</kbd> to skate · <kbd>Space</kbd> to shoot, or to poke the puck loose ·
-    <kbd>X</kbd> to pass, to switch skater, or to win a faceoff · <kbd>C</kbd> to body check · <kbd>P</kbd> to pause
+    <kbd>X</kbd> to pass, to switch skater, or to win a faceoff · <kbd>C</kbd> to body check, or at a whistle to drop the gloves · <kbd>P</kbd> to
+    pause
   </p>
   <p class="game-live" data-live aria-live="polite"></p>
 </div>

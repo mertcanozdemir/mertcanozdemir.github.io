@@ -1859,6 +1859,75 @@ html.game-full {
   top: 27%;
 }
 
+// A fight: each fighter's balance, and the keys.
+.game-fight {
+  display: flex;
+  position: absolute;
+  z-index: 2;
+  top: 4%;
+  right: 3%;
+  left: 3%;
+  gap: 0.8rem;
+  align-items: flex-start;
+  justify-content: space-between;
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 700;
+  pointer-events: none;
+
+  &[hidden] {
+    display: none;
+  }
+
+  p {
+    margin: 0;
+  }
+}
+
+.game-fight-side {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.4rem 0.6rem;
+  border-radius: 8px;
+  background: rgba(12, 14, 18, 0.85);
+
+  &.is-b {
+    align-items: flex-end;
+  }
+}
+
+.game-fight-bar {
+  display: block;
+  width: min(9rem, 30vw);
+  height: 0.5rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #3a3f46;
+
+  i {
+    display: block;
+    height: 100%;
+    background: var(--rink-team-a);
+    transition: width 0.15s;
+  }
+}
+
+.is-b .game-fight-bar i {
+  margin-left: auto;
+  background: var(--rink-team-b);
+}
+
+.game-fight-keys {
+  align-self: center;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  background: rgba(12, 14, 18, 0.75);
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-align: center;
+}
+
 // A call, while play is stopped: the referee's signal and what it was.
 .game-call {
   display: flex;

@@ -371,6 +371,23 @@ shots can also be blocked, or slip past a body.
   after the replay for a penalty, 2.8 s for the others; a key or a tap goes
   on to the faceoff (`skipStop()`).
 
+**Fights** (Mertcan's idea): after a dirty hit (`FIGHT.foul`, half the time)
+or a hard one into the boards (`FIGHT.boards`), one of the team knocked down
+stands up for them and the gloves come off (`startFight()`, the phase
+`fight`); at a whistle the person can start one with C close to an opponent
+(`challenge()`). The camera closes in, the others back off to a ring, sticks
+and gloves lie on the ice. Each holds the other's jersey with one hand and
+punches with the other: Space punches after a wind-up (`FIGHT.windup`, the arm
+drawn back: what the other can see coming), ↓ ducks (a ducked punch misses), X
+pulls the jersey (balance, and sometimes it goes over the head: no punching
+for a moment); balance bars at the top (`[data-fight]`). Out of balance, down;
+after `FIGHT.long` the linesmen step in. Both get a major, 15 s in the box
+(five minutes of twenty, as in the NHL: the IIHF throws fighters out of the
+game, which would empty a three-on-three rink), with a card and the referee's
+fighting signal, and the faceoff is at the spot nearest the fight. The
+computer ducks about a third of the person's punches on normal (at first it
+ducked four in five). The checker has fights too, about one in five games.
+
 Against a person the computer's team is a little sharper (`sharp()`: as fast,
 keener pokes, better goalie). Three periods of a minute, then sudden-death
 overtime if tied. Touch screens get a stick and three buttons (pass, check,

@@ -26,6 +26,12 @@
   const BLUE = 7.5,
     SPOT = { neutral: 5, end: 20, side: 7 },
     MINOR = 10;
+  // A fight: how likely after a dirty hit (or a hard one into the boards),
+  // each fighter's balance, a punch's wind-up (what the other can see
+  // coming), a duck, what a punch and a jersey pulled take off, how long
+  // before the linesmen step in, and a major for fighting, 15 s here (five
+  // minutes of twenty, as in the NHL; the IIHF throws both out of the game).
+  const FIGHT = { foul: 0.5, boards: 0.15, balance: 100, windup: 0.32, duck: 0.45, punch: [12, 19], pull: 7, long: 10, major: 15 };
   // A body check: the burst's speed (m/s) and length (s), how long whoever it
   // knocks down stays down, and the closing speed it takes to knock them down.
   const CHECK = { speed: 10.5, time: 0.3, down: 1.2, hard: 3.5 };
@@ -164,7 +170,8 @@
     reset() {
       this.score = { a: 0, b: 0 };
       this.shots = { a: 0, b: 0 };
-      this.offside = this.icing = this.delayed = null;
+      this.offside = this.icing = this.delayed = this.fight = null;
+      this.boxBound = [];
       this.period = 1;
       this.clock = this.periodLength;
       this.overtime = false;
@@ -283,21 +290,20 @@
       if (this.phase === "over") return;
       if (this.phase === "intermission") return this.leave(dt);
       if (this.phase === "return") return this.comeOn(dt);
+      if (this.phase === "fight") return this.fightStep(dt, input);
       if (this.phase === "faceoff") return this.dropPuck(dt, input);
       if (this.phase !== "play") {
         this.wait -= dt;
         if (this.phase === "goal" || this.phase === "stop") {
           this.glide(dt);
           this.moveRef(dt);
-          if (this.boxBound) this.toTheBox(dt);
+          if (this.boxBound.length) this.toTheBox(dt);
         }
         if (this.wait > 0) return;
         if (this.phase === "goal") return this.decided ? this.finish() : this.faceoff();
         if (this.phase === "stop") {
-          if (this.boxBound) {
-            this.toBox(this.boxBound);
-            this.boxBound = null;
-          }
+          for (const [p, len] of this.boxBound) this.toBox(p, len);
+          this.boxBound = [];
           return this.faceoff(this.stopAt);
         }
         this.phase = "play";
@@ -410,7 +416,7 @@
       this.phase = "stop";
       // Long enough to see what was called (the page shows it), and for a
       // penalty to skate to the box.
-      this.wait = why === "penalty" ? 5 : 2.8;
+      this.wait = why === "penalty" ? 5 : why === "fight" ? 5 : 2.8;
       this.stopAt = at;
       this.offside = this.icing = null;
       this.ref.signal = false;
@@ -428,18 +434,21 @@
       this.whistle("penalty", p.team, [-DIR[p.team] * SPOT.end, (Math.sign(this.puck.y) || 1) * SPOT.side], p, why);
       this.events[this.events.length - 1].on = this.players.indexOf(on);
       // Off to the box, skating: in it by the faceoff at the latest.
-      this.boxBound = p;
+      this.boxBound.push([p, MINOR]);
       p.down = 0;
     }
     // The one going to the box skates to its door, across the ice.
     toTheBox(dt) {
-      const p = this.boxBound,
-        dx = -DIR[p.team] * 5.4 - p.x,
+      for (const [p, len] of this.boxBound.slice()) this.skateToBox(p, len, dt);
+    }
+    skateToBox(p, len, dt) {
+      if (p.down > 0) return (p.down = Math.max(0, p.down - dt));
+      const dx = -DIR[p.team] * 5.4 - p.x,
         dy = -W + SKATER_R + 0.4 - p.y,
         d = hypot(dx, dy);
       if (d < 0.8) {
-        this.boxBound = null;
-        return this.toBox(p);
+        this.boxBound = this.boxBound.filter(([q]) => q !== p);
+        return this.toBox(p, len);
       }
       const want = Math.min(6, d * 2),
         ax = (dx / d) * want - p.vx,
@@ -454,15 +463,155 @@
       if (sp > 0.5) [p.fx, p.fy] = [p.vx / sp, p.vy / sp];
       confine(p, SKATER_R);
     }
+    // The gloves come off: one of the team knocked down stands up for them
+    // (or whoever was hit, once up) against the one who hit. Play stops; a
+    // penalty waiting goes with the fight.
+    startFight(hitter, mate) {
+      this.delayed = this.offside = this.icing = null;
+      const [a, b] = hitter.team === "a" ? [hitter, mate] : [mate, hitter],
+        at = { x: clamp((a.x + b.x) / 2, -L + 4, L - 4), y: clamp((a.y + b.y) / 2, -W + 2.5, W - 2.5) };
+      outOfNet(at, 2.5);
+      const pk = this.puck;
+      if (pk.carrier) [pk.vx, pk.vy, pk.carrier] = [pk.carrier.vx, pk.carrier.vy, null];
+      this.phase = "fight";
+      this.fight = { a, b, t: 0, at: [at.x, at.y], bal: { a: FIGHT.balance, b: FIGHT.balance }, act: { a: {}, b: {} }, winner: null, end: 0 };
+      for (const f of [a, b]) Object.assign(f, { down: 0, dash: 0, wx: 0, wy: 0 });
+      if (this.human) this.controlled = a;
+      this.events.push({ type: "fight", a: this.players.indexOf(a), b: this.players.indexOf(b) });
+    }
+    // Each fighter holds the other's jersey with one hand and punches with
+    // the other. A punch is wound up first (FIGHT.windup: what the other sees
+    // coming), and misses if they duck in time; a pull takes balance and can
+    // put the jersey over their head (they cannot punch for a moment). Out of
+    // balance, down; or the linesmen step in after FIGHT.long.
+    fightStep(dt, input) {
+      const F = this.fight,
+        pk = this.puck,
+        f = Math.max(0, 1 - 1.2 * dt);
+      F.t += dt;
+      pk.vx *= f;
+      pk.vy *= f;
+      pk.x += pk.vx * dt;
+      pk.y += pk.vy * dt;
+      confine(pk, PUCK_R);
+      this.glide(dt);
+      // The others give them room: back to a ring round the fight.
+      for (const p of this.players) {
+        if (p === F.a || p === F.b || p.box > 0 || p.role === "goalie" || this.boxBound.some(([q]) => q === p)) continue;
+        const dx = p.x - F.at[0],
+          dy = p.y - F.at[1],
+          d = hypot(dx, dy) || 1;
+        if (d < 5.5) {
+          p.x += (dx / d) * Math.min(2.2 * dt, 5.5 - d);
+          p.y += (dy / d) * Math.min(2.2 * dt, 5.5 - d);
+          confine(p, SKATER_R);
+        }
+      }
+      this.moveRef(dt, F.at[0], clamp(F.at[1] - 3.5, -W + 1.6, W - 1.6));
+      for (const [k, p, side] of [
+        ["a", F.a, -1],
+        ["b", F.b, 1],
+      ]) {
+        const tx = F.at[0] + side * 0.78,
+          ty = F.at[1],
+          e = Math.min(1, 6 * dt);
+        if (!(p.down > 0)) {
+          p.x += (tx - p.x) * e;
+          p.y += (ty - p.y) * e;
+          [p.fx, p.fy] = [-side, 0];
+        } else p.down = Math.max(0.5, p.down - dt);
+        p.vx = p.vy = 0;
+        const act = F.act[k];
+        for (const n of ["wind", "punch", "duck", "pull", "blind", "cool", "duckCool"]) act[n] = Math.max(0, (act[n] || 0) - dt);
+      }
+      if (F.end) {
+        if ((F.end -= dt) <= 0) this.endFight();
+        return;
+      }
+      // What each does: the person's fighter from the keys, the computer's by itself.
+      for (const k of ["a", "b"]) {
+        const me = F.act[k],
+          them = F.act[k === "a" ? "b" : "a"],
+          person = this.human && k === "a",
+          s = this.sharp(k);
+        let punch = false,
+          pull = false,
+          duck = false;
+        if (person) [punch, pull, duck] = [!!input.shoot, !!input.pass, !!input.duck];
+        else {
+          // Sees a punch coming about a third of the time (more on hard).
+          duck = them.wind > 0 && them.wind < FIGHT.windup * 0.8 && this.random() < Math.max(0.3, 0.7 + 0.6 * s) * dt;
+          punch = this.random() < (0.9 + 0.3 * s) * dt;
+          pull = this.random() < 0.18 * dt;
+        }
+        if (duck && !me.duckCool && !me.wind) [me.duck, me.duckCool] = [FIGHT.duck, FIGHT.duck + 0.45];
+        if (me.cool || me.wind || me.duck || me.blind) continue;
+        if (punch) [me.wind, me.cool] = [FIGHT.windup * (1 - 0.15 * Math.max(0, s)), 0.75];
+        else if (pull) {
+          me.pull = 0.3;
+          me.cool = 0.9;
+          F.bal[k === "a" ? "b" : "a"] -= FIGHT.pull;
+          if (!them.duck && this.random() < 0.4) them.blind = 1.1;
+          this.events.push({ type: "pull", team: k, blind: them.blind > 0 });
+        }
+      }
+      // Punches that were wound up land now, unless the other ducked.
+      for (const k of ["a", "b"]) {
+        const me = F.act[k],
+          o = k === "a" ? "b" : "a";
+        if (!me.landing && me.wind > 0) me.landing = true;
+        if (me.landing && me.wind <= 0) {
+          me.landing = false;
+          me.punch = 0.2;
+          const landed = !F.act[o].duck;
+          if (landed) F.bal[o] -= FIGHT.punch[0] + this.random() * (FIGHT.punch[1] - FIGHT.punch[0]) * (F.act[o].blind ? 1.3 : 1);
+          else me.cool += 0.3;
+          this.events.push({ type: "punch", team: k, landed });
+        }
+      }
+      const down = F.bal.a <= 0 ? F.a : F.bal.b <= 0 ? F.b : null;
+      if (down || F.t > FIGHT.long) {
+        F.winner = down ? (down === F.a ? F.b : F.a) : Math.abs(F.bal.a - F.bal.b) < 8 ? null : F.bal.a > F.bal.b ? F.a : F.b;
+        if (down) down.down = CHECK.down;
+        F.end = 1.4;
+        this.events.push({ type: "fight-end", winner: F.winner ? this.players.indexOf(F.winner) : -1, down: !!down });
+      }
+    }
+    // The linesmen part them: both to the box for fighting, and the faceoff
+    // at the spot nearest the fight.
+    endFight() {
+      const F = this.fight,
+        dots = [[0, 0]];
+      for (const x of [-SPOT.end, -SPOT.neutral, SPOT.neutral, SPOT.end]) for (const y of [-SPOT.side, SPOT.side]) dots.push([x, y]);
+      const at = dots.sort((p, q) => hypot(p[0] - F.at[0], p[1] - F.at[1]) - hypot(q[0] - F.at[0], q[1] - F.at[1]))[0];
+      this.fight = null;
+      this.whistle("fight", null, at, F.a);
+      this.events[this.events.length - 1].b = this.players.indexOf(F.b);
+      this.events[this.events.length - 1].winner = F.winner ? this.players.indexOf(F.winner) : -1;
+      for (const p of [F.a, F.b]) this.boxBound.push([p, FIGHT.major]);
+    }
+
     // The page's "go on": the faceoff now.
     skipStop() {
       if (this.phase === "stop") this.wait = 0;
     }
+    // At a stoppage the person can drop the gloves with an opponent close by.
+    challenge() {
+      const me = this.controlled;
+      if (this.phase !== "stop" || !me || me.box > 0 || this.boxBound.some(([q]) => q === me)) return false;
+      const them = this.skaters("b")
+        .filter((o) => !this.boxBound.some(([q]) => q === o))
+        .sort((p, q) => dist(p, me) - dist(q, me))[0];
+      if (!them || dist(them, me) > 4) return false;
+      this.wait = 0;
+      this.startFight(me, them);
+      return true;
+    }
     // The penalty boxes are across the ice from the benches, either side of
     // the timekeeper: team a's on the left, b's on the right.
-    toBox(p) {
+    toBox(p, len = MINOR) {
       const k = this.players.filter((q) => q.team === p.team && q.box > 0).length;
-      Object.assign(p, { box: MINOR, off: true, vx: 0, vy: 0, wx: 0, wy: 0, down: 0, dash: 0, fx: 0, fy: 1 });
+      Object.assign(p, { box: len, off: true, vx: 0, vy: 0, wx: 0, wy: 0, down: 0, dash: 0, fx: 0, fy: 1 });
       [p.x, p.y] = [-DIR[p.team] * (5.4 + k * 1.3), -W - 0.85];
       if (this.human && p === this.controlled) {
         const pk = this.puck,
@@ -679,7 +828,7 @@
     // After a goal everyone coasts to a stop.
     glide(dt) {
       for (const p of this.players) {
-        if (p.box > 0 || p === this.boxBound) continue;
+        if (p.box > 0 || this.boxBound.some(([q]) => q === p) || (this.fight && (p === this.fight.a || p === this.fight.b))) continue;
         const f = Math.max(0, 1 - 2.5 * dt);
         p.vx *= f;
         p.vy *= f;
@@ -945,6 +1094,14 @@
       const boards = !!confine(near, SKATER_R + 2.2);
       this.events.push({ type: "hit", team: hitter.team, boards, by: this.players.indexOf(hitter), on: this.players.indexOf(victim) });
       const foul = !had ? "interference" : behind && boards ? "boarding" : null;
+      // Someone stands up for the one knocked down: a fight, now and then.
+      const chance = foul ? FIGHT.foul : boards && speed > CHECK.hard + 2 ? FIGHT.boards : 0;
+      if (chance && this.phase === "play" && hitter.role === "skater" && this.random() < chance) {
+        const mate = this.skaters(victim.team)
+          .filter((m) => m !== victim && !(m.down > 0))
+          .sort((m, n) => dist(m, hitter) - dist(n, hitter))[0];
+        if (mate && dist(mate, hitter) < 12) return this.startFight(hitter, mate);
+      }
       if (foul && !this.delayed && this.phase === "play") {
         this.delayed = { p: hitter, why: foul, on: victim };
         this.events.push({
@@ -2060,6 +2217,7 @@
         ${digits(-1.6)}
         <g transform="translate(0 -2.52)">
           <g data-back><circle r="0.4" fill="${shirt}" ${edge}/><rect x="-0.07" y="-0.38" width="0.14" height="0.62" rx="0.07" fill="#fff" opacity="0.5"/></g>
+          <path data-over d="M -0.5 0.5 Q -0.62 -0.5 0 -0.56 Q 0.62 -0.5 0.5 0.5 Q 0 0.3 -0.5 0.5 Z" fill="${shirt}" ${edge} visibility="hidden"/>
           <g data-face>
             <circle cy="0.04" r="0.34" fill="${skin}"/>
             <path d="M -0.42 0.02 Q -0.44 -0.42 0 -0.44 Q 0.44 -0.42 0.42 0.02 L 0.3 -0.04 Q 0 -0.24 -0.3 -0.04 Z" fill="${shirt}" ${edge}/>
@@ -2296,6 +2454,14 @@
     plane.appendChild(marks || el("g", { "data-marks": "", fill: "none", "stroke-linecap": "round", "stroke-linejoin": "round" }));
     // At a faceoff, a ring closing on the dot: the puck drops as it closes.
     el("circle", { "data-drop-ring": "", r: 1, fill: "none", stroke: "#f5a623", "stroke-width": 0.32, opacity: 0 }, plane);
+    // A fight's gloves and sticks, dropped on the ice.
+    plane.insertAdjacentHTML(
+      "beforeend",
+      `<g data-dropped style="display: none">
+        <path d="M -2.6 1.3 L -0.6 2.2 M 0.8 1.8 L 2.9 0.9" stroke="var(--rink-stick)" stroke-width="0.12" stroke-linecap="round"/>
+        <rect x="-1.9" y="0.5" width="0.5" height="0.38" rx="0.12" fill="var(--rink-glove)"/><rect x="-1.2" y="1.5" width="0.5" height="0.38" rx="0.12" fill="var(--rink-glove)"/>
+        <rect x="1.1" y="0.7" width="0.5" height="0.38" rx="0.12" fill="var(--rink-glove)"/><rect x="1.8" y="1.7" width="0.5" height="0.38" rx="0.12" fill="var(--rink-glove)"/></g>`
+    );
     // In the replay of a foul, round whoever took the penalty.
     el(
       "circle",
@@ -2476,6 +2642,14 @@
       now = fx.now || 0;
     drawResurfacer(svg, view, fx.rz, now);
     freshIce(svg, view, fx);
+    // A fight's dropped gloves and sticks, until the faceoff.
+    const dropped = svg.querySelector("[data-dropped]"),
+      F = game.fight;
+    if (F) svg.fightAt = F.at;
+    const showDropped = !!(svg.fightAt && (F || game.phase === "stop"));
+    if (!showDropped) svg.fightAt = null;
+    dropped.style.display = showDropped ? "" : "none";
+    if (showDropped) dropped.setAttribute("transform", `translate(${svg.fightAt[0].toFixed(2)} ${svg.fightAt[1].toFixed(2)})`);
     // A foul's replay: a red ring round who took the penalty, and the name.
     const mk = fx.mark != null ? game.players[fx.mark] : null,
       foulRing = svg.querySelector("[data-foul-ring]"),
@@ -2518,6 +2692,20 @@
                 return 0.12 * Math.sin(phase) * amp;
               })();
         root.helmetLook(g, Math.atan2(p.fy, p.fx) + (down ? 1.2 : 0) + turn, lx, ly, down);
+        // In a fight: the stick dropped, bare fists, the one punching out ahead.
+        const F = game.fight,
+          fight = F && (p === F.a || p === F.b) ? F.act[p === F.a ? "a" : "b"] : null,
+          stickTop = g.querySelector("[data-stick-top]");
+        if (stickTop) {
+          stickTop.style.display = fight ? "none" : "";
+          for (const fist of g.querySelectorAll("[data-fist]")) {
+            fist.setAttribute("fill", fight ? skinOf(i) : "var(--rink-glove)");
+            const out =
+              fight && fist.dataset.fist === "1" ? (fight.punch > 0 ? "translate(0.85 -0.45)" : fight.wind > 0 ? "translate(-0.45 0.1)" : "") : "";
+            if (out) fist.setAttribute("transform", out);
+            else fist.removeAttribute("transform");
+          }
+        }
         if (p.role === "goalie") poseGoalie(g, p, false);
         const stars = g.querySelector("[data-stars]");
         stars.setAttribute("visibility", down ? "visible" : "hidden");
@@ -2567,7 +2755,32 @@
           [ux, uy] = goalie ? poseGoalie(g, p, true) : [0, 0];
         const top = goalie ? [0.95 + ux, -1.55 + uy] : [hand * 0.46 + sx * 0.22, -1.58],
           low = goalie ? top : [hand * 0.66 + sx * 0.3, -1.24];
-        if (!goalie) {
+        // In a fight: no stick, bare fists, one hand on the other's jersey and
+        // the other punching (drawn back as it winds up); ducking, lower and
+        // back; the jersey pulled over the head.
+        const F = game.fight,
+          fight = F && (p === F.a || p === F.b) ? F.act[p === F.a ? "a" : "b"] : null;
+        g.querySelector("[data-sticks]").style.display = fight ? "none" : "";
+        g.querySelector("[data-over]")?.setAttribute("visibility", fight && fight.blind > 0 ? "visible" : "hidden");
+        for (const glove of g.querySelectorAll("[data-glove]")) glove.setAttribute("fill", fight ? skinOf(i) : "var(--rink-glove)");
+        if (fight && !down) {
+          const f = Math.sign(sx) || 1,
+            fist = fight.wind > 0 ? [-f * 0.45, -1.9] : fight.punch > 0 ? [f * 1.35, -2.4] : [f * 0.3, -1.72],
+            grab = fight.pull > 0 ? [f * 0.7, -1.7] : [f * 1.0, -2.0];
+          for (const [sh, [hx, hy]] of [
+            [f, grab],
+            [-f, fist],
+          ]) {
+            const arm = g.querySelector(`[data-arm="${sh}"]`);
+            arm.setAttribute("x1", sh * 0.62);
+            arm.setAttribute("y1", -1.98);
+            arm.setAttribute("x2", hx.toFixed(2));
+            arm.setAttribute("y2", hy.toFixed(2));
+            const glove = g.querySelector(`[data-glove="${sh}"]`);
+            glove.setAttribute("cx", hx.toFixed(2));
+            glove.setAttribute("cy", hy.toFixed(2));
+          }
+        } else if (!goalie) {
           for (const [s, [hx, hy]] of [
             [-hand, top],
             [hand, low],
@@ -2588,7 +2801,10 @@
         let lean = 0,
           sway = 0,
           bob = 0;
-        if (!goalie && !down) {
+        if (fight && !down) {
+          if (fight.duck > 0) [lean, bob] = [-(Math.sign(sx) || 1) * 12, 0.35];
+          else if (fight.punch > 0) lean = (Math.sign(sx) || 1) * 8;
+        } else if (!goalie && !down) {
           const { phase, amp, speed, braking } = strideOf(svg, i, p, fx.now || 0),
             sin = Math.sin(phase);
           for (const side of [-1, 1]) {
@@ -2617,7 +2833,7 @@
         // Skating away up the screen, the back of the helmet shows instead.
         const away = sy < -0.55 && !down;
         const face = g.querySelector("[data-face]");
-        face.setAttribute("visibility", away ? "hidden" : "visible");
+        face.setAttribute("visibility", away || (fight && fight.blind > 0) ? "hidden" : "visible");
         g.querySelector("[data-back]").setAttribute("visibility", away ? "visible" : "hidden");
         face.setAttribute("transform", `translate(${(sx * 0.08).toFixed(2)} 0)`);
         // The eyes watch the puck, or look ahead with it.
@@ -2951,6 +3167,7 @@
         }
       },
       cheer: (t) => noise(t, 2.4, 1100, 0.6, 0.3, "bandpass", 0.35),
+      swish: (t) => noise(t, 0.16, 1800, 0.8, 0.22, "highpass", 0.03),
       // Hands clapping all round the arena, a few seconds of it, over a murmur.
       applause: (t) => {
         for (let i = 0; i < 110; i++)
@@ -3394,6 +3611,19 @@
       const p = game.players[ev.by],
         yours = ev.team === "a",
         who = p ? `${p.number ? `#${p.number} ` : ""}${p.name || ""}, ${yours ? "your team" : "the computer"}` : yours ? "Your team" : "The computer";
+      if (ev.why === "fight") {
+        const q = game.players[ev.b],
+          w = game.players[ev.winner];
+        card.querySelector("[data-call-sign]").innerHTML = signalSVG("fighting");
+        card.querySelector("[data-call-what]").textContent = "Fighting";
+        card.querySelector("[data-call-who]").textContent = `${p.name} and ${q.name}${w ? `: ${w.name} won it` : ""}`;
+        card.querySelector("[data-call-why]").textContent =
+          "15 s each in the box (five minutes in the NHL; under the IIHF's rules both would be out of the game).";
+        card.querySelector("[data-call-then]").textContent = "Both teams a skater short.";
+        card.hidden = false;
+        live.textContent = `Fighting: ${p.name} and ${q.name}. 15 s each in the box.`;
+        return;
+      }
       const [kind, what, why, then] =
         ev.why === "offside"
           ? ["offside", "Offside", "Went into the zone ahead of the puck.", "Faceoff outside the blue line."]
@@ -3700,9 +3930,11 @@
       if (busy && GAME_KEYS.includes(e.code)) e.preventDefault();
       // The crew at work: any key skips to the end.
       if (state === "crew" && !e.repeat && (GAME_KEYS.includes(e.code) || e.code === "Enter" || e.code === "Escape")) return endResurfacing(true);
-      // Play stopped for a call: any key goes on to the faceoff.
+      // Play stopped for a call: C close to an opponent drops the gloves; any
+      // other key goes on to the faceoff.
       if (state === "playing" && game.phase === "stop" && !e.repeat && (GAME_KEYS.includes(e.code) || e.code === "Enter")) {
         e.preventDefault();
+        if ((e.code === "KeyC" || e.code === "KeyL") && game.challenge()) return (card.hidden = true);
         game.skipStop();
         card.hidden = true;
         presses.shoot = presses.pass = presses.check = false;
@@ -3809,7 +4041,14 @@
           il = hypot(ix, iy);
         [x, y] = [(ix / il) * l, (iy / il) * l];
       }
-      const out = { x, y, shoot: presses.shoot, pass: presses.pass, check: presses.check };
+      const out = {
+        x,
+        y,
+        shoot: presses.shoot,
+        pass: presses.pass,
+        check: presses.check,
+        duck: keys.has("ArrowDown") || keys.has("KeyS") || touch.y > 0.5,
+      };
       presses.shoot = presses.pass = presses.check = false;
       return out;
     }
@@ -3878,6 +4117,18 @@
             on = game.players[ev.on].name;
           if (ev.by === you) say(ev.boards ? `${on} into the boards!` : `Checked ${on}!`, 1.2);
           else if (ev.on === you) say(ev.boards ? `${by} puts you into the boards. Ouch.` : `Ouch. ${by} got you.`, 1.2);
+        } else if (ev.type === "fight") {
+          const [a, b] = [game.players[ev.a], game.players[ev.b]];
+          say(`The gloves are off: ${a.name} and ${b.name}.`, 2.4);
+          sound.play("cheer");
+        } else if (ev.type === "punch") sound.play(ev.landed ? "thud" : "swish", ev.landed);
+        else if (ev.type === "pull") {
+          sound.play("swish");
+          if (ev.blind) say(ev.team === "a" ? "Jersey over the head!" : "Your jersey is over your head!", 1);
+        } else if (ev.type === "fight-end") {
+          const w = game.players[ev.winner];
+          say(w ? `${w.name} wins the fight.` : "The linesmen step in: nobody won.", 2.2);
+          sound.play("cheer");
         } else if (ev.type === "whistle") {
           sound.play("whistle");
           toast.hidden = true;
@@ -3919,8 +4170,36 @@
         sound.play("cheer");
       }
       if (back && now - back > 8000) back = 0;
-      draw(svg, game, { now, lamp, view, follow: true, fresh: back ? now - back : null });
+      draw(svg, game, {
+        now,
+        lamp,
+        view,
+        follow: true,
+        fresh: back ? now - back : null,
+        ...(game.fight ? { zoom: 0.55, focus: game.fight.at } : {}),
+      });
+      showFight();
       hud();
+    }
+    // A fight: each fighter's balance, and the keys.
+    const fightBox = $("[data-fight]");
+    function showFight() {
+      const F = game.fight;
+      if (!F) {
+        if (!fightBox.hidden) fightBox.hidden = true;
+        return;
+      }
+      if (fightBox.hidden) {
+        for (const k of ["a", "b"]) {
+          const p = F[k];
+          fightBox.querySelector(`[data-fight-name="${k}"]`).textContent = `${p.number ? `#${p.number} ` : ""}${p.name || ""}`;
+        }
+        fightBox.querySelector("[data-fight-keys]").textContent = touchy()
+          ? "Shoot punches · pull the stick down to duck · Pass pulls the jersey"
+          : "Space punches · ↓ ducks · X pulls the jersey";
+        fightBox.hidden = false;
+      }
+      for (const k of ["a", "b"]) fightBox.querySelector(`[data-fight-bar="${k}"]`).style.width = `${Math.max(0, F.bal[k])}%`;
     }
     // The rules, in a few words. `ev.team` is the team that broke one.
     function ruled(ev, name) {

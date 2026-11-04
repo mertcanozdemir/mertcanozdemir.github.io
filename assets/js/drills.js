@@ -120,11 +120,11 @@
       <path d="M 0.3 -0.44 Q 0.72 0 0.3 0.44 M 0.4 -0.46 V 0.46 M 0.52 -0.38 V 0.38" fill="none" stroke="var(--rink-cage)" stroke-width="0.05"/></g>`;
     }
     return `<g data-helmet>
-      <path d="M 0.42 0.66 L 1.42 0.31 Q 1.53 0.13 1.5 -0.17" stroke="var(--rink-stick)" stroke-width="0.12" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+      <path data-stick-top d="M 0.42 0.66 L 1.42 0.31 Q 1.53 0.13 1.5 -0.17" stroke="var(--rink-stick)" stroke-width="0.12" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
       <ellipse cx="-0.12" rx="0.66" ry="1.12" fill="${jersey}" ${edge}/>
       <path d="M -0.6 -0.78 Q -0.12 -1 0.3 -0.78 M -0.6 0.78 Q -0.12 1 0.3 0.78" fill="none" stroke="#fff" stroke-width="0.1" opacity="0.6"/>
-      <circle cx="0.42" cy="0.62" r="0.17" fill="var(--rink-glove)" ${edge}/>
-      <circle cx="0.5" cy="0.12" r="0.17" fill="var(--rink-glove)" ${edge}/>
+      <circle data-fist="1" cx="0.42" cy="0.62" r="0.17" fill="var(--rink-glove)" ${edge}/>
+      <circle data-fist="0" cx="0.5" cy="0.12" r="0.17" fill="var(--rink-glove)" ${edge}/>
       <circle cx="0.02" r="0.5" fill="${jersey}" ${edge}/>
       <path d="M -0.44 0 H -0.06" stroke="#fff" stroke-width="0.14" stroke-linecap="round" opacity="0.5"/>
       <circle cx="0.04" cy="-0.47" r="0.12" fill="${jersey}" ${edge}/>

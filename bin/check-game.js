@@ -25,6 +25,11 @@ function mulberry32(seed) {
 // A person who skates at the puck, and with it straight for the net, shooting
 // from close in. Not clever, but it should be able to score.
 function scripted(game) {
+  // In a fight: punches now and then, ducks some of what it sees coming.
+  if (game.phase === "fight") {
+    const them = game.fight.act.b;
+    return { shoot: Math.random() < 0.03, duck: them.wind > 0 && Math.random() < 0.5, pass: Math.random() < 0.004 };
+  }
   // At a faceoff, the stick comes down a tenth of a second after the ring
   // closes and the referee lets the puck go (a person watching the ring).
   if (game.phase === "faceoff") {
@@ -61,15 +66,19 @@ function run(seed, mode, level = "normal", size = 3) {
   let loose = 0,
     longestLoose = 0,
     t = 0;
-  const counts = { save: 0, post: 0, steal: 0, block: 0, pass: 0, hit: 0, offside: 0, icing: 0, penalty: 0 },
+  const counts = { save: 0, post: 0, steal: 0, block: 0, pass: 0, hit: 0, offside: 0, icing: 0, penalty: 0, fight: 0 },
     draws = { a: 0, b: 0 };
-  let back = 0; // how long the teams take to come back out after an intermission
+  let back = 0, // how long the teams take to come back out after an intermission
+    fighting = 0;
   while (game.phase !== "over" && t < 600) {
     // Between periods everyone skates off, then the next one starts.
     if (game.phase === "intermission" && game.benched) game.nextPeriod();
     const input = mode === "script" ? scripted(game) : {};
     game.step(STEP, input);
     t += STEP;
+    if (game.phase === "fight") {
+      if ((fighting += STEP) > 13) problems.push(`a fight still going after 13 s at ${t.toFixed(1)} s`);
+    } else fighting = 0;
     if (game.phase === "return") back += STEP;
     else if (back) {
       if (back > 9.5) problems.push(`the teams took ${back.toFixed(1)} s to come back at ${t.toFixed(1)} s`);
@@ -77,7 +86,7 @@ function run(seed, mode, level = "normal", size = 3) {
     }
     for (const ev of game.events.splice(0)) {
       if (ev.type in counts) counts[ev.type]++;
-      if (ev.type === "whistle") counts[ev.why]++;
+      if (ev.type === "whistle" && ev.why !== "fight") counts[ev.why]++;
       if (ev.type === "draw") draws[ev.team]++;
     }
     const pk = game.puck;
@@ -87,7 +96,7 @@ function run(seed, mode, level = "normal", size = 3) {
     if (!inside(pk, 0.3)) problems.push(`puck outside the rink at ${t.toFixed(1)} s (${pk.x.toFixed(2)}, ${pk.y.toFixed(2)})`);
     for (const p of game.players) {
       if (p.box > 0) {
-        if (p.box > 10.01) problems.push(`${p.team}${p.slot} in the box for ${p.box.toFixed(1)} s`);
+        if (p.box > 15.01) problems.push(`${p.team}${p.slot} in the box for ${p.box.toFixed(1)} s`);
         continue;
       }
       if (!inside(p, 0.9)) problems.push(`${p.team}${p.slot} outside the rink at ${t.toFixed(1)} s`);
@@ -162,7 +171,22 @@ for (const [mode, size] of [
   ["script", 5],
 ]) {
   const label = size === 5 ? `${mode} 5v5` : mode;
-  const totals = { goals: 0, shots: 0, a: 0, b: 0, saves: 0, blocks: 0, steals: 0, hits: 0, passes: 0, ot: 0, offside: 0, icing: 0, penalty: 0 };
+  const totals = {
+    goals: 0,
+    shots: 0,
+    a: 0,
+    b: 0,
+    saves: 0,
+    blocks: 0,
+    steals: 0,
+    hits: 0,
+    passes: 0,
+    ot: 0,
+    offside: 0,
+    icing: 0,
+    penalty: 0,
+    fight: 0,
+  };
   for (let i = 1; i <= games; i++) {
     const r = run(i, mode, "normal", size);
     totals.goals += r.score.a + r.score.b;
@@ -177,6 +201,7 @@ for (const [mode, size] of [
     totals.offside += r.counts.offside;
     totals.icing += r.counts.icing;
     totals.penalty += r.counts.penalty;
+    totals.fight += r.counts.fight;
     totals.ot += r.overtime ? 1 : 0;
     if (r.problems.length) {
       bad++;
@@ -188,7 +213,7 @@ for (const [mode, size] of [
     `${label.padEnd(10)} goals/game ${per(totals.goals)} (blue ${per(totals.a)}, orange ${per(totals.b)}), shots ${per(totals.shots)}, saves ${per(totals.saves)}, blocks ${per(
       totals.blocks
     )}, steals ${per(totals.steals)}, hits ${per(totals.hits)}, passes ${per(totals.passes)}, overtime ${totals.ot}/${games}\n` +
-      `${"".padEnd(10)} whistles/game: offside ${per(totals.offside)}, icing ${per(totals.icing)}, penalties ${per(totals.penalty)}`
+      `${"".padEnd(10)} whistles/game: offside ${per(totals.offside)}, icing ${per(totals.icing)}, penalties ${per(totals.penalty)}, fights ${per(totals.fight)}`
   );
   // The rules should stop play now and then, not all the time.
   const stops = (totals.offside + totals.icing + totals.penalty) / games;
