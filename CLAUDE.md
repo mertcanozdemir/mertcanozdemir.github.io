@@ -140,9 +140,9 @@ A "coming soon" placeholder was tried and dropped: a piece goes up when it works
   and the MRI piece are kept apart. `data-image` on the piece swaps in any
   picture, such as a real MR slice; it moves the same way. (The old
   `mybrain.gif` in git history is a rotating 3D surface render, not a slice.) A
-  Shepp–Logan phantom was tried first and was too sober. The piece links to the
-  comparison graph on the lab's site; the article behind it is still to be
-  written.
+  Shepp–Logan phantom was tried first and was too sober. It no longer links to
+  the comparison graph on the lab's site: the site is independent of the lab's
+  (Mertcan). A page of its own, for the piece to lead to, is being planned.
 - **Three on three** links to the game (below); its picture is one frame of the
   computer playing itself, a few seconds in, different on every visit, always
   drawn from above (Mertcan asked), whatever view the game was last played in.
