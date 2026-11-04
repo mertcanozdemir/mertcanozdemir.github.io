@@ -1337,7 +1337,11 @@ html[data-theme="dark"] {
 // The scoreboard (game.js): LED digits on black whatever the theme, as on an
 // arena's: red for the time, amber for the scores, shots and period.
 .game-board {
-  flex: 1 1 17rem;
+  // A share of the rink's width, so the two shrink together, down to a size
+  // its digits can still be read at.
+  flex: none;
+  width: 37%;
+  min-width: 9rem;
   max-width: 24rem;
 
   svg {
