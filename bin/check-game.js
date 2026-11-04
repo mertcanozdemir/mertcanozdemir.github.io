@@ -61,7 +61,7 @@ function run(seed, mode, level = "normal", size = 3) {
   let loose = 0,
     longestLoose = 0,
     t = 0;
-  const counts = { save: 0, post: 0, steal: 0, block: 0, pass: 0, hit: 0 },
+  const counts = { save: 0, post: 0, steal: 0, block: 0, pass: 0, hit: 0, offside: 0, icing: 0, penalty: 0 },
     draws = { a: 0, b: 0 };
   let back = 0; // how long the teams take to come back out after an intermission
   while (game.phase !== "over" && t < 600) {
@@ -77,6 +77,7 @@ function run(seed, mode, level = "normal", size = 3) {
     }
     for (const ev of game.events.splice(0)) {
       if (ev.type in counts) counts[ev.type]++;
+      if (ev.type === "whistle") counts[ev.why]++;
       if (ev.type === "draw") draws[ev.team]++;
     }
     const pk = game.puck;
@@ -85,6 +86,10 @@ function run(seed, mode, level = "normal", size = 3) {
     }
     if (!inside(pk, 0.3)) problems.push(`puck outside the rink at ${t.toFixed(1)} s (${pk.x.toFixed(2)}, ${pk.y.toFixed(2)})`);
     for (const p of game.players) {
+      if (p.box > 0) {
+        if (p.box > 10.01) problems.push(`${p.team}${p.slot} in the box for ${p.box.toFixed(1)} s`);
+        continue;
+      }
       if (!inside(p, 0.9)) problems.push(`${p.team}${p.slot} outside the rink at ${t.toFixed(1)} s`);
       if (p.down > 1.25) problems.push(`${p.team}${p.slot} down for too long at ${t.toFixed(1)} s`);
     }
@@ -157,7 +162,7 @@ for (const [mode, size] of [
   ["script", 5],
 ]) {
   const label = size === 5 ? `${mode} 5v5` : mode;
-  const totals = { goals: 0, shots: 0, a: 0, b: 0, saves: 0, blocks: 0, steals: 0, hits: 0, passes: 0, ot: 0 };
+  const totals = { goals: 0, shots: 0, a: 0, b: 0, saves: 0, blocks: 0, steals: 0, hits: 0, passes: 0, ot: 0, offside: 0, icing: 0, penalty: 0 };
   for (let i = 1; i <= games; i++) {
     const r = run(i, mode, "normal", size);
     totals.goals += r.score.a + r.score.b;
@@ -169,6 +174,9 @@ for (const [mode, size] of [
     totals.hits += r.counts.hit;
     totals.steals += r.counts.steal;
     totals.passes += r.counts.pass;
+    totals.offside += r.counts.offside;
+    totals.icing += r.counts.icing;
+    totals.penalty += r.counts.penalty;
     totals.ot += r.overtime ? 1 : 0;
     if (r.problems.length) {
       bad++;
@@ -179,8 +187,15 @@ for (const [mode, size] of [
   console.log(
     `${label.padEnd(10)} goals/game ${per(totals.goals)} (blue ${per(totals.a)}, orange ${per(totals.b)}), shots ${per(totals.shots)}, saves ${per(totals.saves)}, blocks ${per(
       totals.blocks
-    )}, steals ${per(totals.steals)}, hits ${per(totals.hits)}, passes ${per(totals.passes)}, overtime ${totals.ot}/${games}`
+    )}, steals ${per(totals.steals)}, hits ${per(totals.hits)}, passes ${per(totals.passes)}, overtime ${totals.ot}/${games}\n` +
+      `${"".padEnd(10)} whistles/game: offside ${per(totals.offside)}, icing ${per(totals.icing)}, penalties ${per(totals.penalty)}`
   );
+  // The rules should stop play now and then, not all the time.
+  const stops = (totals.offside + totals.icing + totals.penalty) / games;
+  if (stops > 8) {
+    bad++;
+    console.log(`  ${stops.toFixed(1)} whistles a game: want 8 at most`);
+  }
   const avg = totals.goals / games;
   if (mode === "cpu" && (avg < 2 || avg > 14)) {
     bad++;
@@ -191,15 +206,17 @@ for (const [mode, size] of [
     console.log("  the scripted person never scored");
   }
 }
-// The levels: the scripted person should do better on easy than on hard.
+// The levels: the scripted person should do better on easy than on hard
+// (over 24 games at least: fewer cannot tell normal from hard).
 {
-  const margin = {};
+  const margin = {},
+    n = Math.max(games, 24);
   for (const level of Object.keys(LEVELS)) {
     let a = 0,
       b = 0,
       won = 0,
       draws = 0;
-    for (let i = 1; i <= games; i++) {
+    for (let i = 1; i <= n; i++) {
       const r = run(i, "script", level);
       a += r.score.a;
       b += r.score.b;
@@ -210,13 +227,12 @@ for (const [mode, size] of [
         console.log(`script on ${level} game ${i}: ${r.problems.slice(0, 3).join("; ")}`);
       }
     }
-    margin[level] = (a - b) / games;
+    margin[level] = (a - b) / n;
     console.log(
-      `level ${level.padEnd(6)} scripted person ${(a / games).toFixed(1)}, computer ${(b / games).toFixed(1)}, faceoffs won ${((100 * won) / (draws || 1)).toFixed(0)}%`
+      `level ${level.padEnd(6)} scripted person ${(a / n).toFixed(1)}, computer ${(b / n).toFixed(1)}, faceoffs won ${((100 * won) / (draws || 1)).toFixed(0)}%`
     );
   }
-  // (A few games are too few to tell normal from hard.)
-  if (games >= 8 && !(margin.easy > margin.normal && margin.normal > margin.hard)) {
+  if (!(margin.easy > margin.normal && margin.normal > margin.hard)) {
     bad++;
     console.log("  the levels are not in order: easy should be easiest");
   }

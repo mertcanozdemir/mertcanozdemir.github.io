@@ -326,6 +326,39 @@ the side of a post it has sealed), rebounds, close range and one-timers; over
 48 games a side the checker's goal rates came out the same as before. Fast
 shots can also be blocked, or slip past a body.
 
+**Rules** (Mertcan asked for offside and the others; `rules()`, `whistle()`):
+
+- Offside: an attacker ahead of the puck into the zone (past the blue line by
+  more than 0.4 m). Carried in, the whistle goes at once; sent in, it is a
+  delayed offside (the referee's arm up), waved off once the whole team is
+  back out of the zone (tagging up) and called if one of them plays the puck
+  first; a goal shot in from outside with a teammate offside is no goal. The
+  faceoff is at the neutral-zone spot. The computer waits at the blue line
+  until the puck is in (`plan()`), its carrier waits for teammates still in
+  the zone, it passes to nobody offside, and in a delayed offside its players
+  keep off the puck until they have tagged up: with all that it goes offside
+  about once a game (it was three to five).
+- Icing: sent from behind the centre line, untouched, over the far goal line
+  past the net (no-touch); not against a team a skater short. The faceoff in
+  the offending team's end. The computer hardly ever ices: it does not dump
+  the puck.
+- Penalties from checks: aimed at a player without the puck (who has not just
+  passed it) is interference; from behind into the boards, boarding (bumping
+  into someone else on the way is no foul: before that, nearly every penalty
+  was a computer's check meeting the wrong player). Delayed while the other
+  team has the puck; any whistle calls it; a goal by the other team washes it
+  out. A minor is `MINOR`, 10 s here (two minutes of twenty would be six), in
+  the penalty box across from the benches (team a's on the left), drawn there
+  behind the far boards, the team a skater short; a power-play goal ends it,
+  and it carries over an intermission. The faceoff in the offending team's
+  end. The computer does not check from behind near the boards.
+- Faceoffs anywhere (`faceoff(at)`, `spotOf()`): lined up round the dot in
+  slot order with whoever is in the box left out (`spot`), never behind a
+  goal line. The whistle (a synthesized pea whistle, two blasts), a few words
+  of what was called (`ruled()`), and the seconds left of a penalty beside
+  each team's score on the board ("PEN"). The checker counts the whistles and
+  wants eight a game at most: offside about 1 to 3, penalties up to about 1.
+
 Against a person the computer's team is a little sharper (`sharp()`: as fast,
 keener pokes, better goalie). Three periods of a minute, then sudden-death
 overtime if tied. Touch screens get a stick and three buttons (pass, check,

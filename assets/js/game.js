@@ -19,6 +19,13 @@
     GOALIE_R = 1.15,
     REACH = 1.3; // the stick, ahead of a skater's centre
   const STEP = 1 / 120; // simulation step, in seconds
+  // The rules' lines and spots, as drills.js draws the rink: the blue lines,
+  // the faceoff spots in the neutral zone and in the ends, and a minor
+  // penalty's length here, with periods of a minute (two minutes of twenty
+  // would be six seconds; ten make a power play worth having).
+  const BLUE = 7.5,
+    SPOT = { neutral: 5, end: 20, side: 7 },
+    MINOR = 10;
   // A body check: the burst's speed (m/s) and length (s), how long whoever it
   // knocks down stays down, and the closing speed it takes to knock them down.
   const CHECK = { speed: 10.5, time: 0.3, down: 1.2, hard: 3.5 };
@@ -157,6 +164,7 @@
     reset() {
       this.score = { a: 0, b: 0 };
       this.shots = { a: 0, b: 0 };
+      this.offside = this.icing = this.delayed = null;
       this.period = 1;
       this.clock = this.periodLength;
       this.overtime = false;
@@ -199,6 +207,8 @@
         checkCool: 0,
         oneTimer: 0, // seconds left to shoot a pass straight back
         goals: 0,
+        box: 0, // seconds left in the penalty box
+        lostAt: -9, // when it last gave up the puck
       };
     }
 
@@ -206,43 +216,63 @@
       return this.players.find((p) => p.team === team && p.role === "goalie");
     }
 
+    // The team's skaters on the ice: not those in the penalty box.
     skaters(team) {
-      return this.players.filter((p) => p.team === team && p.role === "skater");
+      return this.players.filter((p) => p.team === team && p.role === "skater" && !(p.box > 0));
+    }
+    // More of its players in the box than the other team's: on the penalty kill.
+    shorthanded(team) {
+      const n = (t) => this.players.filter((p) => p.team === t && p.box > 0).length;
+      return n(team) > n(other(team));
     }
 
     stick(p) {
       return { x: p.x + p.fx * REACH, y: p.y + p.fy * REACH };
     }
 
-    // Where each lines up for a faceoff: the centre at the dot, then a wing
-    // and a defender; five a side add the other wing and the other defender.
-    spotOf(p) {
+    // Where each lines up for a faceoff at the spot `at`: the centre at the
+    // dot, then a wing and a defender; five a side add the other wing and the
+    // other defender (`spot`, its place in the line-up: someone in the box
+    // leaves it to the next). Never behind a goal line; goalies in their nets.
+    spotOf(p, at = [0, 0]) {
       const s = DIR[p.team];
       if (p.role === "goalie") return [-s * (GOAL_X - 1), 0];
-      const [x, y] = [
+      const [dx, dy] = [
         [-1.6, 0],
         [-6, -6],
         [-12, 4],
         [-6, 6],
         [-12, -4],
-      ][p.slot];
-      return [s * x, s * y];
+      ][p.spot ?? p.slot];
+      const o = { x: clamp(at[0] + s * dx, -GOAL_X + 2.5, GOAL_X - 2.5), y: at[1] + s * dy };
+      confine(o, SKATER_R + 0.3);
+      outOfNet(o, SKATER_R);
+      return [o.x, o.y];
+    }
+    lineUp() {
+      for (const team of ["a", "b"])
+        this.skaters(team)
+          .sort((p, q) => p.slot - q.slot)
+          .forEach((p, i) => (p.spot = i));
     }
 
-    faceoff() {
+    faceoff(at = [0, 0]) {
+      this.lineUp();
       for (const p of this.players) {
+        if (p.box > 0) continue;
         const s = DIR[p.team];
-        [p.x, p.y] = this.spotOf(p);
+        [p.x, p.y] = this.spotOf(p, at);
         Object.assign(p, { vx: 0, vy: 0, fx: s, fy: 0, wx: 0, wy: 0, noTouch: 0, cool: 0, down: 0, dash: 0, checkCool: 0, oneTimer: 0, off: false });
       }
       // The referee holds the puck over the dot, between the centres, and
       // drops it at a moment of its own: see dropPuck().
-      Object.assign(this.puck, { x: 0, y: 0, h: 1.3, vx: 0, vy: 0, carrier: null, last: null, held: 0, beat: null, rebound: 0, trail: [] });
-      Object.assign(this.ref, { x: 0, y: -0.9, vx: 0, vy: 0, fx: 0, fy: 1, arm: 1 });
+      Object.assign(this.puck, { x: at[0], y: at[1], h: 1.3, vx: 0, vy: 0, carrier: null, last: null, held: 0, beat: null, rebound: 0, trail: [] });
+      Object.assign(this.ref, { x: at[0], y: at[1] - 0.9, vx: 0, vy: 0, fx: 0, fy: 1, arm: 1, signal: false });
+      this.offside = this.icing = null;
       const release = 0.7 + this.random() * 0.9,
         [lo, hi] = REACTION[this.level] || REACTION.normal;
-      this.drop = { t: 0, release, land: release + 0.32, you: null, cpu: lo + this.random() * (hi - lo), winner: null, why: "", gone: false };
-      if (this.human) this.controlled = this.players[0];
+      this.drop = { t: 0, release, land: release + 0.32, you: null, cpu: lo + this.random() * (hi - lo), winner: null, why: "", gone: false, at };
+      if (this.human) this.controlled = this.skaters("a").find((p) => p.spot === 0) || this.controlled;
       this.phase = "faceoff";
       this.events.push({ type: "faceoff", n: ++this.draws });
     }
@@ -256,12 +286,13 @@
       if (this.phase === "faceoff") return this.dropPuck(dt, input);
       if (this.phase !== "play") {
         this.wait -= dt;
-        if (this.phase === "goal") {
+        if (this.phase === "goal" || this.phase === "stop") {
           this.glide(dt);
           this.moveRef(dt);
         }
         if (this.wait > 0) return;
         if (this.phase === "goal") return this.decided ? this.finish() : this.faceoff();
+        if (this.phase === "stop") return this.faceoff(this.stopAt);
         this.phase = "play";
         this.dropped = this.t || 0;
         return;
@@ -270,6 +301,12 @@
         this.clock -= dt;
         if (this.clock <= 0) {
           this.clock = 0;
+          // A penalty still to call is served all the same.
+          if (this.delayed) {
+            this.toBox(this.delayed.p);
+            this.delayed = null;
+          }
+          this.offside = this.icing = null;
           if (this.period < this.periods) {
             this.phase = "intermission";
             this.wait = 0;
@@ -291,6 +328,11 @@
       // step, so the press that made it is not taken twice.
       const you = this.human ? this.controlled : null;
       for (const p of this.players) {
+        if (p.box > 0) {
+          // In the penalty box, the clock running only in play.
+          if ((p.box -= dt) <= 0) this.outOfBox(p);
+          continue;
+        }
         p.cool = Math.max(0, p.cool - dt);
         p.noTouch = Math.max(0, p.noTouch - dt);
         p.checkCool = Math.max(0, p.checkCool - dt);
@@ -308,9 +350,97 @@
         else if (p === you) this.obey(p, input);
         else this.think(p, dt);
       }
+      const px = this.puck.x;
       this.move(dt);
       this.movePuck(dt);
       this.moveRef(dt);
+      this.rules(px);
+    }
+
+    // The lines. Offside: an attacker ahead of the puck into the zone. Carried
+    // in, the whistle goes at once; sent in, the linesman waits (a delayed
+    // offside), and it is waved off once they are all back out of the zone
+    // (tagging up), or called if one of them plays the puck first. Icing: the
+    // puck sent from behind the centre line over the far goal line, past the
+    // net and untouched; not against a team a skater short. And a delayed
+    // penalty, called once the team that took it has the puck.
+    rules(px) {
+      if (this.phase !== "play") return;
+      const pk = this.puck,
+        side = Math.sign(pk.y) || 1;
+      for (const team of ["a", "b"]) {
+        const s = DIR[team],
+          by = pk.carrier || pk.last;
+        if (!(s * px <= BLUE && s * pk.x > BLUE) || !by || by.team !== team) continue;
+        const ahead = this.skaters(team).filter((p) => p !== pk.carrier && s * p.x > BLUE + 0.4);
+        if (!ahead.length) continue;
+        if (pk.carrier) return this.whistle("offside", team, [s * SPOT.neutral, side * SPOT.side], ahead[0]);
+        this.offside = { team, by: ahead[0] };
+        this.events.push({ type: "delayed", why: "offside", team, by: this.players.indexOf(ahead[0]) });
+      }
+      const o = this.offside;
+      if (o) {
+        const s = DIR[o.team];
+        if (s * pk.x < BLUE || !this.skaters(o.team).some((p) => s * p.x > BLUE)) {
+          this.offside = null;
+          this.events.push({ type: "onside", team: o.team });
+        } else if (pk.carrier && pk.carrier.team === o.team) return this.whistle("offside", o.team, [s * SPOT.neutral, side * SPOT.side], o.by);
+      }
+      const ic = this.icing;
+      if (ic && (pk.carrier || pk.last !== ic.by)) this.icing = null;
+      else if (ic && DIR[ic.team] * pk.x > GOAL_X && Math.abs(pk.y) > NET_HALF) {
+        return this.whistle("icing", ic.team, [-DIR[ic.team] * SPOT.end, (Math.sign(ic.y) || side) * SPOT.side], ic.by);
+      }
+      const d = this.delayed;
+      if (d && pk.carrier && pk.carrier.team === d.p.team) this.callPenalty();
+      this.ref.signal = !!(this.offside || this.delayed);
+    }
+
+    // The whistle: play stops; everyone coasts, then the faceoff at `at`.
+    whistle(why, team, at, by, foul) {
+      // Any whistle calls a penalty waiting to be called.
+      if (this.delayed && why !== "penalty") return this.callPenalty();
+      this.phase = "stop";
+      this.wait = 1.8;
+      this.stopAt = at;
+      this.offside = this.icing = null;
+      this.ref.signal = false;
+      const pk = this.puck;
+      if (pk.carrier) [pk.vx, pk.vy] = [pk.carrier.vx, pk.carrier.vy];
+      pk.carrier = null;
+      this.events.push({ type: "whistle", why, team, by: by ? this.players.indexOf(by) : -1, foul });
+    }
+
+    // A penalty, called: whoever took it sits in the box for a minor, the team
+    // a skater short, and the faceoff is in its own end.
+    callPenalty() {
+      const { p, why } = this.delayed;
+      this.delayed = null;
+      this.whistle("penalty", p.team, [-DIR[p.team] * SPOT.end, (Math.sign(this.puck.y) || 1) * SPOT.side], p, why);
+      this.toBox(p);
+    }
+    // The penalty boxes are across the ice from the benches, either side of
+    // the timekeeper: team a's on the left, b's on the right.
+    toBox(p) {
+      const k = this.players.filter((q) => q.team === p.team && q.box > 0).length;
+      Object.assign(p, { box: MINOR, off: true, vx: 0, vy: 0, wx: 0, wy: 0, down: 0, dash: 0, fx: 0, fy: 1 });
+      [p.x, p.y] = [-DIR[p.team] * (5.4 + k * 1.3), -W - 0.85];
+      if (this.human && p === this.controlled) {
+        const pk = this.puck,
+          next = this.skaters("a").sort((a, b) => dist(a, pk) - dist(b, pk))[0];
+        if (next) this.controlled = next;
+      }
+    }
+    // Out of the box, by its door onto the ice.
+    outOfBox(p) {
+      Object.assign(p, { box: 0, off: false, vx: 0, vy: 2, fx: 0, fy: 1 });
+      p.y = -W + SKATER_R + 0.6;
+      this.events.push({ type: "back", team: p.team, by: this.players.indexOf(p) });
+    }
+    // Who sent the puck on its way, for icing: from its own half.
+    sent(p) {
+      const pk = this.puck;
+      this.icing = p.role === "skater" && DIR[p.team] * pk.x < 0 && !this.shorthanded(p.team) ? { team: p.team, y: pk.y, by: p } : null;
     }
 
     // The end of a period: everyone skates off to the bench (on the near side,
@@ -393,16 +523,16 @@
     // The winner's centre draws it back to a teammate.
     wonDraw(team, why = "") {
       const pk = this.puck,
-        mine = (slot) => this.players.find((p) => p.team === team && p.slot === slot),
+        mine = (spot) => this.skaters(team).find((p) => p.spot === spot),
         centre = mine(0),
-        back = mine(1),
-        loser = this.players.find((p) => p.team !== team && p.slot === 0);
+        back = mine(1) || this.goalieOf(team),
+        loser = this.skaters(other(team)).find((p) => p.spot === 0);
       const dx = back.x - pk.x,
         dy = back.y - pk.y,
         d = hypot(dx, dy) || 1;
       Object.assign(pk, { h: 0, carrier: null, last: centre, vx: (dx / d) * 9, vy: (dy / d) * 9 });
       centre.noTouch = 0.5;
-      loser.noTouch = 0.45;
+      if (loser) loser.noTouch = 0.45;
       this.events.push({ type: "draw", team, why });
       this.phase = "play";
       this.dropped = this.t || 0;
@@ -446,6 +576,7 @@
     comeBack() {
       this.phase = "return";
       this.wait = 0;
+      this.lineUp();
       this.players.forEach((p) => {
         // Out of the door in turn, a goalie first, as teams come out.
         p.cue = 0.5 + (p.role === "goalie" ? 0 : 0.35 + p.slot * 0.3) + (p.team === "b" ? 0.15 : 0);
@@ -461,6 +592,7 @@
       Object.assign(this.puck, { x: this.ref.x, y: this.ref.y + 0.9 });
       let ready = true;
       for (const p of this.players) {
+        if (p.box > 0) continue;
         if (this.wait < p.cue) {
           ready = false;
           continue;
@@ -508,6 +640,7 @@
     // After a goal everyone coasts to a stop.
     glide(dt) {
       for (const p of this.players) {
+        if (p.box > 0) continue;
         const f = Math.max(0, 1 - 2.5 * dt);
         p.vx *= f;
         p.vy *= f;
@@ -588,6 +721,10 @@
           [own + s * 13, -pk.y * 0.3]
         );
       }
+      // Onside: while the puck is outside the zone it attacks (or a delayed
+      // offside is on against the team, to tag up), nobody waits inside it.
+      if (s * pk.x <= BLUE || (this.offside && this.offside.team === team))
+        for (const sp of spots) if (s * sp[0] > BLUE - 1.6) sp[0] = s * (BLUE - 1.6);
       // Nearest-first, so the closest skater takes the first (most urgent) spot.
       const free = mine.slice();
       for (const [x, y] of spots) {
@@ -622,8 +759,12 @@
       if (c === p) return this.carry(p, dt);
       // ...or line up a body check on a carrier close by.
       if (c && c.team !== p.team && c.role === "skater" && p.checkCool <= 0 && (this.t || 0) - (this.dropped || 0) > 1.2) {
-        const d = dist(p, c);
-        if (d > 1.8 && d < 3.4 && this.random() < Math.max(0.1, 0.45 + 0.55 * this.sharp(p.team)) * dt) {
+        const d = dist(p, c),
+          // From behind, near the boards, is boarding: it holds off.
+          behind = ((c.x - p.x) * c.fx + (c.y - p.y) * c.fy) / (d || 1) > 0.4,
+          near = { x: c.x, y: c.y },
+          boards = !!confine(near, SKATER_R + 2.6);
+        if (!(behind && boards) && d > 1.8 && d < 3.4 && this.random() < Math.max(0.1, 0.45 + 0.55 * this.sharp(p.team)) * dt) {
           return this.check(p, c.x + c.vx * 0.15 - p.x, c.y + c.vy * 0.15 - p.y);
         }
       }
@@ -675,6 +816,9 @@
         tx += side * (-ay / al) * 3;
         ty += side * (ax / al) * 3;
       }
+      // Not over the blue line with the puck while a teammate is still in the
+      // zone: it waits at the line for them to come out (or it is offside).
+      if (s * p.x < BLUE && this.skaters(p.team).some((m) => m !== p && s * m.x > BLUE)) tx = s * Math.min(s * tx, BLUE - 1.2);
       const spot = { x: tx, y: ty };
       confine(spot, SKATER_R);
       // Never park with the puck: the target stays a few metres away.
@@ -717,6 +861,17 @@
     check(p, dx, dy) {
       if (p.checkCool > 0 || p.down > 0 || p.role === "goalie" || this.puck.carrier === p) return;
       const l = hypot(dx, dy) || 1;
+      // Who it is aimed at, and whether they have the puck (or just had it):
+      // aimed at someone without it, it is interference.
+      let target = null,
+        near = 4.5;
+      for (const o of this.skaters(other(p.team))) {
+        const along = ((o.x - p.x) * dx + (o.y - p.y) * dy) / l,
+          across = Math.abs((o.x - p.x) * dy - (o.y - p.y) * dx) / l;
+        if (along > 0 && along < near && across < 1.6) [target, near] = [o, along];
+      }
+      p.target = target;
+      p.targetHad = !target || this.puck.carrier === target || (this.t || 0) - target.lostAt < 0.6;
       p.dash = CHECK.time;
       p.dashX = (dx / l) * CHECK.speed;
       p.dashY = (dy / l) * CHECK.speed;
@@ -724,8 +879,14 @@
       this.events.push({ type: "lunge", team: p.team });
     }
 
+    // A check that knocks someone down. Aimed at a player without the puck
+    // (who has not just passed it) it is interference; from behind into the
+    // boards, boarding: a penalty either way, delayed while the other team
+    // has the puck. Bumping into someone else on the way is no foul.
     knock(hitter, victim, nx, ny, speed) {
-      const pk = this.puck;
+      const pk = this.puck,
+        had = victim !== hitter.target || hitter.targetHad,
+        behind = nx * victim.fx + ny * victim.fy > 0.55;
       victim.down = CHECK.down;
       victim.noTouch = CHECK.down + 0.2;
       victim.dash = 0;
@@ -744,6 +905,11 @@
       const near = { x: victim.x, y: victim.y };
       const boards = !!confine(near, SKATER_R + 2.2);
       this.events.push({ type: "hit", team: hitter.team, boards, by: this.players.indexOf(hitter), on: this.players.indexOf(victim) });
+      const foul = !had ? "interference" : behind && boards ? "boarding" : null;
+      if (foul && !this.delayed && this.phase === "play") {
+        this.delayed = { p: hitter, why: foul };
+        this.events.push({ type: "delayed", why: "penalty", foul, team: hitter.team, by: this.players.indexOf(hitter) });
+      }
     }
 
     switchPlayer() {
@@ -769,7 +935,7 @@
         dy = q.y - a.y,
         len2 = dx * dx + dy * dy || 1;
       return this.players.some((o) => {
-        if (o.team === p.team || o.role === "goalie") return false;
+        if (o.team === p.team || o.role === "goalie" || o.box > 0) return false;
         const t = clamp(((o.x - a.x) * dx + (o.y - a.y) * dy) / len2, 0, 1);
         return hypot(a.x + dx * t - o.x, a.y + dy * t - o.y) < margin;
       });
@@ -781,8 +947,11 @@
       const s = DIR[p.team];
       let best = null,
         bestScore = -Infinity;
+      const inside = (q) => s * q.x > BLUE - 0.2;
       for (const m of this.skaters(p.team)) {
         if (m === p) continue;
+        // Into the zone from outside it, to someone already in there: offside.
+        if (!inside(this.puck) && inside(m)) continue;
         const d = dist(m, p);
         if (d < 3 || d > 32) continue;
         const slot = hypot(s * GOAL_X - m.x, m.y);
@@ -798,6 +967,8 @@
       const pk = this.puck;
       pk.carrier = null;
       pk.last = p;
+      p.lostAt = this.t || 0;
+      this.sent(p);
       pk.beat = null;
       pk.oneTimer = false;
       p.noTouch = p.role === "goalie" ? 0.8 : 0.35;
@@ -855,8 +1026,10 @@
       if (Math.min(dist(this.stick(p), pk), dist(p, pk) - 0.8) > reach) return;
       if (this.random() >= chance) return;
       const ang = Math.atan2(p.fy, p.fx) + (this.random() - 0.5) * 1.8;
+      c.lostAt = this.t || 0;
       pk.carrier = null;
       pk.last = p;
+      this.sent(p);
       pk.vx = c.vx * 0.3 + Math.cos(ang) * 5;
       pk.vy = c.vy * 0.3 + Math.sin(ang) * 5;
       c.noTouch = 0.45;
@@ -936,7 +1109,8 @@
     }
 
     move(dt) {
-      for (const p of this.players) {
+      const ps = this.players.filter((p) => !(p.box > 0));
+      for (const p of ps) {
         if (p.dash > 0) [p.wx, p.wy] = [p.dashX, p.dashY];
         let dvx = p.wx - p.vx,
           dvy = p.wy - p.vy;
@@ -962,7 +1136,6 @@
         }
       }
       // Bodies bump: pushed apart, and the closing speed shared.
-      const ps = this.players;
       for (let i = 0; i < ps.length; i++) {
         for (let j = i + 1; j < ps.length; j++) {
           const a = ps[i],
@@ -1074,7 +1247,7 @@
       if (pk.beat && dist(pk.beat, pk) > GOALIE_R + PUCK_R + 0.3) pk.beat = null;
       if (pk.through && dist(pk.through, pk) > SKATER_R + PUCK_R + 0.3) pk.through = null;
       for (const g of this.players) {
-        if (g.role !== "goalie" || g.noTouch > 0 || pk.beat === g) continue;
+        if (g.role !== "goalie" || g.noTouch > 0 || pk.beat === g || g.box > 0) continue;
         if (dist(g, pk) > GOALIE_R + PUCK_R) continue;
         if (sp < 6) {
           this.cover(g);
@@ -1126,8 +1299,12 @@
       }
       let best = null,
         bestReach = 0.8;
+      // In a delayed offside, the computer's players of that team keep off the
+      // puck until they have tagged up.
+      const wait = this.offside && this.offside.team;
       for (const p of this.players) {
-        if (p.role !== "skater" || p.noTouch > 0) continue;
+        if (p.role !== "skater" || p.noTouch > 0 || p.box > 0) continue;
+        if (p.team === wait && !(this.human && p === this.controlled)) continue;
         if (sp > 21) {
           // Too fast to take: an opponent in its way may block it with the
           // body, or it slips through, past the skates.
@@ -1198,6 +1375,18 @@
     }
 
     goal(team) {
+      // Shot in from outside the zone with a teammate offside: no goal.
+      if (this.offside && this.offside.team === team)
+        return this.whistle("offside", team, [DIR[team] * SPOT.neutral, (Math.sign(this.puck.y) || 1) * SPOT.side], this.offside.by);
+      // A penalty still to call on the team scored on is not served; a goal
+      // on the power play lets the first of them out of the box.
+      if (this.delayed && this.delayed.p.team !== team) this.delayed = null;
+      if (this.shorthanded(other(team))) {
+        const first = this.players.filter((q) => q.team === other(team) && q.box > 0).sort((a, b) => a.box - b.box)[0];
+        if (first) this.outOfBox(first);
+      }
+      this.offside = this.icing = null;
+      this.ref.signal = false;
       this.score[team]++;
       const pk = this.puck;
       pk.vx *= 0.2;
@@ -1530,7 +1719,8 @@
       <rect class="sb-panel" x="1" y="1" width="318" height="98" rx="8"/>
       <g class="sb-caption" text-anchor="middle">
         ${caption(52, 14, 9.5, "YOU")}${caption(160, 14, 9.5, "TIME", "data-caption")}${caption(268, 14, 9.5, "COMPUTER")}
-        ${caption(52, 75, 7.5, "SHOTS")}${caption(160, 75, 7.5, "PERIOD")}${caption(268, 75, 7.5, "SHOTS")}</g>
+        ${caption(52, 75, 7.5, "SHOTS")}${caption(160, 75, 7.5, "PERIOD")}${caption(268, 75, 7.5, "SHOTS")}
+        ${caption(91, 26, 6, "PEN", 'data-pen="a"')}${caption(229, 26, 6, "PEN", 'data-pen="b"')}</g>
       <rect x="40" y="17.5" width="24" height="1.8" fill="var(--rink-team-a)"/><rect x="241" y="17.5" width="54" height="1.8" fill="var(--rink-team-b)"/>
       <circle class="sb-lamp" data-goal="a" cx="16" cy="40" r="4"/><circle class="sb-lamp" data-goal="b" cx="304" cy="40" r="4"/>
       ${digitsSVG("a", "sb-amber", 52, 22, 19, 36, 4.6, [6])}
@@ -1538,7 +1728,9 @@
       ${digitsSVG("b", "sb-amber", 268, 22, 19, 36, 4.6, [6])}
       ${digitsSVG("x", "sb-amber", 52, 79, 10, 17, 2.6, [3.5])}
       ${digitsSVG("p", "sb-amber", 153.25, 79, 11, 17, 2.8, [2.5])}
-      ${digitsSVG("y", "sb-amber", 268, 79, 10, 17, 2.6, [3.5])}</svg>`;
+      ${digitsSVG("y", "sb-amber", 268, 79, 10, 17, 2.6, [3.5])}
+      ${digitsSVG("q", "sb-red", 91, 30, 8, 14, 2.2, [2.5])}
+      ${digitsSVG("r", "sb-red", 229, 30, 8, 14, 2.2, [2.5])}</svg>`;
     const svgEl = el.querySelector("svg"),
       digits = {};
     for (const g of el.querySelectorAll("[data-digit]")) digits[g.dataset.digit] = { ch: null, segs: [...g.children] };
@@ -1561,6 +1753,10 @@
         write("y", two(v.shotsB));
         write("t", v.time);
         write("p", v.period);
+        // Seconds left of a penalty, the team a skater short.
+        write("q", v.penA ? two(v.penA) : "  ");
+        write("r", v.penB ? two(v.penB) : "  ");
+        el.querySelectorAll("[data-pen]").forEach((c) => c.classList.toggle("is-off", !(c.dataset.pen === "a" ? v.penA : v.penB)));
         el.querySelectorAll("[data-colon]").forEach((c) => c.classList.toggle("on", !!v.colon));
         el.querySelector("[data-point]").classList.toggle("on", !!v.point);
         const cap = el.querySelector("[data-caption]");
@@ -2100,6 +2296,8 @@
       y1 = Math.max(...ys) + 0.8;
     svg.rinkBox = { x0, y0, x1, y1 };
     svg.setAttribute("viewBox", `${x0.toFixed(1)} ${y0.toFixed(1)} ${(x1 - x0).toFixed(1)} ${(y1 - y0).toFixed(1)}`);
+    // Behind the far boards, the penalty boxes: whoever is in one shows over them.
+    el("g", { "data-boxed": "" }, svg);
     svg.insertAdjacentHTML("beforeend", boardsSVG(true));
     el("g", { "data-hats": "" }, svg);
     const things = el("g", { "data-things": "" }, svg);
@@ -2201,6 +2399,8 @@
       f = game.drop;
     if (game.human && game.phase === "faceoff" && f && f.t >= 0.25 && f.t < f.release + 0.2) {
       const k = clamp((f.release - f.t) / Math.max(0.1, f.release - 0.25), 0, 1);
+      ring.setAttribute("cx", (f.at || [0])[0]);
+      ring.setAttribute("cy", (f.at || [0, 0])[1]);
       ring.setAttribute("r", (0.55 + 3.4 * k).toFixed(2));
       ring.setAttribute("opacity", f.t < f.release ? "0.95" : (1 - (f.t - f.release) / 0.2).toFixed(2));
       ring.setAttribute("stroke", f.t < f.release ? "#f5a623" : "#fff");
@@ -2210,7 +2410,7 @@
     if (view === "top") {
       game.players.forEach((p, i) => {
         const g = groups[i];
-        g.style.display = p.off ? "none" : "";
+        g.style.display = p.off && !(p.box > 0) ? "none" : "";
         g.setAttribute("transform", `translate(${p.x.toFixed(2)} ${p.y.toFixed(2)})`);
         // Everyone watches the puck, except whoever has it, who looks ahead; a
         // player knocked down lies turned, with crosses for eyes and stars.
@@ -2244,11 +2444,16 @@
       ref.setAttribute("transform", `translate(${rx.toFixed(2)} ${ry.toFixed(2)})`);
       ref.dataset.depth = ry;
       const arm = ref.querySelector("[data-ref-arm]");
-      arm.setAttribute("x2", (0.74 + ((px - rx) / TALL - 0.74) * up).toFixed(2));
-      arm.setAttribute("y2", (-1.25 + ((py - ry) / TALL + 1.25) * up).toFixed(2));
+      // A delayed call (offside or a penalty): the arm straight up.
+      arm.setAttribute("x2", game.ref.signal ? "0.66" : (0.74 + ((px - rx) / TALL - 0.74) * up).toFixed(2));
+      arm.setAttribute("y2", game.ref.signal ? "-3.15" : (-1.25 + ((py - ry) / TALL + 1.25) * up).toFixed(2));
+      const boxed = svg.querySelector("[data-boxed]"),
+        onIce = svg.querySelector("[data-things]");
       game.players.forEach((p, i) => {
         const g = groups[i];
-        g.style.display = p.off ? "none" : "";
+        g.style.display = p.off && !(p.box > 0) ? "none" : "";
+        const home = p.box > 0 ? boxed : onIce;
+        if (g.parentNode !== home) home.appendChild(g);
         const [x, y] = TILT.at(p.x, p.y);
         g.setAttribute("transform", `translate(${x.toFixed(2)} ${y.toFixed(2)})`);
         g.dataset.depth = y;
@@ -2666,6 +2871,29 @@
             tone(t + at, len, hz * k, type, peak, 0.012);
       },
       click: (t) => noise(t, 0.03, 3200, 2, 0.5),
+      // The referee's whistle: a pea whistle's trill, two short blasts.
+      whistle: (t) => {
+        for (const [at, len] of [
+          [0, 0.16],
+          [0.22, 0.42],
+        ]) {
+          const o = ctx.createOscillator(),
+            lfo = ctx.createOscillator(),
+            depth = ctx.createGain();
+          o.type = "sine";
+          o.frequency.value = 2950;
+          lfo.frequency.value = 28;
+          depth.gain.value = 180;
+          lfo.connect(depth);
+          depth.connect(o.frequency);
+          o.connect(env(t + at, 0.16, 0.01, len));
+          for (const n of [o, lfo]) {
+            n.start(t + at);
+            n.stop(t + at + len + 0.05);
+          }
+          noise(t + at, len, 3000, 2, 0.05, "bandpass", 0.01);
+        }
+      },
       buzzer: (t) => tone(t, 1.1, 196, "square", 0.12, 0.01),
       beep: (t) => {
         tone(t, 0.14, 440, "square", 0.12);
@@ -2823,7 +3051,13 @@
         : game.overtime
           ? { time: "----", colon: true }
           : boardTime(game.clock);
+      const pen = (t) => {
+        const left = game.players.filter((p) => p.team === t && p.box > 0).map((p) => p.box);
+        return left.length ? Math.ceil(Math.min(...left)) : 0;
+      };
       board.set({
+        penA: pen("a"),
+        penB: pen("b"),
         a: game.score.a,
         b: game.score.b,
         shotsA: game.shots.a,
@@ -3471,6 +3705,10 @@
             on = game.players[ev.on].name;
           if (ev.by === you) say(ev.boards ? `${on} into the boards!` : `Checked ${on}!`, 1.2);
           else if (ev.on === you) say(ev.boards ? `${by} puts you into the boards. Ouch.` : `Ouch. ${by} got you.`, 1.2);
+        } else if (ev.type === "whistle" || ev.type === "delayed" || ev.type === "back") {
+          if (ev.type === "whistle") sound.play("whistle");
+          const said = ruled(ev, (game.players[ev.by] || {}).name || "");
+          if (said) say(said, ev.type === "whistle" ? 3.2 : 2.4, ev.type !== "whistle");
         } else if (ev.type === "shot" && ev.oneTimer && ev.you) say("One-timer!", 0.8);
         else if (ev.type === "post") say("Off the post!", 1);
         else if (ev.type === "overtime") say("Tied. Next goal wins.", 2.5);
@@ -3506,6 +3744,25 @@
       if (back && now - back > 8000) back = 0;
       draw(svg, game, { now, lamp, view, follow: true, fresh: back ? now - back : null });
       hud();
+    }
+    // The rules, in a few words. `ev.team` is the team that broke one.
+    function ruled(ev, name) {
+      const yours = ev.team === "a";
+      if (ev.type === "back") return `${name} is back from the box.`;
+      if (ev.type === "delayed")
+        return ev.why === "offside"
+          ? yours
+            ? "Delayed offside: everyone out of the zone to tag up."
+            : ""
+          : yours
+            ? `Delayed penalty on ${name}.`
+            : "Delayed penalty on the computer: keep the puck.";
+      if (ev.why === "offside")
+        return yours ? `Offside: ${name} went into the zone ahead of the puck.` : `Offside against the computer: ${name} was in ahead of the puck.`;
+      if (ev.why === "icing")
+        return yours ? "Icing: from your own half over their goal line. Faceoff in your end." : "Icing by the computer. Faceoff in its end.";
+      const what = ev.foul === "boarding" ? "boarding: a check from behind into the boards" : "interference: a check on someone without the puck";
+      return yours ? `${name}, ${what}. 10 s in the box: a skater short.` : `${name}, ${what}. 10 s in the box: a power play for you.`;
     }
     // What each event sounds like.
     function sfx(ev) {

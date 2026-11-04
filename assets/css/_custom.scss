@@ -1458,6 +1458,11 @@ html[data-theme="dark"] {
     letter-spacing: 0.1em;
   }
 
+  // "PEN" only while the team has someone in the box.
+  .sb-caption .is-off {
+    opacity: 0.2;
+  }
+
   polygon,
   rect[data-colon],
   rect[data-point] {
