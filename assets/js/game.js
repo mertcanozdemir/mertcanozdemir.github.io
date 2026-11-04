@@ -1687,28 +1687,34 @@
       ${starsSVG(0.9)}</g>`;
   }
 
-  // A goalie's stance (`stance` in the simulation) on its drawing: standing
-  // ready, down in the butterfly, or on the post with one pad down along the
-  // goal line, toward the net. Returns where the upper body has gone.
+  // One of a goalie drawing's stances: standing ready, down in the
+  // butterfly, or on the post with one pad down along the goal line (to the
+  // left of the drawing, or with `flip` -1 to the right) and the body leaning
+  // over it. Returns where the upper body has gone.
+  function setStance(g, stance, flip = 1) {
+    g.querySelectorAll("[data-stance]").forEach((e) => {
+      const on = e.dataset.stance === stance;
+      e.setAttribute("visibility", on ? "visible" : "hidden");
+      if (on && stance === "post") e.setAttribute("transform", `scale(${flip} 1)`);
+    });
+    const [ux, uy] = stance === "butterfly" ? [0, 0.6] : stance === "post" ? [-0.1 * flip, 0.3] : [0, 0],
+      upper = g.querySelector("[data-upper]");
+    if (upper)
+      upper.setAttribute("transform", stance === "ready" ? "" : `translate(${ux} ${uy})${stance === "post" ? ` rotate(${-6 * flip} 0 -1.1)` : ""}`);
+    return [ux, uy];
+  }
+  // A goalie's stance (`stance` in the simulation) on its drawing; in the TV
+  // camera's view the pad on the post lies toward the net. From above, the
+  // post is drawn as ready.
   function poseGoalie(g, p, tv) {
     const stance = p.stance || "ready",
-      s = DIR[p.team],
-      key = tv ? stance + s : stance === "butterfly" ? stance : "ready";
+      flip = DIR[p.team],
+      key = tv ? stance + flip : stance === "butterfly" ? stance : "ready";
     if (g.dataset.pose !== key) {
       g.dataset.pose = key;
-      g.querySelectorAll("[data-stance]").forEach((e) => {
-        const on = e.dataset.stance === (tv ? stance : key);
-        e.setAttribute("visibility", on ? "visible" : "hidden");
-        if (on && e.dataset.stance === "post") e.setAttribute("transform", `scale(${s} 1)`);
-      });
-      const upper = g.querySelector("[data-upper]");
-      if (upper)
-        upper.setAttribute(
-          "transform",
-          stance === "butterfly" ? "translate(0 0.6)" : stance === "post" ? `translate(${-0.1 * s} 0.3) rotate(${-6 * s} 0 -1.1)` : ""
-        );
+      setStance(g, tv ? stance : key, flip);
     }
-    return stance === "butterfly" ? [0, 0.6] : stance === "post" ? [-0.1 * s, 0.3] : [0, 0];
+    return stance === "butterfly" ? [0, 0.6] : stance === "post" ? [-0.1 * flip, 0.3] : [0, 0];
   }
 
   const skinOf = (i) => {
@@ -1769,14 +1775,16 @@
       return g.innerHTML;
     };
     const set = (e, attrs) => Object.entries(attrs).forEach(([k, v]) => e.setAttribute(k, typeof v === "number" ? v.toFixed(2) : v));
-    const out = [];
-    game.players.forEach((p, i) => {
+    const out = [],
+      pose = {};
+    const add = (p, i, stance, flip) => {
       const goalie = p.role === "goalie";
       for (const back of [false, true]) {
         const g = el("g", {}),
           hand = (i % 2 ? 1 : -1) * (back ? -1 : 1);
         g.innerHTML = standingSVG(p.team, goalie, skinOf(i), p.number);
-        const top = goalie ? [0.95, -1.55] : [hand * 0.46, -1.58],
+        const [ux, uy] = goalie ? setStance(g, stance, flip) : [0, 0];
+        const top = goalie ? [0.95 + ux, -1.55 + uy] : [hand * 0.46, -1.58],
           low = goalie ? top : [hand * 0.66, -1.24];
         if (!goalie)
           for (const [side, [hx, hy]] of [
@@ -1791,11 +1799,28 @@
         g.querySelector("[data-back]").setAttribute("visibility", back ? "visible" : "hidden");
         out.push(tidy(g));
       }
-    });
+    };
+    game.players.forEach((p, i) => add(p, i, "ready", 1));
     const ref = el("g", {});
     ref.innerHTML = REF_STAND;
+    pose.ref = out.length;
     out.push(tidy(ref));
-    return out;
+    // A goalie's other stances after those, so the replay shows the goalie as
+    // the game did: the butterfly, and on the post with the pad down to the
+    // drawing's left or right (toward the post, as the eye sees it).
+    game.players.forEach((p, i) => {
+      if (p.role !== "goalie") return;
+      pose[i] = { ready: i * 2 };
+      for (const [name, stance, flip] of [
+        ["butterfly", "butterfly", 1],
+        ["postLeft", "post", 1],
+        ["postRight", "post", -1],
+      ]) {
+        pose[i][name] = out.length;
+        add(p, i, stance, flip);
+      }
+    });
+    return { cells: out, pose };
   }
 
   // ——— The Kamboni, from above ———
@@ -2761,8 +2786,10 @@
       // A moment later, so the goal itself is not held up.
       setTimeout(() => {
         try {
-          if (cabView()) cab.prepareReplay(replaySprites(game), svg.querySelector("[data-marks]"));
-          else replayOf = null;
+          if (cabView()) {
+            const { cells, pose } = replaySprites(game);
+            cab.prepareReplay(cells, svg.querySelector("[data-marks]"), pose);
+          } else replayOf = null;
         } catch (e) {
           replayOf = null;
         }

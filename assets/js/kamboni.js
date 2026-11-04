@@ -462,7 +462,7 @@ void main() {
     // The players and the referee as their drawings, standing up and turned
     // to the eye (front or back as they face it), life size, each with a
     // shadow; the puck, facing the eye, and its streak when it flies.
-    const CELL = { w: 3, h: 4.2, foot: 3.6, cols: 9 }, // in drawing units
+    const CELL = { w: 3.4, h: 4.2, foot: 3.6, cols: 8 }, // in drawing units (a goalie in the butterfly is 3 across)
       M = 0.686, // metres a drawing unit: 2.77 units of player are 1.9 m
       ATLAS = 2048, // the drawings' texture, pixels across
       atlas = canvas2d(1, 1),
@@ -470,10 +470,12 @@ void main() {
     let atlasTex = null,
       atlasV = 1, // the texture's height in drawing units
       sprites = 0,
+      poses = {}, // where in the texture the referee and the goalies' other stances are
       replayReady = false,
       cam = null;
-    function prepareReplay(markups, marks) {
+    function prepareReplay(markups, marks, pose = {}) {
       const mine = ++job;
+      poses = pose;
       replayReady = false;
       cam = null;
       build(); // in the theme's colours of the moment
@@ -610,11 +612,21 @@ void main() {
         // Facing away from the eye: its back.
         const away = p.fx * (cam.eye[0] - p.x) + p.fy * (cam.eye[2] - p.y) < 0,
           side = p.fx * (cam.eye[2] - p.y) - p.fy * (cam.eye[0] - p.x);
-        sprite(people, i * 2 + (away ? 1 : 0), p.x, p.y, cam.eye, p.down > 0 ? (side > 0 ? 1 : -1) : 0);
+        // A goalie in its stance of the moment; on the post, the pad down on
+        // the side the post is, to the eye.
+        let cell = i * 2;
+        const st = poses[i],
+          stance = p.stance || "ready";
+        if (st && stance === "butterfly") cell = st.butterfly;
+        else if (st && stance === "post") {
+          const post = [Math.sign(p.x) * deps.goal.x, (Math.sign(p.y) || 1) * deps.goal.half];
+          cell = (post[0] - p.x) * (cam.eye[2] - p.y) + (post[1] - p.y) * (p.x - cam.eye[0]) > 0 ? st.postRight : st.postLeft;
+        }
+        sprite(people, cell + (away ? 1 : 0), p.x, p.y, cam.eye, p.down > 0 ? (side > 0 ? 1 : -1) : 0);
       });
       if (snap.ref) {
         disc(shadows, [snap.ref.x, 0, snap.ref.y], 0.5, shade);
-        sprite(people, sprites - 1, snap.ref.x, snap.ref.y, cam.eye);
+        sprite(people, poses.ref ?? sprites - 1, snap.ref.x, snap.ref.y, cam.eye);
       }
       // The scorer's own stick, low in the picture: on the left or the right
       // as the drawings hold it (half shoot left, half right).

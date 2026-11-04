@@ -388,7 +388,9 @@ slowing to 0.28 for the shot (`showReplay()`, frames interpolated by
 `between()`), about 7 s in all. kamboni.js draws it in 3D (`prepareReplay()`,
 `replayFrame()`): the game's own drawings stand on the ice as cut-outs turned to
 the eye (`replaySprites()` in game.js: each player from the front and the back,
-then the referee), with shadows, the nets, the puck (larger than life, more so
+then the referee, then each goalie's other stances, so the replay shows the
+goalie in the butterfly or on the post as the game did: Mertcan missed them;
+`poses` in kamboni.js says where they are), with shadows, the nets, the puck (larger than life, more so
 the further off) with its streak, the scorer's own stick at the bottom, and the
 goal light on the glass that comes on when the puck is in. The camera keeps the
 puck low in the picture and the net in it. Without WebGL it is the old replay,
