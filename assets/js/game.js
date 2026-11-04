@@ -137,7 +137,7 @@
   // How much the computer's team is ahead of the person's at each level, and
   // how soon after the puck lands at a faceoff its centre's stick comes down (s).
   const LEVELS = { easy: -0.5, normal: 1, hard: 1.6 };
-  const REACTION = { easy: [0.2, 0.42], normal: [0.1, 0.28], hard: [0.03, 0.17] };
+  const REACTION = { easy: [0.35, 0.65], normal: [0.22, 0.45], hard: [0.16, 0.32] };
 
   class Game {
     constructor(opts = {}) {
@@ -229,7 +229,7 @@
       Object.assign(this.ref, { x: 0, y: -0.9, vx: 0, vy: 0, fx: 0, fy: 1, arm: 1 });
       const release = 0.7 + this.random() * 0.9,
         [lo, hi] = REACTION[this.level] || REACTION.normal;
-      this.drop = { t: 0, release, land: release + 0.22, you: null, cpu: lo + this.random() * (hi - lo) };
+      this.drop = { t: 0, release, land: release + 0.32, you: null, cpu: lo + this.random() * (hi - lo), winner: null, why: "" };
       if (this.human) this.controlled = this.players[0];
       this.phase = "faceoff";
       this.events.push({ type: "faceoff", n: ++this.draws });
@@ -344,24 +344,28 @@
       }
     }
 
-    // A faceoff: the puck falls from the referee's hand, and whoever has their
-    // stick down first once it lands wins the draw. For the person that is
-    // pressing pass as it lands (more than a moment early is a loss: the rule
-    // is that the puck must be down); the computer's stick comes down quicker
-    // the harder the level. Between two computer teams it is a toss-up.
+    // A faceoff: the referee lets the puck go, and the quicker stick wins the
+    // draw. For the person that is pressing pass (or shoot) once the puck has
+    // left the referee's hand: before that is early, and loses (the rule); the
+    // computer's centre reacts in REACTION seconds for the level. Two computer
+    // teams toss for it. The draw happens once the puck is down.
     dropPuck(dt, input) {
       const f = this.drop,
         pk = this.puck;
       f.t += dt;
-      const fall = clamp((f.t - f.release) / (f.land - f.release), 0, 1);
+      const fall = clamp((f.t - f.release) / (f.land - f.release), 0, 1),
+        since = f.t - f.release;
       pk.h = 1.3 * (1 - fall * fall);
-      this.ref.arm = f.t < f.release ? 1 : Math.max(0, 1 - (f.t - f.release) * 3);
-      if (this.human && input.pass && f.you === null) f.you = f.t - f.land;
-      if (f.t < f.land) return;
-      if (!this.human) return this.wonDraw(this.random() < 0.5 ? "a" : "b");
-      if (f.you !== null && f.you < -0.1) return this.wonDraw("b", "early");
-      if (f.you !== null && f.you <= f.cpu) return this.wonDraw("a");
-      if (f.t - f.land >= f.cpu) return this.wonDraw("b", f.you === null ? "late" : "slow");
+      this.ref.arm = since < 0 ? 1 : Math.max(0, 1 - since * 3);
+      if (this.human && (input.pass || input.shoot) && f.you === null) f.you = since;
+      if (!f.winner) {
+        if (!this.human) {
+          if (since >= 0) f.winner = this.random() < 0.5 ? "a" : "b";
+        } else if (f.you !== null && f.you < 0) [f.winner, f.why] = ["b", "early"];
+        else if (f.you !== null && f.you <= f.cpu) f.winner = "a";
+        else if (since >= f.cpu) [f.winner, f.why] = ["b", "slow"];
+      }
+      if (f.winner && f.t >= f.land) this.wonDraw(f.winner, f.why);
     }
     // The winner's centre draws it back to a teammate.
     wonDraw(team, why = "") {
@@ -2175,13 +2179,46 @@
         noise(t, 0.2, 260, 0.7, hard ? 1 : 0.6, "lowpass");
         tone(t, 0.18, 95, "sine", hard ? 0.55 : 0.35, 0.004, 50);
       },
-      // An arena's goal horn: a low chord, through a filter.
+      // The goal horn, a ship's horn as in the big arenas: one long, deep
+      // blast, two notes a hair apart so it wavers, its octave, a brassy
+      // middle, sliding up to pitch as it starts.
       horn: (t) => {
-        const f = ctx.createBiquadFilter();
-        f.type = "lowpass";
-        f.frequency.value = 900;
-        f.connect(env(t, 0.5, 0.08, 1.8));
-        for (const hz of [110, 138.6, 165]) tone(t, 1.8, hz, "sawtooth", 0, 0, 0, f);
+        const dur = 2.8,
+          low = ctx.createBiquadFilter(),
+          brass = ctx.createBiquadFilter(),
+          g = ctx.createGain();
+        low.type = "lowpass";
+        low.frequency.value = 1400;
+        brass.type = "peaking";
+        brass.frequency.value = 420;
+        brass.Q.value = 1.2;
+        brass.gain.value = 9;
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(0.55, t + 0.14);
+        g.gain.setValueAtTime(0.55, t + dur - 0.6);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+        low.connect(brass);
+        brass.connect(g);
+        g.connect(master);
+        for (const [hz, kind, level] of [
+          [92, "sawtooth", 1],
+          [92.7, "sawtooth", 1],
+          [184.5, "sawtooth", 0.45],
+          [138.5, "square", 0.25],
+        ]) {
+          const o = ctx.createOscillator(),
+            v = ctx.createGain();
+          o.type = kind;
+          o.frequency.setValueAtTime(hz * 0.93, t);
+          o.frequency.exponentialRampToValueAtTime(hz, t + 0.18);
+          o.frequency.setValueAtTime(hz, t + dur - 0.5);
+          o.frequency.exponentialRampToValueAtTime(hz * 0.97, t + dur);
+          v.gain.value = level * 0.3;
+          o.connect(v);
+          v.connect(low);
+          o.start(t);
+          o.stop(t + dur + 0.05);
+        }
       },
       cheer: (t) => noise(t, 2.4, 1100, 0.6, 0.35, "bandpass", 0.35),
       buzzer: (t) => tone(t, 1.1, 196, "square", 0.12, 0.01),
@@ -2819,11 +2856,11 @@
         else if (ev.type === "post") say("Off the post!", 1);
         else if (ev.type === "overtime") say("Tied. Next goal wins.", 2.5);
         else if (ev.type === "faceoff" && ev.n <= 2)
-          say(touchy() ? "Faceoff: tap pass as the puck lands." : "Faceoff: press X as the puck lands.", 2.2, true);
+          say(touchy() ? "Faceoff: tap pass as the referee drops the puck." : "Faceoff: press X as the referee drops the puck.", 2.4, true);
         else if (ev.type === "draw")
           say(
-            ev.team === "a" ? "You win the draw." : ev.why === "early" ? "Too early: the puck must be down." : "The computer wins the draw.",
-            1.3,
+            ev.team === "a" ? "You win the draw." : ev.why === "early" ? "Too early: wait for the drop." : "Too slow: the computer wins the draw.",
+            1.4,
             true
           );
         else if (ev.type === "intermission") buzzer(ev, now);

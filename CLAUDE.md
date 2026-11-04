@@ -232,13 +232,16 @@ drawings. Commercial games license real names, so this was raised with him.
 
 **Faceoffs** (Mertcan's rule): a referee (striped shirt, orange armbands; only
 drawn, `game.ref`, who then follows play along the far boards) holds the puck
-over the dot and drops it at a moment of its own (`dropPuck()`). Whoever's
-stick is down first once it lands wins the draw and draws it back to a
-teammate: the person by pressing pass (X, or the touch pass button) as it
-lands, more than 0.1 s early being a loss ("the puck must be down"); the
-computer's centre reacts in `REACTION` seconds for the level. Computer against
-computer it is a toss-up. The checker's scripted person presses 0.12 s after
-landing and wins about 100%, 80% and 30% of draws on easy, normal and hard.
+over the dot and lets it go at a moment of its own (`dropPuck()`); the quicker
+stick wins the draw and draws it back to a teammate. For the person that is
+pressing pass or shoot once the puck has left the referee's hand: pressing
+before is early and loses (the rule). The computer's centre reacts in
+`REACTION` seconds for the level. A first version counted from the puck
+landing and gave the computer 0.1 s after it: Mertcan could not win a draw,
+since a person sees the landing and is already too late. Computer against
+computer it is a toss-up. The checker's scripted person presses 0.25 s after
+the release (about a person's reaction) and wins about 100%, 80% and 40% of
+draws on easy, normal and hard.
 
 **Levels**: easy, normal, hard, chosen on the start and final screens and
 remembered (`hockey-level`). `sharp()` is how far the computer's team is ahead
@@ -256,7 +259,8 @@ rink's corners. Before this the rink did not fit a laptop's window (its bottom
 phone held sideways.
 
 **Sound** (`sounds()`): WebAudio, no files: puck off a stick, the post, saves,
-checks and boards, the goal horn (a low chord) and the crowd, the buzzer, the
+checks and boards, the goal horn (a ship's horn, as in the big arenas, which
+Mertcan asked for) and the crowd, the buzzer, the
 Kamboni's horn. "mute" in the HUD, remembered (`hockey-sound`). Browsers start
 it only after a click or a key, so `wake()` runs on those.
 
