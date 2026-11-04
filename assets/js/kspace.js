@@ -58,6 +58,10 @@
       "The scanner listens with eight coils round the head, each hearing best the part nearest it. Each coil hears the folded copies differently, which is enough to pull them apart.",
     coils8: "Eight coils, eight copies to pull apart: too many for them, and the copies do not quite come apart.",
     net: "Today's fastest scans do both: the coils pull the copies apart as far as they can, and a network that has looked at 15,744 drawn cats cleans up the rest with what cats look like.",
+    // For the dog: never "cat" alone in these, which would be read as "dog".
+    netDog4: "At four times as fast the coils have done most of the work, so the network, which has only ever seen cats, still gets the dog right.",
+    netDog8:
+      "At eight times as fast the network has much more to fill in, and it has only ever seen cats: the dog's muzzle and nose, which cats do not have, come out smudged or not at all.",
   };
   const clockOf = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
   // Gaussian noise, by Box and Muller.
@@ -771,7 +775,7 @@
         results.sense = results.sense || unfoldWithCoils();
         results.coils = results.coils || keepMeasured(results.sense);
         showResult(results.coils, `the cat, unfolded with ${COILS} coils`, PLANS[plan].R === 8 ? SAID.coils8 : SAID.coils4);
-      } else if (results.net) showResult(results.net, "the cat, from the coils and a network", SAID.net);
+      } else if (results.net) showResult(results.net, "the cat, from the coils and a network", netSaid());
       else {
         thinking = true;
         label("the cat, the network is thinking…");
@@ -783,7 +787,7 @@
           .then((out) => {
             if (asked !== plan || mode !== "net") return;
             results.net = keepMeasured([Float64Array.from(out), A()]);
-            showResult(results.net, "the cat, from the coils and a network", SAID.net);
+            showResult(results.net, "the cat, from the coils and a network", netSaid());
           })
           .catch(() => {
             mode = "measured";
@@ -797,6 +801,8 @@
           });
       }
     }
+    // What the network did: for a dog, what it makes of something it has never seen.
+    const netSaid = () => (who !== "dog" ? SAID.net : PLANS[plan].R === 8 ? SAID.netDog8 : SAID.netDog4);
     function showResult(result, text, said) {
       filled = logOf(...fftOf(result));
       label(text);

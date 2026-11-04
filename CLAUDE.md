@@ -139,8 +139,12 @@ A "coming soon" placeholder was tried and dropped: a piece goes up when it works
     worker, about a second), taught on 15,744 drawn cats with JAX
     (`bin/catnet/`: `cats.py` draws them varied, `train.py` scans them with the
     page's coils and teaches the network, `export.py` writes the weights in the
-    order `network()` reads them). It has only ever seen cats, which the dog is
-    there to show.
+    order `network()` reads them). On cats it has not seen: 35.3 dB at 4×
+    (the coils alone 28.9), 27.5 dB at 8× (19.6). It has only ever seen cats,
+    which the dog is there to show: at 4× the coils have done most of the work
+    and the dog comes out right; at 8× its muzzle and nose come out smudged
+    or not at all. A first network, working from the folded image of a
+    single coil, was worse than the coils at 8× (18 dB) and was dropped.
 
   Mertcan asked where the deep learning was (the point is fast MRI), and for it
   to read as popular science. Earlier versions: the visitor measured lines by
