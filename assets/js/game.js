@@ -1696,7 +1696,10 @@
 
   // A hockey player standing up, its feet at (0, 0): skates with blades,
   // striped socks, hockey pants, a jersey over shoulder pads, gloves on the
-  // stick, and an open helmet with a half visor, ear guards and a chin strap.
+  // stick, and an open helmet with ear guards, a clear half visor over the
+  // eyes down to the bottom of the nose (as the IIHF rules have it), and the
+  // chin strap under the chin, the mouth between: drawn lower, the visor and
+  // the strap made everyone look as if smiling.
   // A goalie is another shape: big pads, a wide chest protector, a blocker and
   // a catching glove, a painted mask with a cage and a paddle stick. The parts
   // that turn with the player (face, arms, stick) are set by draw().
@@ -1820,8 +1823,10 @@
             <path d="M -0.42 0.02 Q -0.44 -0.42 0 -0.44 Q 0.44 -0.42 0.42 0.02 L 0.3 -0.04 Q 0 -0.24 -0.3 -0.04 Z" fill="${shirt}" ${edge}/>
             <circle cx="-0.38" cy="0.04" r="0.1" fill="${shirt}"/><circle cx="0.38" cy="0.04" r="0.1" fill="${shirt}"/>
             ${eye(-0.12)}${eye(0.12)}
-            <path d="M -0.32 -0.06 Q 0 0.16 0.32 -0.06 L 0.3 0.1 Q 0 0.28 -0.3 0.1 Z" fill="var(--rink-visor-clear)"/>
-            <path d="M -0.3 0.12 Q 0 0.52 0.3 0.12" fill="none" stroke="var(--rink-strap)" stroke-width="0.04"/>
+            <path d="M -0.07 0.25 H 0.07" stroke="var(--rink-mouth)" stroke-width="0.035" stroke-linecap="round"/>
+            <path d="M -0.33 -0.1 Q 0 -0.2 0.33 -0.1 L 0.31 0.13 Q 0 0.16 -0.31 0.13 Z" fill="var(--rink-visor-clear)" stroke="rgba(255, 255, 255, 0.55)" stroke-width="0.02"/>
+            <path d="M -0.22 -0.07 L -0.15 0.07" stroke="#fff" stroke-width="0.03" stroke-linecap="round" opacity="0.6"/>
+            <path d="M -0.37 0.1 Q -0.31 0.42 0 0.43 Q 0.31 0.42 0.37 0.1" fill="none" stroke="var(--rink-strap)" stroke-width="0.035"/>
           </g>
         </g>
       </g>

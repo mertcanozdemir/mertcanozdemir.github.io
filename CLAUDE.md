@@ -254,7 +254,10 @@ the team's jersey, a helmet open at the front where the face and eyes are,
 gloves and a stick. Standing, in the tilted view (`standingSVG`): skates with
 blades, striped socks, hockey pants, a jersey over shoulder pads, gloves on the
 stick at the player's side (half shoot left, half right) and an open helmet with
-ear guards, a half visor and a chin strap. The stick is a hockey stick drawn to a real one's proportions (IIHF rules:
+ear guards, a clear half visor over the eyes down to the bottom of the nose (as
+the IIHF rules have it), the mouth, and the chin strap under the chin (a
+visor drawn lower, with the strap below it, made everyone look as if smiling,
+Mertcan said). The stick is a hockey stick drawn to a real one's proportions (IIHF rules:
 1.63 m to the heel, the blade 32 cm long and 5 to 7.6 cm high; a goalie's 39.5
 by 9 cm, with the paddle 71 cm up the shaft): a thin shaft and a long, low
 blade flat on the ice, its toe rounded (`stickSVG()`, `setStick()`). As a plain
