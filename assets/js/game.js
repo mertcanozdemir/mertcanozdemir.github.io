@@ -896,66 +896,286 @@
   };
 
   // Stars that circle a player who has been knocked down.
-  const STARS = `<g data-stars visibility="hidden">${[0, 120, 240]
-    .map(
-      (a) =>
-        `<path transform="rotate(${a}) translate(0 -1.5)" d="M 0 -0.3 L 0.08 -0.08 L 0.3 0 L 0.08 0.08 L 0 0.3 L -0.08 0.08 L -0.3 0 L -0.08 -0.08 Z" fill="var(--rink-puck)"/>`
-    )
-    .join("")}</g>`;
+  const starsSVG = (r) =>
+    `<g data-stars visibility="hidden">${[0, 120, 240]
+      .map(
+        (a) =>
+          `<path transform="rotate(${a}) translate(0 ${-r})" d="M 0 -0.3 L 0.08 -0.08 L 0.3 0 L 0.08 0.08 L 0 0.3 L -0.08 0.08 L -0.3 0 L -0.08 -0.08 Z" fill="var(--rink-puck)"/>`
+      )
+      .join("")}</g>`;
+  const LAMP = `<defs><radialGradient id="rink-lamp"><stop offset="0" stop-color="#ff3b30" stop-opacity="0.85"/><stop offset="1" stop-color="#ff3b30" stop-opacity="0"/></radialGradient></defs>`;
 
-  // `fx` carries what only the page knows: the time, a lit goal lamp, hats.
-  function draw(svg, game, fx = {}) {
-    if (!svg.querySelector("[data-players]")) {
-      svg.insertAdjacentHTML("afterbegin", root.rinkSVG ? root.rinkSVG() : "");
-      el("g", { "data-marks": "", fill: "none", "stroke-linecap": "round", "stroke-linejoin": "round" }, svg);
-      svg.insertAdjacentHTML(
-        "beforeend",
-        `<defs><radialGradient id="rink-lamp"><stop offset="0" stop-color="#ff3b30" stop-opacity="0.85"/><stop offset="1" stop-color="#ff3b30" stop-opacity="0"/></radialGradient></defs>`
-      );
-      for (const s of [1, -1])
-        el("circle", { "data-lamp": s, cx: s * (GOAL_X + NET_DEPTH * 0.6), cy: 0, r: 3.4, fill: "url(#rink-lamp)", opacity: 0 }, svg);
-      el("g", { "data-hats": "" }, svg);
-      el(
-        "polyline",
-        { "data-trail": "", fill: "none", stroke: "var(--rink-shot)", "stroke-width": "0.35", "stroke-linecap": "round", opacity: ".45" },
-        svg
-      );
-      el("circle", { "data-puck": "", r: "0.45", fill: "var(--rink-puck)", stroke: "var(--rink-puck-edge)", "stroke-width": "0.1" }, svg);
-      el(
-        "circle",
-        {
-          "data-you": "",
-          r: "1.75",
-          fill: "none",
-          stroke: "var(--rink-team-a)",
-          "stroke-width": "0.2",
-          "stroke-dasharray": "0.7 0.45",
-          opacity: ".8",
-        },
-        svg
-      );
-      const layer = el("g", { "data-players": "" }, svg);
-      game.players.forEach((p, i) => {
-        const g = el("g", { "data-player": i }, layer);
-        g.insertAdjacentHTML("beforeend", root.helmetSVG(p.team, p.role === "goalie") + STARS);
-      });
+  // ——— Two views ———
+  // From above, as the drills are drawn, or tilted: an orthographic camera above
+  // the near boards, turned a little (YAW) and tilted so the ice is squashed by
+  // SQUASH, heights rising up the screen RISE a metre. The game is the same
+  // either way; only the drawing changes, and which way the keys skate.
+  const YAW = -0.2,
+    SQUASH = 0.6,
+    RISE = 0.82,
+    TALL = 1.25; // standing players are drawn this much bigger, to be seen
+  const TILT = (() => {
+    const c = Math.cos(YAW),
+      s = Math.sin(YAW);
+    const m = [c, SQUASH * s, -s, SQUASH * c]; // as SVG's matrix(a b c d): x' = a x + c y, y' = b x + d y
+    const det = m[0] * m[3] - m[1] * m[2];
+    return {
+      m,
+      at: (x, y, h = 0) => [m[0] * x + m[2] * y, m[1] * x + m[3] * y - h * RISE],
+      // A direction on the screen, as a direction on the ice.
+      back: (sx, sy) => [(m[3] * sx - m[2] * sy) / det, (-m[1] * sx + m[0] * sy) / det],
+    };
+  })();
+  const BOARDS = 1.15; // m high
+  const pt = (x, y, h) =>
+    TILT.at(x, y, h)
+      .map((v) => v.toFixed(2))
+      .join(",");
+
+  // The boards' outline, with outward normals, corner by corner.
+  function outline() {
+    const out = [],
+      cx = L - CORNER,
+      cy = W - CORNER;
+    const corners = [
+      [cx, cy, 0],
+      [-cx, cy, Math.PI / 2],
+      [-cx, -cy, Math.PI],
+      [cx, -cy, (3 * Math.PI) / 2],
+    ];
+    for (const [kx, ky, a0] of corners) {
+      for (let i = 0; i <= 10; i++) {
+        const a = a0 + (i / 10) * (Math.PI / 2);
+        out.push({ x: kx + Math.cos(a) * CORNER, y: ky + Math.sin(a) * CORNER, nx: Math.cos(a), ny: Math.sin(a) });
+      }
     }
+    return out;
+  }
+
+  // The boards standing up round the ice: the far side's inside face, drawn
+  // behind everything, and the near side's, see-through, in front.
+  function boardsSVG(far) {
+    const pts = outline(),
+      faces = [],
+      kicks = [],
+      rail = [];
+    for (let i = 0; i < pts.length; i++) {
+      const a = pts[i],
+        b = pts[(i + 1) % pts.length];
+      const facing = TILT.m[1] * (a.nx + b.nx) + TILT.m[3] * (a.ny + b.ny); // < 0: faces up the screen, the far side
+      if (facing < 0 !== far) continue;
+      faces.push(`M ${pt(a.x, a.y, 0)} L ${pt(b.x, b.y, 0)} L ${pt(b.x, b.y, BOARDS)} L ${pt(a.x, a.y, BOARDS)} Z`);
+      kicks.push(`M ${pt(a.x, a.y, 0)} L ${pt(b.x, b.y, 0)} L ${pt(b.x, b.y, 0.25)} L ${pt(a.x, a.y, 0.25)} Z`);
+      rail.push(`M ${pt(a.x, a.y, BOARDS)} L ${pt(b.x, b.y, BOARDS)}`);
+    }
+    return `<g opacity="${far ? 1 : 0.3}" stroke-linejoin="round">
+      <path d="${faces.join(" ")}" fill="var(--rink-wall)" stroke="var(--rink-wall)" stroke-width="0.04"/>
+      <path d="${kicks.join(" ")}" fill="var(--rink-board)" stroke="var(--rink-board)" stroke-width="0.04"/>
+      <path d="${rail.join(" ")}" fill="none" stroke="var(--rink-board)" stroke-width="0.24" stroke-linecap="round"/></g>`;
+  }
+
+  // A net standing on the goal line: mesh on the back, sides and top, and the
+  // red frame of posts and crossbar.
+  function net3SVG(s) {
+    const x0 = s * GOAL_X,
+      x1 = s * (GOAL_X + NET_DEPTH),
+      h = NET_HALF,
+      top = 1.8,
+      low = 1.0;
+    const mesh = `fill="var(--rink-mesh)" stroke="var(--rink-mesh-line)" stroke-width="0.05" stroke-linejoin="round"`;
+    const face = (...p) => `<polygon points="${p.map((q) => pt(...q)).join(" ")}" ${mesh}/>`;
+    return `<g data-net="${s}">
+      ${face([x1, -h, 0], [x1, h, 0], [x1, h, low], [x1, -h, low])}
+      ${face([x0, -h, 0], [x1, -h, 0], [x1, -h, low], [x0, -h, top])}
+      ${face([x0, h, 0], [x1, h, 0], [x1, h, low], [x0, h, top])}
+      ${face([x0, -h, top], [x0, h, top], [x1, h, low], [x1, -h, low])}
+      <path d="M ${pt(x0, -h, 0)} L ${pt(x0, -h, top)} L ${pt(x0, h, top)} L ${pt(x0, h, 0)}" fill="none" stroke="var(--rink-red)" stroke-width="0.17" stroke-linejoin="round" stroke-linecap="round"/></g>`;
+  }
+
+  // A player standing up, its feet at (0, 0): skates and pants, a jersey in the
+  // team's colour and the helmet, with the visor and eyes turned the way the
+  // player faces. A goalie has pads, a wider body and a caged mask.
+  function standingSVG(team, goalie) {
+    const shirt = `var(--rink-team-${team})`;
+    const w = goalie ? 0.8 : 0.62;
+    const leg = (x) =>
+      goalie
+        ? `<rect x="${x}" y="-0.8" width="0.55" height="0.8" rx="0.18" fill="var(--rink-mask)" stroke="var(--rink-helmet-edge)" stroke-width="0.05"/>`
+        : `<rect x="${x}" y="-0.66" width="0.3" height="0.66" rx="0.13" fill="var(--rink-pants)"/>`;
+    const eye = (s) =>
+      `<circle data-white="${s}" r="0.14" fill="#fff"/><circle data-pupil="${s}" r="0.07" fill="#111"/>
+      <path data-out="${s}" d="M -0.08 -0.08 L 0.08 0.08 M 0.08 -0.08 L -0.08 0.08" stroke="#111" stroke-width="0.05" stroke-linecap="round" visibility="hidden"/>`;
+    return `<line data-stick stroke="var(--rink-stick)" stroke-width="${goalie ? 0.22 : 0.14}" stroke-linecap="round"/>
+      <g transform="scale(${TALL})">
+      <ellipse rx="0.85" ry="${(0.85 * SQUASH).toFixed(2)}" fill="var(--rink-shadow)"/>
+      <g data-figure>
+        ${goalie ? leg(-0.62) + leg(0.07) : leg(-0.38) + leg(0.08)}
+        <rect x="${-w}" y="-1.9" width="${2 * w}" height="1.42" rx="0.5" fill="${shirt}" stroke="var(--rink-helmet-edge)" stroke-width="0.05"/>
+        <rect x="${-w}" y="-0.98" width="${2 * w}" height="0.44" rx="0.2" fill="var(--rink-pants)"/>
+        <g transform="translate(0 -2.4)">
+          <circle r="0.64" fill="${goalie ? "var(--rink-mask)" : shirt}" stroke="var(--rink-helmet-edge)" stroke-width="0.05"/>
+          <rect x="-0.1" y="-0.62" width="0.2" height="0.7" rx="0.1" fill="${goalie ? shirt : "#fff"}" opacity="${goalie ? 0.95 : 0.45}"/>
+          <ellipse cx="-0.22" cy="-0.3" rx="0.2" ry="0.1" fill="#fff" opacity="0.3"/>
+          <g data-face>
+            <rect x="-0.42" y="-0.17" width="0.84" height="0.44" rx="0.21" fill="var(--rink-visor)"/>
+            ${eye(-1)}${eye(1)}
+            ${goalie ? '<path d="M -0.26 -0.15 V 0.25 M 0 -0.15 V 0.25 M 0.26 -0.15 V 0.25" stroke="var(--rink-mask)" stroke-width="0.05"/>' : ""}
+          </g>
+        </g>
+      </g>
+      ${starsSVG(0.9)}</g>`;
+  }
+
+  function build(svg, game, view) {
+    // The marks on the ice stay with the ice through a change of view.
+    const marks = svg.querySelector("[data-marks]");
+    if (marks) marks.remove();
+    svg.replaceChildren();
+    svg.dataset.view = view;
+    const plane = el("g", { "data-plane": "" }, svg);
+    plane.insertAdjacentHTML("afterbegin", root.rinkSVG ? root.rinkSVG() : "");
+    plane.appendChild(marks || el("g", { "data-marks": "", fill: "none", "stroke-linecap": "round", "stroke-linejoin": "round" }));
+    svg.insertAdjacentHTML("beforeend", LAMP);
+    const trail = { "data-trail": "", fill: "none", stroke: "var(--rink-shot)", "stroke-width": "0.35", "stroke-linecap": "round", opacity: ".45" };
+    const ring = {
+      "data-you": "",
+      r: "1.75",
+      fill: "none",
+      stroke: "var(--rink-team-a)",
+      "stroke-width": "0.2",
+      "stroke-dasharray": "0.7 0.45",
+      opacity: ".8",
+    };
+    if (view === "top") {
+      svg.setAttribute("viewBox", "-30.6 -16.8 61.2 34.2");
+      for (const s of [1, -1])
+        el("circle", { "data-lamp": s, cx: s * (GOAL_X + NET_DEPTH * 0.6), cy: 0, r: 3.4, fill: "url(#rink-lamp)", opacity: 0 }, plane);
+      el("g", { "data-hats": "" }, plane);
+      el("polyline", trail, plane);
+      el("circle", { "data-puck": "", r: "0.45", fill: "var(--rink-puck)", stroke: "var(--rink-puck-edge)", "stroke-width": "0.1" }, plane);
+      el("circle", ring, plane);
+      const layer = el("g", { "data-players": "" }, plane);
+      game.players.forEach((p, i) => {
+        el("g", { "data-player": i }, layer).insertAdjacentHTML("beforeend", root.helmetSVG(p.team, p.role === "goalie") + starsSVG(1.5));
+      });
+      return;
+    }
+    // Tilted: the ice and what lies on it are one plane, drawn through the
+    // camera's matrix; the boards, nets, players and puck stand on it, drawn in
+    // order from the far side to the near one.
+    plane.setAttribute("transform", `matrix(${TILT.m.map((v) => v.toFixed(4)).join(" ")} 0 0)`);
+    el("polyline", trail, plane);
+    el("circle", ring, plane);
+    const xs = [],
+      ys = [];
+    for (const p of outline())
+      for (const h of [0, BOARDS]) {
+        const [x, y] = TILT.at(p.x, p.y, h);
+        xs.push(x);
+        ys.push(y);
+      }
+    const x0 = Math.min(...xs) - 1,
+      y0 = Math.min(...ys) - 3.1 * TALL,
+      x1 = Math.max(...xs) + 1,
+      y1 = Math.max(...ys) + 0.8;
+    svg.setAttribute("viewBox", `${x0.toFixed(1)} ${y0.toFixed(1)} ${(x1 - x0).toFixed(1)} ${(y1 - y0).toFixed(1)}`);
+    svg.insertAdjacentHTML("beforeend", boardsSVG(true));
+    el("g", { "data-hats": "" }, svg);
+    const things = el("g", { "data-things": "" }, svg);
+    for (const s of [1, -1]) things.insertAdjacentHTML("beforeend", net3SVG(s));
+    things.insertAdjacentHTML(
+      "beforeend",
+      `<g data-puck><ellipse cy="0.08" rx="0.45" ry="${(0.45 * SQUASH).toFixed(2)}" fill="var(--rink-puck-edge)"/><ellipse rx="0.45" ry="${(0.45 * SQUASH).toFixed(2)}" fill="var(--rink-puck)"/></g>`
+    );
+    game.players.forEach((p, i) => el("g", { "data-player": i }, things).insertAdjacentHTML("beforeend", standingSVG(p.team, p.role === "goalie")));
+    svg.insertAdjacentHTML("beforeend", boardsSVG(false));
+    for (const s of [1, -1]) {
+      const [cx, cy] = TILT.at(s * (GOAL_X + NET_DEPTH * 0.5), 0, 1.2);
+      el("circle", { "data-lamp": s, cx, cy, r: 3.2, fill: "url(#rink-lamp)", opacity: 0 }, svg);
+    }
+  }
+
+  // `fx` carries what only the page knows: the view, the time, a lit goal lamp.
+  function draw(svg, game, fx = {}) {
+    const view = fx.view || "top";
+    if (svg.dataset.view !== view) build(svg, game, view);
     const pk = game.puck,
       now = fx.now || 0;
-    const groups = svg.querySelectorAll("[data-player]");
-    game.players.forEach((p, i) => {
-      const g = groups[i];
-      g.setAttribute("transform", `translate(${p.x.toFixed(2)} ${p.y.toFixed(2)})`);
-      // Everyone watches the puck, except whoever has it, who looks ahead; a
-      // player knocked down lies turned, with crosses for eyes and stars.
-      const down = p.down > 0;
-      const [lx, ly] = pk.carrier === p ? [p.fx, p.fy] : [pk.x - p.x, pk.y - p.y];
-      root.helmetLook(g, Math.atan2(p.fy, p.fx) + (down ? 1.2 : 0), lx, ly, down);
-      const stars = g.querySelector("[data-stars]");
-      stars.setAttribute("visibility", down ? "visible" : "hidden");
-      if (down) stars.setAttribute("transform", `rotate(${((now / 4) % 360).toFixed(0)})`);
-    });
-    svg.querySelector("[data-puck]").setAttribute("transform", `translate(${pk.x.toFixed(2)} ${pk.y.toFixed(2)})`);
+    // By player, not by place in the drawing: tilted, that order changes.
+    const groups = game.players.map((p, i) => svg.querySelector(`[data-player="${i}"]`));
+    if (view === "top") {
+      game.players.forEach((p, i) => {
+        const g = groups[i];
+        g.setAttribute("transform", `translate(${p.x.toFixed(2)} ${p.y.toFixed(2)})`);
+        // Everyone watches the puck, except whoever has it, who looks ahead; a
+        // player knocked down lies turned, with crosses for eyes and stars.
+        const down = p.down > 0;
+        const [lx, ly] = pk.carrier === p ? [p.fx, p.fy] : [pk.x - p.x, pk.y - p.y];
+        root.helmetLook(g, Math.atan2(p.fy, p.fx) + (down ? 1.2 : 0), lx, ly, down);
+        const stars = g.querySelector("[data-stars]");
+        stars.setAttribute("visibility", down ? "visible" : "hidden");
+        if (down) stars.setAttribute("transform", `rotate(${((now / 4) % 360).toFixed(0)})`);
+      });
+      svg.querySelector("[data-puck]").setAttribute("transform", `translate(${pk.x.toFixed(2)} ${pk.y.toFixed(2)})`);
+    } else {
+      const [px, py] = TILT.at(pk.x, pk.y);
+      game.players.forEach((p, i) => {
+        const g = groups[i];
+        const [x, y] = TILT.at(p.x, p.y);
+        g.setAttribute("transform", `translate(${x.toFixed(2)} ${y.toFixed(2)})`);
+        g.dataset.depth = y;
+        // Which way the player faces, on the screen: the face turns that way,
+        // and is hidden when the player skates away up the screen.
+        const [fx0, fy0] = TILT.at(p.fx, p.fy),
+          fl = hypot(fx0, fy0) || 1;
+        const sx = fx0 / fl,
+          sy = fy0 / fl,
+          down = p.down > 0;
+        const [bx, by] = TILT.at(p.fx * REACH, p.fy * REACH);
+        const stick = g.querySelector("[data-stick]");
+        stick.setAttribute("x1", (sx * 0.55 * TALL).toFixed(2));
+        stick.setAttribute("y1", ((down ? -0.2 : -1.2) * TALL).toFixed(2));
+        stick.setAttribute("x2", bx.toFixed(2));
+        stick.setAttribute("y2", by.toFixed(2));
+        const lie = down ? (sx >= 0 ? 80 : -80) : 0;
+        g.querySelector("[data-figure]").setAttribute("transform", lie ? `rotate(${lie})` : "");
+        const face = g.querySelector("[data-face]");
+        face.setAttribute("visibility", sy < -0.55 && !down ? "hidden" : "visible");
+        face.setAttribute("transform", `translate(${(sx * 0.2).toFixed(2)} 0)`);
+        // The eyes watch the puck, or look ahead with it.
+        const [lx, ly] = pk.carrier === p ? [sx, sy] : [px - x, py - (y - 2.4)];
+        const ll = hypot(lx, ly) || 1;
+        for (const s of [-1, 1]) {
+          const ex = s * 0.17;
+          face.querySelector(`[data-white="${s}"]`).setAttribute("cx", ex);
+          const pupil = face.querySelector(`[data-pupil="${s}"]`);
+          pupil.setAttribute("cx", (ex + (lx / ll) * 0.06).toFixed(3));
+          pupil.setAttribute("cy", ((ly / ll) * 0.06).toFixed(3));
+          // "inherit", not "visible", so a face turned away hides its pupils too.
+          pupil.setAttribute("visibility", down ? "hidden" : "inherit");
+          const out = face.querySelector(`[data-out="${s}"]`);
+          out.setAttribute("transform", `translate(${ex} 0)`);
+          out.setAttribute("visibility", down ? "inherit" : "hidden");
+        }
+        const stars = g.querySelector("[data-stars]");
+        stars.setAttribute("visibility", down ? "visible" : "hidden");
+        if (down) {
+          const r = (lie * Math.PI) / 180;
+          stars.setAttribute(
+            "transform",
+            `translate(${(Math.sin(r) * 2.4).toFixed(2)} ${(-Math.cos(r) * 2.4).toFixed(2)}) rotate(${((now / 4) % 360).toFixed(0)})`
+          );
+        }
+      });
+      const puck = svg.querySelector("[data-puck]");
+      puck.setAttribute("transform", `translate(${px.toFixed(2)} ${py.toFixed(2)})`);
+      puck.dataset.depth = py;
+      // Far to near, so whatever is nearer is drawn over what it stands in front of.
+      const things = svg.querySelector("[data-things]");
+      for (const n of things.querySelectorAll("[data-net]")) n.dataset.depth ??= TILT.at(+n.dataset.net * (GOAL_X + NET_DEPTH / 2), 0)[1];
+      const order = [...things.children].sort((a, b) => a.dataset.depth - b.dataset.depth);
+      if (order.some((e, i) => things.children[i] !== e)) order.forEach((e) => things.appendChild(e));
+    }
     svg.querySelector("[data-trail]").setAttribute("points", pk.trail.map((t) => t.map((v) => v.toFixed(2)).join(",")).join(" "));
     const you = svg.querySelector("[data-you]");
     you.style.display = game.human ? "" : "none";
@@ -964,14 +1184,21 @@
       const on = fx.lamp && +lamp.dataset.lamp === fx.lamp.side && now < fx.lamp.until;
       lamp.setAttribute("opacity", on ? (0.55 + 0.35 * Math.sin(now / 80)).toFixed(2) : "0");
     }
-    // Hats fall onto the ice, spinning, stay a while and fade.
+    // Hats fall onto the ice, spinning, stay a while and fade: from beyond the
+    // far boards seen from above, from the sky when tilted.
     svg.querySelectorAll("[data-hat]").forEach((h) => {
       const age = (now - +h.dataset.t0) / 1000;
       if (age > 8) return h.remove();
       const k = clamp(age / 0.9, 0, 1),
-        e = 1 - (1 - k) * (1 - k);
-      const y = -19 + (+h.dataset.y + 19) * e;
-      h.setAttribute("transform", `translate(${h.dataset.x} ${y.toFixed(2)}) rotate(${(+h.dataset.r + (1 - e) * 240).toFixed(0)})`);
+        e = 1 - (1 - k) * (1 - k),
+        spin = (+h.dataset.r + (1 - e) * 240).toFixed(0);
+      if (view === "top") {
+        const y = -19 + (+h.dataset.y + 19) * e;
+        h.setAttribute("transform", `translate(${h.dataset.x} ${y.toFixed(2)}) rotate(${spin})`);
+      } else {
+        const [x, y] = TILT.at(+h.dataset.x, +h.dataset.y, 14 * (1 - e));
+        h.setAttribute("transform", `translate(${x.toFixed(2)} ${y.toFixed(2)}) scale(1 ${SQUASH}) rotate(${spin})`);
+      }
       h.setAttribute("opacity", age > 7 ? (8 - age).toFixed(2) : "1");
     });
   }
@@ -1071,10 +1298,19 @@
 
   // The home page's piece: the computer against itself, a few seconds in,
   // drawn once.
+  // The view the visitor last chose, tilted unless they chose the one from above.
+  const chosenView = () => {
+    try {
+      return localStorage.getItem("hockey-view") === "top" ? "top" : "tilt";
+    } catch (e) {
+      return "tilt";
+    }
+  };
+
   function still(rootEl) {
     const game = new Game({ human: false });
     for (let t = 0; t < 7; t += STEP) game.step(STEP);
-    draw(rootEl.querySelector("svg"), game);
+    draw(rootEl.querySelector("svg"), game, { view: chosenView() });
   }
 
   function play(rootEl) {
@@ -1088,9 +1324,10 @@
       live = $("[data-live]");
     let game = new Game();
     let state = "ready"; // ready, playing, paused, over
+    let view = chosenView();
     // The running game, for tests and the console.
     rootEl.hockey = { game: () => game };
-    draw(svg, game);
+    draw(svg, game, { view });
     const marks = skateMarks(svg);
 
     function show(t, body, label) {
@@ -1112,14 +1349,25 @@
       const t = Math.ceil(game.clock);
       $("[data-clock]").textContent = game.overtime ? "overtime" : `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
       $("[data-pause]").textContent = state === "paused" ? "resume" : "pause";
+      $("[data-view]").textContent = view === "tilt" ? "view from above" : "tilted view";
     }
+    $("[data-view]").addEventListener("click", () => {
+      view = view === "tilt" ? "top" : "tilt";
+      try {
+        localStorage.setItem("hockey-view", view);
+      } catch (e) {
+        // Not remembered, which is fine.
+      }
+      draw(svg, game, { view });
+      hud();
+    });
 
     function start() {
       if (state === "over") {
         game = new Game();
         marks.clear();
       }
-      if (state === "over" || state === "ready") draw(svg, game);
+      if (state === "over" || state === "ready") draw(svg, game, { view });
       state = "playing";
       overlay.hidden = true;
       last = null;
@@ -1138,7 +1386,7 @@
     $("[data-restart]").addEventListener("click", () => {
       game = new Game();
       marks.clear();
-      draw(svg, game);
+      draw(svg, game, { view });
       state = "playing";
       overlay.hidden = true;
       toast.hidden = true;
@@ -1231,8 +1479,15 @@
       if (keys.has("ArrowRight") || keys.has("KeyD")) x += 1;
       if (keys.has("ArrowUp") || keys.has("KeyW")) y -= 1;
       if (keys.has("ArrowDown") || keys.has("KeyS")) y += 1;
-      const l = hypot(x, y);
-      if (l > 1) [x, y] = [x / l, y / l];
+      let l = hypot(x, y);
+      if (l > 1) [x, y, l] = [x / l, y / l, 1];
+      // Keys and the stick mean directions on the screen: tilted, that is not
+      // the same direction on the ice.
+      if (view === "tilt" && l > 0) {
+        const [ix, iy] = TILT.back(x, y),
+          il = hypot(ix, iy);
+        [x, y] = [(ix / il) * l, (iy / il) * l];
+      }
       const out = { x, y, shoot: presses.shoot, pass: presses.pass, check: presses.check };
       presses.shoot = presses.pass = presses.check = false;
       return out;
@@ -1281,7 +1536,7 @@
         }
       }
       marks.update(game, now);
-      draw(svg, game, { now, lamp });
+      draw(svg, game, { now, lamp, view });
       hud();
     }
     let lamp = null;

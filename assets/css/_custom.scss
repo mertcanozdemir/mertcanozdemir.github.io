@@ -1252,6 +1252,11 @@ a.piece:hover .piece-more {
   --rink-mask: #f2f4f6;
   --rink-visor: #1d2430;
   --rink-helmet-edge: rgba(0, 0, 0, 0.28);
+  --rink-pants: #2a3140; // the tilted view's players, boards and nets
+  --rink-shadow: rgba(20, 30, 45, 0.16);
+  --rink-wall: #fdfefe;
+  --rink-mesh: rgba(150, 160, 172, 0.18);
+  --rink-mesh-line: rgba(120, 130, 142, 0.55);
   --game-veil: rgba(255, 255, 255, 0.82);
 }
 
@@ -1260,6 +1265,11 @@ html[data-theme="dark"] {
   --rink-mask: #d3d8dd;
   --rink-visor: #0f1318;
   --rink-helmet-edge: rgba(0, 0, 0, 0.5);
+  --rink-pants: #10151b;
+  --rink-shadow: rgba(0, 0, 0, 0.35);
+  --rink-wall: #2e353d;
+  --rink-mesh: rgba(220, 226, 232, 0.1);
+  --rink-mesh-line: rgba(220, 226, 232, 0.4);
   --game-veil: rgba(22, 24, 26, 0.85);
 }
 

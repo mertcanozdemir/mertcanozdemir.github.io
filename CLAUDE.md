@@ -196,6 +196,20 @@ goalie). Three minutes, then sudden-death overtime if tied. Touch screens get a
 stick and three buttons (pass, check, shoot), shown by `(pointer: coarse)` or
 after the first touch.
 
+Two views, switched by a button above the rink and remembered per browser
+(`hockey-view` in localStorage): **tilted**, the default and Mertcan's idea
+("izometrik"), and **from above**, as the drills are drawn. Tilted is an
+orthographic camera above the near boards, turned a little and tilted (`YAW`,
+`SQUASH`, `RISE`, the `TILT` matrix): the ice and what lies on it (markings,
+marks, the ring round your skater) are one plane drawn through that matrix,
+and on it stand boards with a far face and a see-through near face, nets with
+mesh and a red frame, and players standing up, a quarter bigger (`TALL`), with
+the helmet's visor and eyes turned the way they face (hidden when they skate
+away up the screen), all drawn far to near. Keys and the stick mean directions
+on the screen, so tilted they are mapped back onto the ice (`TILT.back`). A true
+45° isometric view was considered and passed over: the goals would sit in the
+corners and the keys would skate diagonally.
+
 Skate marks (`skateMarks()`, page side only): every player leaves twin blade
 tracks, and a fan of snow where they stop hard, turn sharply or go down. They
 build up through a game, so the ice looks used by the end (goalies scratch up
