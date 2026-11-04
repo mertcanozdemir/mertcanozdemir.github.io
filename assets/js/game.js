@@ -1700,43 +1700,48 @@
   // A goalie is another shape: big pads, a wide chest protector, a blocker and
   // a catching glove, a painted mask with a cage and a paddle stick. The parts
   // that turn with the player (face, arms, stick) are set by draw().
-  // A hockey stick standing up from the ice: the shaft from the top hand, and
-  // the blade flat on the ice, tape round its middle, the toe turned up a
-  // little; a goalie's has the wide paddle low on the shaft and a bigger
-  // blade. setStick() puts it where it is held.
+  // A hockey stick standing on the ice, to a real one's proportions (IIHF
+  // rules: up to 1.63 m to the heel, the blade 32 cm long and 5 to 7.6 cm
+  // high; a goalie's blade 39.5 cm long and 9 cm high, 11.5 at the heel, and
+  // the widened paddle 71 cm up the shaft). The shaft from the top hand, and
+  // a long, low blade flat on the ice, its toe rounded; a goalie's with the
+  // paddle. setStick() puts it where it is held.
   function stickSVG(goalie) {
     const line = `stroke="var(--rink-stick)" stroke-linecap="round"`;
     return `<g data-sticks>
-      <line data-stick ${line} stroke-width="${goalie ? 0.12 : 0.11}"/>
-      ${goalie ? `<line data-paddle ${line} stroke-width="0.26"/>` : ""}
-      <path data-blade fill="none" ${line} stroke-width="${goalie ? 0.26 : 0.17}"/>
-      <path data-tape fill="none" stroke="var(--rink-tape)" stroke-width="${goalie ? 0.12 : 0.08}" stroke-linecap="round" opacity="0.9"/></g>`;
+      <line data-stick ${line} stroke-width="${goalie ? 0.09 : 0.085}"/>
+      ${goalie ? `<line data-paddle ${line} stroke-width="0.16"/>` : ""}
+      <path data-blade fill="var(--rink-stick)"/></g>`;
   }
   // From the top hand (x1, y1) to the middle of the blade (bx, by), on the
-  // ice; the toe out away from the shaft, `toe` 1 to the right, -1 left.
+  // ice; the blade runs on from the heel away from the shaft, `toe` 1 to the
+  // right, -1 to the left.
   function setStick(g, x1, y1, bx, by, toe, goalie) {
-    const f = (v) => v.toFixed(2),
-      back = goalie ? 0.34 : 0.22,
-      ahead = goalie ? 0.42 : 0.34,
-      hx = bx - toe * back,
-      tx = bx + toe * ahead,
-      ty = by - (goalie ? 0.08 : 0.1),
+    const f = (v) => v.toFixed(3),
+      long = goalie ? 0.56 : 0.46, // the blade, heel to toe
+      high = goalie ? 0.13 : 0.1, // at the heel
+      tip = goalie ? 0.11 : 0.075, // at the toe
+      hx = bx - toe * long * 0.4,
+      tx = hx + toe * long,
       stick = g.querySelector("[data-stick]");
     stick.setAttribute("x1", f(x1));
     stick.setAttribute("y1", f(y1));
     stick.setAttribute("x2", f(hx));
-    stick.setAttribute("y2", f(by));
+    stick.setAttribute("y2", f(by - high * 0.6));
     const paddle = g.querySelector("[data-paddle]");
     if (paddle) {
       paddle.setAttribute("x1", f(x1 + (hx - x1) * 0.55));
       paddle.setAttribute("y1", f(y1 + (by - y1) * 0.55));
       paddle.setAttribute("x2", f(hx));
-      paddle.setAttribute("y2", f(by));
+      paddle.setAttribute("y2", f(by - high * 0.6));
     }
-    g.querySelector("[data-blade]").setAttribute("d", `M ${f(hx)} ${f(by)} Q ${f(bx + toe * ahead * 0.6)} ${f(by + 0.03)} ${f(tx)} ${f(ty)}`);
-    g.querySelector("[data-tape]").setAttribute(
+    // Flat along the bottom, the toe rounded, the top edge falling a little
+    // from the heel to the toe, and the heel rounded into the shaft.
+    const r = tip / 2;
+    g.querySelector("[data-blade]").setAttribute(
       "d",
-      `M ${f(bx - toe * back * 0.35)} ${f(by + 0.01)} L ${f(bx + toe * ahead * 0.45)} ${f(by + 0.01)}`
+      `M ${f(hx)} ${f(by)} L ${f(tx - toe * r)} ${f(by)} Q ${f(tx)} ${f(by)} ${f(tx)} ${f(by - r)} Q ${f(tx)} ${f(by - tip)} ${f(tx - toe * r)} ${f(by - tip)} ` +
+        `L ${f(hx + toe * 0.05)} ${f(by - high)} Q ${f(hx - toe * 0.02)} ${f(by - high)} ${f(hx - toe * 0.02)} ${f(by - high * 0.5)} Q ${f(hx - toe * 0.02)} ${f(by)} ${f(hx)} ${f(by)} Z`
     );
   }
 
