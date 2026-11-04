@@ -433,10 +433,27 @@ marks and the frost, drawn into a canvas through an SVG data URL (CSS variables
 substituted, since an image cannot see them); the clean, wet ice is painted onto
 it along the track and only that patch is uploaded. Round it: boards with
 KAMBONI adverts, glass, and stands that start right behind the glass (with a
-gap you saw into the void). Over it, the cab: its frame, a mirror (a second,
-flipped render) that shows the clean band behind, a dashboard with the wheel,
-a gauge, an arrow to the dirtiest ice (4 m blocks) and a nodding cat, and a
-map. No WebGL: from above instead. Headless Chrome logs "GPU stall due to
+gap you saw into the void). Over it, what the driver sits in, **open on top**
+as on a real resurfacer (a cab is an extra on real ones; the first version had
+a roof and pillars and looked like a truck, Mertcan said): the snow tank's side
+on the right with a mirror on an arm (a second, flipped render) that shows the
+clean band behind, a grab rail on the left, the white front deck with the
+wheel, a gauge for the ice and a cat, and the map at the top left. Two aids
+replaced an arrow to the dirtiest ice, which Mertcan found useless:
+
+- the **ICE CAM** on the dash (`screenBox()`, a third render through a hole
+  in the dash's SVG): the ice from straight above, heading up, the Kamboni
+  drawn in, and the cells the game counts as clean tinted blue (`wetCells()`),
+  so the strips still to do stand out (a real one has a rear camera on a
+  screen);
+- the **lane laser** (`laser()`; a real option on one maker's machines): two
+  lines on the ice ahead where the band's edges will run, green on the wet
+  edge of an earlier pass or the boards (drivers line their passes up so),
+  amber over a strip that would be left, white with nothing to line up with,
+  dim blue over clean ice. The cat is the trainer: it nods on the seam and
+  shakes its head at a gap. A toast says so once, four seconds in.
+
+No WebGL: from above instead. Headless Chrome logs "GPU stall due to
 ReadPixels" here; that is its software compositing, not the game.
 
 Two views, switched by a button above the rink and remembered per browser

@@ -2,9 +2,12 @@
 // of the hockey game (game.js starts it). In 3D, with WebGL: the ice is the
 // game's own rink drawing, frosted and scratched up, turning to wet ice where
 // the Kamboni has been; round it the boards, the glass and the stands. Over
-// that the cab: its frame, a mirror looking back at the clean band, the
-// dashboard (the wheel, a gauge for how clean the ice is, an arrow to the
-// dirtiest ice and a cat that nods along) and a map of the rink.
+// that what the driver sits in, open on top as on a real resurfacer: the
+// snow tank beside the seat with a mirror on an arm looking back at the clean
+// band, the white front deck with the wheel, a camera's screen showing the
+// ice round the Kamboni from above, a gauge for how clean the ice is and a
+// cat that sways along and nods or shakes its head at the driving; a lane
+// laser on the ice ahead; and a map of the rink.
 //
 // Rink coordinates as in the game, in metres: x along the rink, y across it
 // (+y the near side), h up. WebGL's X, Y and Z are x, h and y.
@@ -20,6 +23,10 @@
     const f = 1 / Math.tan(fovy / 2),
       nf = 1 / (near - far);
     return [f / aspect, 0, 0, 0, 0, f, 0, 0, 0, 0, (far + near) * nf, -1, 0, 0, 2 * far * near * nf, 0];
+  }
+  // Straight on, without perspective: `hw` and `hh` metres either side.
+  function ortho(hw, hh, near, far) {
+    return [1 / hw, 0, 0, 0, 0, 1 / hh, 0, 0, 0, 0, -2 / (far - near), 0, 0, 0, -(far + near) / (far - near), 1];
   }
   function lookAt(e, c, u) {
     let zx = e[0] - c[0],
@@ -159,11 +166,35 @@ void main() {
     };
   }
 
-  const FRAME_SVG = `<path d="M 0 0 H 100 V 3.2 H 0 Z M 0 0 H 7 L 2.6 50 H 0 Z M 100 0 H 93 L 97.4 50 H 100 Z" fill="#14171b"/>
-    <rect x="49.4" y="2.6" width="1.2" height="1.8" fill="#14171b"/>
-    <rect x="40" y="4" width="20" height="8" rx="1" fill="none" stroke="#14171b" stroke-width="5" vector-effect="non-scaling-stroke"/>`;
-  const DASH_SVG = `<path d="M -300 60 V 21 Q 200 3 700 21 V 60 Z" fill="#1b1f25"/>
-    <path d="M -300 21 Q 200 3 700 21" fill="none" stroke="#3b424b" stroke-width="1.2"/>
+  // Round the driver, who sits up high in the open, on the left, as on a
+  // real resurfacer (a cab is an extra): no roof and no windscreen. On the
+  // right the side of the snow tank beside the seat, a mirror on an arm from
+  // it (MIRROR, in hundredths of the view), and a grab rail on the left.
+  const MIRROR = { x: 73, y: 7, w: 17, h: 22 };
+  const FRAME_SVG = `<path d="M 88.5 50 L 91 22 Q 91.3 19.6 93.4 19 L 100 17 V 50 Z" fill="var(--rink-rz-tank)"/>
+    <path d="M 88.5 50 L 91 22 Q 91.3 19.6 93.4 19 L 100 17" fill="none" stroke="var(--rink-rz-edge)" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+    <path d="M 89.9 34.5 L 100 31.6" stroke="var(--rink-team-a)" stroke-width="7" vector-effect="non-scaling-stroke"/>
+    <path d="M 96.5 18.2 Q 95.6 13.5 ${MIRROR.x + MIRROR.w} ${(MIRROR.y + MIRROR.h * 0.75) / 2}" fill="none" stroke="#2b3036" stroke-width="5" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+    <rect x="${MIRROR.x}" y="${MIRROR.y / 2}" width="${MIRROR.w}" height="${MIRROR.h / 2}" rx="2.2" fill="none" stroke="#1b1f25" stroke-width="7" vector-effect="non-scaling-stroke"/>
+    <path d="M 0.6 50 L 2.4 31 Q 2.8 28.2 5.6 27.6" fill="none" stroke="#c3cad1" stroke-width="7" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+    <path d="M 0.6 50 L 2.4 31 Q 2.8 28.2 5.6 27.6" fill="none" stroke="#8d98a4" stroke-width="2" stroke-linecap="round" vector-effect="non-scaling-stroke"/>`;
+  // Ahead of the driver, the Kamboni's white front deck with its rounded
+  // edge, and on it the steering column with the wheel, and a panel with the
+  // camera's screen (SCREEN: the ice round the Kamboni from above, as the
+  // GL draws it through the hole) and the ICE gauge; the nodding cat.
+  const SCREEN = { x: 182, y: 15, w: 64, h: 33 };
+  const DASH_SVG = `<defs><mask id="cab-screen-hole" maskUnits="userSpaceOnUse" x="-300" y="-20" width="1000" height="90">
+      <rect x="-300" y="-20" width="1000" height="90" fill="#fff"/>
+      <rect x="${SCREEN.x}" y="${SCREEN.y}" width="${SCREEN.w}" height="${SCREEN.h}" rx="2.5" fill="#000"/></mask></defs>
+    <g mask="url(#cab-screen-hole)">
+      <path d="M -300 60 V 25 Q 200 8 700 25 V 60 Z" fill="var(--rink-rz)"/>
+      <path d="M -300 25 Q 200 8 700 25" fill="none" stroke="var(--rink-rz-edge)" stroke-width="0.9"/>
+      <path d="M -300 29.5 Q 200 12.5 700 29.5" fill="none" stroke="var(--rink-team-a)" stroke-width="1.6"/>
+      <path d="M 64 60 L 76 33 Q 120 27 164 33 L 176 60 Z" fill="#1b1f25"/>
+      <path d="M 172 60 L 176 17 Q 177 11 183 11 H 298 Q 304 11 305 17 L 309 60 Z" fill="#1b1f25"/>
+    </g>
+    <rect x="${SCREEN.x}" y="${SCREEN.y}" width="${SCREEN.w}" height="${SCREEN.h}" rx="2.5" fill="none" stroke="#3b424b" stroke-width="0.9"/>
+    <text x="${SCREEN.x + 2.5}" y="${SCREEN.y + 4.4}" font-size="3" font-weight="700" fill="#e6ebf0" opacity="0.85" style="paint-order: stroke" stroke="#0f1215" stroke-width="0.8">ICE CAM</text>
     <g transform="translate(118 52)"><g data-wheel>
       <circle r="34" fill="none" stroke="#2b3036" stroke-width="7"/>
       <circle r="37.2" fill="none" stroke="#434a53" stroke-width="0.8"/>
@@ -171,18 +202,14 @@ void main() {
       <circle r="9" fill="#2b3036"/><text y="2.6" font-size="7.5" font-weight="700" text-anchor="middle" fill="#8b949e">K</text>
       <ellipse cx="-29" cy="-17" rx="6" ry="8" transform="rotate(-30 -29 -17)" fill="var(--rink-team-a)"/>
       <ellipse cx="29" cy="-17" rx="6" ry="8" transform="rotate(30 29 -17)" fill="var(--rink-team-a)"/></g></g>
-    <g transform="translate(205 31)">
-      <circle r="9.5" fill="#0f1215" stroke="#3b424b" stroke-width="0.8"/>
-      <path data-arrow d="M 0 -7 L 4.2 3 L 0 1 L -4.2 3 Z" fill="#ffd54a"/>
-      <text y="15.5" font-size="3.6" text-anchor="middle" fill="#8b949e">to dirty ice</text></g>
-    <g transform="translate(282 33)">
+    <g transform="translate(275 31)">
       <circle r="13.5" fill="#0f1215" stroke="#3b424b" stroke-width="0.8"/>
       <path data-goal fill="none" stroke="#34c759" stroke-width="2.2"/>
       <line data-needle y2="-10.5" stroke="#ff6b4a" stroke-width="1.4" stroke-linecap="round"/>
       <circle r="1.6" fill="#3b424b"/>
       <text y="-4.2" font-size="3.4" text-anchor="middle" fill="#8b949e">ICE</text>
       <text data-ice y="8.5" font-size="4.6" font-weight="700" text-anchor="middle" fill="#e6ebf0">0%</text></g>
-    <g transform="translate(345 26)">
+    <g transform="translate(338 27)">
       <rect x="-5" y="-1" width="10" height="9" rx="2" fill="#4a525c"/>
       <g data-cat><path d="M 0 -2 V -4" stroke="#8b949e" stroke-width="1"/>
         <path d="M -6.4 -11 L -5.4 -19 L -1.4 -14.6 Z M 6.4 -11 L 5.4 -19 L 1.4 -14.6 Z" fill="#a9b1ba"/>
@@ -215,7 +242,7 @@ void main() {
     const $ = (s) => el.querySelector(s);
     const parts = {
       wheel: $("[data-wheel]"),
-      arrow: $("[data-arrow]"),
+      screen: $(".cab-dash"),
       needle: $("[data-needle]"),
       ice: $("[data-ice]"),
       cat: $("[data-cat]"),
@@ -431,33 +458,6 @@ void main() {
       gl.generateMipmap(gl.TEXTURE_2D);
     }
 
-    // The dashboard's arrow points at the dirtiest ice near by: the ice in
-    // 4 m blocks, each worth its dirty cells over how far it is.
-    let aimAt = null,
-      aimed = -1e9;
-    function dirtiest(now) {
-      if (now - aimed < 300) return;
-      aimed = now;
-      const bins = new Map();
-      for (const c of rz.cells) {
-        if (c.clean) continue;
-        const k = Math.floor((c.x + 32) / 4) * 100 + Math.floor((c.y + 16) / 4),
-          b = bins.get(k) || { n: 0, x: 0, y: 0 };
-        b.n++;
-        b.x += c.x;
-        b.y += c.y;
-        bins.set(k, b);
-      }
-      let best = 0;
-      aimAt = null;
-      for (const b of bins.values()) {
-        const bx = b.x / b.n,
-          by = b.y / b.n,
-          worth = b.n / (Math.hypot(bx - rz.x, by - rz.y) + 6);
-        if (worth > best) [best, aimAt] = [worth, [bx, by]];
-      }
-    }
-
     // ——— The replay: a goal seen again from the scorer's eyes ———
     // The players and the referee as their drawings, standing up and turned
     // to the eye (front or back as they face it), life size, each with a
@@ -466,7 +466,15 @@ void main() {
       M = 0.686, // metres a drawing unit: 2.77 units of player are 1.9 m
       ATLAS = 2048, // the drawings' texture, pixels across
       atlas = canvas2d(1, 1),
-      dyn = { sprites: gl.createBuffer(), shadows: gl.createBuffer(), puck: gl.createBuffer(), streak: gl.createBuffer() };
+      dyn = {
+        sprites: gl.createBuffer(),
+        shadows: gl.createBuffer(),
+        puck: gl.createBuffer(),
+        streak: gl.createBuffer(),
+        machine: gl.createBuffer(),
+        wet: gl.createBuffer(),
+        laser: gl.createBuffer(),
+      };
     let atlasTex = null,
       atlasV = 1, // the texture's height in drawing units
       sprites = 0,
@@ -699,7 +707,142 @@ void main() {
       scene(mul(perspective(FOV, W / H, 0.3, 260), lookAt(cam.eye, at, [0, 1, 0])), 1, true, extra);
     }
 
-    const cat = { a: 0, w: 0 };
+    // The screen's hole in the dashboard, in the view's pixels (GL counts them
+    // from the bottom). Measured again when the view changes size.
+    let screenAt = null;
+    function screenBox(W, H) {
+      if (screenAt && screenAt.W === W && screenAt.H === H) return screenAt.box;
+      const svg = parts.screen,
+        v = view.getBoundingClientRect(),
+        m = svg.getScreenCTM();
+      if (!m || !v.width) return null;
+      const pt = (x, y) => new DOMPoint(x, y).matrixTransform(m),
+        a = pt(SCREEN.x + 0.6, SCREEN.y + 0.6),
+        b = pt(SCREEN.x + SCREEN.w - 0.6, SCREEN.y + SCREEN.h - 0.6),
+        kx = W / v.width,
+        ky = H / v.height;
+      const box = {
+        x: Math.round((a.x - v.left) * kx),
+        y: Math.round(H - (b.y - v.top) * ky),
+        w: Math.round((b.x - a.x) * kx),
+        h: Math.round((b.y - a.y) * ky),
+      };
+      screenAt = { W, H, box: box.w > 4 && box.h > 4 ? box : null };
+      return screenAt.box;
+    }
+    // The Kamboni as the camera sees it, flat on the ice: its white body with
+    // the stripe, the snow tank, the driver's seat at the front left, and the
+    // conditioner and towel trailing behind.
+    // The ice the game counts as clean, metre by metre, near (x, y): blue on
+    // the screen, so the strips still to do stand out white.
+    function wetCells(x, y, r) {
+      const q = quads(),
+        blue = [0.2, 0.55, 1, 0.42];
+      for (const cell of rz.cells) {
+        if (!cell.clean || Math.abs(cell.x - x) > r || Math.abs(cell.y - y) > r) continue;
+        const [x0, x1, y0, y1] = [cell.x - 0.5, cell.x + 0.5, cell.y - 0.5, cell.y + 0.5];
+        q.add([x0, 0.02, y0], [x1, 0.02, y0], [x1, 0.02, y1], [x0, 0.02, y1], blue);
+      }
+      return q;
+    }
+
+    // The lane laser (real resurfacers can have one): two lines on the ice
+    // ahead, where the edges of the clean band will run. Each stretch shows
+    // what is just outside it: green, the wet edge of an earlier pass or the
+    // boards, which is how drivers line up their passes ("keep your tires
+    // lined up with the line of the surfaced ice"); amber, a strip of cut-up
+    // ice between it and the wet ice, which would be left; white, nothing
+    // to line up with; dim blue, ice already clean. `mood` is for the cat.
+    let grid = null;
+    const cellAt = (x, y) => {
+      const c = grid.get(Math.floor(x + 30) * 31 + Math.floor(y + 15));
+      return c ? (c.clean ? "clean" : "dirty") : "off";
+    };
+    const LASER = {
+      seam: [0.25, 1, 0.45, 0.95],
+      gap: [1, 0.66, 0.12, 0.95],
+      free: [1, 1, 1, 0.6],
+      done: [0.45, 0.72, 1, 0.45],
+    };
+    function laser() {
+      const q = quads(),
+        c = Math.cos(rz.h),
+        s = Math.sin(rz.h),
+        half = RZ.width / 2,
+        seen = { seam: 0, gap: 0 };
+      for (const side of [-1, 1]) {
+        // The driver's right is (-s, c).
+        const rx = -s * side,
+          ry = c * side,
+          at = (d, o) => [rz.x + c * d + rx * o, rz.y + s * d + ry * o];
+        for (let d = 3; d < 13; d += 1.6) {
+          const [mx, my] = at(d + 0.8, half);
+          if (cellAt(mx, my) === "off" && cellAt(...at(d + 0.8, half - 1)) === "off") break;
+          const inside = cellAt(...at(d + 0.8, half - 0.6)),
+            outside = cellAt(...at(d + 0.8, half + 0.5));
+          let state = "free";
+          if (inside === "clean" && outside !== "dirty") state = "done";
+          else if (outside !== "dirty") state = "seam";
+          else
+            for (const o of [1.3, 2.1, 2.9])
+              if (cellAt(...at(d + 0.8, half + o)) === "clean") {
+                state = "gap";
+                break;
+              }
+          if (d < 8 && state in seen) seen[state]++;
+          const col = LASER[state],
+            [ax, ay] = at(d, half),
+            [bx, by] = at(d + 1.6, half),
+            w = 0.05;
+          q.add(
+            [ax - rx * w, 0.03, ay - ry * w],
+            [bx - rx * w, 0.03, by - ry * w],
+            [bx + rx * w, 0.03, by + ry * w],
+            [ax + rx * w, 0.03, ay + ry * w],
+            col
+          );
+          const glow = [col[0], col[1], col[2], col[3] * 0.25],
+            g = 0.2;
+          q.add(
+            [ax - rx * g, 0.025, ay - ry * g],
+            [bx - rx * g, 0.025, by - ry * g],
+            [bx + rx * g, 0.025, by + ry * g],
+            [ax + rx * g, 0.025, ay + ry * g],
+            glow
+          );
+        }
+      }
+      return { q, mood: seen.seam ? "yes" : seen.gap ? "no" : null };
+    }
+
+    let rzColours = null; // read again for each intermission, in the theme of the moment
+    function machine() {
+      const q = quads(),
+        c = Math.cos(rz.h),
+        s = Math.sin(rz.h);
+      const at = (a, b, h) => [rz.x + c * a - s * b, h, rz.y + s * a + c * b],
+        rect = (a0, a1, b0, b1, h, col) => q.add(at(a0, b0, h), at(a1, b0, h), at(a1, b1, h), at(a0, b1, h), col);
+      rzColours = rzColours || {
+        body: rgba(cssVar("--rink-rz") || "#fbfcfd"),
+        tank: rgba(cssVar("--rink-rz-tank") || "#dce3ea"),
+        dark: rgba(cssVar("--rink-rz-dark") || "#56606b"),
+        towel: rgba(cssVar("--rink-towel") || "#cfd9e3"),
+        stripe: rgba(cssVar("--rink-team-a") || "#2f6fd6"),
+      };
+      const { body, tank, dark, towel, stripe } = rzColours;
+      rect(-3.75, -2.95, -1.35, 1.35, 0.05, towel);
+      rect(-3.05, -2.55, -1.5, 1.5, 0.1, dark);
+      rect(-2.6, 2.6, -1.3, 1.3, 0.3, dark);
+      rect(-2.52, 2.52, -1.22, 1.22, 0.32, body);
+      rect(-2.35, 2.35, -1.2, -1.08, 0.34, stripe);
+      rect(-2.35, 2.35, 1.08, 1.2, 0.34, stripe);
+      rect(-2.35, 0.95, -1.02, 1.02, 0.36, tank);
+      rect(1.15, 1.95, -1.08, -0.16, 0.36, dark);
+      rect(1.2, 2.25, 0.05, 1.0, 0.38, tank);
+      return q;
+    }
+
+    const cat = { a: 0, w: 0, t: 0, yes: 0, no: 0 };
     let last = null,
       shake = 0;
     return {
@@ -719,9 +862,10 @@ void main() {
         const mine = ++job;
         el.classList.remove("is-replay");
         rz = r;
+        rzColours = null;
+        grid = new Map(r.cells.map((cell) => [Math.floor(cell.x + 30) * 31 + Math.floor(cell.y + 15), cell]));
         ready = painted = mapped = 0;
         mapPoints = "";
-        aimed = -1e9;
         last = null;
         build();
         const floor = `<rect x="-32" y="-16" width="64" height="32" fill="#2a2f36"/>`;
@@ -767,35 +911,58 @@ void main() {
         gl.viewport(0, 0, W, H);
         gl.clearColor(...ARENA, 1);
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-        scene(mul(perspective(0.95, W / H, 0.1, 260), lookAt(eye, look(rz.h, EYE.pitch), up)), 1);
-        // The mirror, in its frame at the top: behind, and the wrong way round.
-        const mx = Math.round(W * 0.4),
-          mw = Math.round(W * 0.2),
-          my = Math.round(H * 0.76),
-          mh = Math.round(H * 0.16);
+        const lane = laser();
+        scene(mul(perspective(0.95, W / H, 0.1, 260), lookAt(eye, look(rz.h, EYE.pitch), up)), 1, false, [
+          drawDynamic(dyn.laser, lane.q, null, { glass: true }),
+        ]);
+        // The mirror, on its arm at the top right: behind, and the wrong way round.
+        const mx = Math.round((W * MIRROR.x) / 100),
+          mw = Math.round((W * MIRROR.w) / 100),
+          my = Math.round(H * (1 - (MIRROR.y + MIRROR.h) / 100)),
+          mh = Math.round((H * MIRROR.h) / 100);
         gl.enable(gl.SCISSOR_TEST);
         gl.scissor(mx, my, mw, mh);
         gl.viewport(mx, my, mw, mh);
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
         scene(mul(perspective(0.6, mw / mh, 0.1, 260), lookAt(eye, look(rz.h + Math.PI, -0.32), [0, 1, 0])), -1);
+        // The camera's screen: the ice round the Kamboni from straight above,
+        // the way it goes up the screen and more of what is ahead than behind,
+        // so the cut-up ice shows where it is to steer for.
+        const sc = screenBox(W, H);
+        if (sc) {
+          gl.scissor(sc.x, sc.y, sc.w, sc.h);
+          gl.viewport(sc.x, sc.y, sc.w, sc.h);
+          gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+          const hh = 9,
+            hw = (hh * sc.w) / sc.h,
+            cx = rz.x + c * 4,
+            cy = rz.y + s * 4;
+          scene(mul(ortho(hw, hh, 1, 60), lookAt([cx, 30, cy], [cx, 0, cy], [c, 0, s])), 1, false, [
+            drawDynamic(dyn.wet, wetCells(cx, cy, Math.hypot(hw, hh) + 1), null, { flat: true }),
+            drawDynamic(dyn.machine, machine(), null),
+          ]);
+        }
         gl.disable(gl.SCISSOR_TEST);
 
         // The dashboard.
         parts.wheel.setAttribute("transform", `rotate(${(rz.wheel * 100).toFixed(1)})`);
         parts.needle.setAttribute("transform", `rotate(${(-120 + 240 * rz.part).toFixed(1)})`);
         parts.ice.textContent = `${Math.floor(100 * rz.part)}%`;
-        dirtiest(now);
-        parts.arrow.style.display = aimAt ? "" : "none";
-        if (aimAt) {
-          const turn = Math.atan2(aimAt[1] - rz.y, aimAt[0] - rz.x) - rz.h;
-          parts.arrow.setAttribute("transform", `rotate(${((turn * 180) / Math.PI).toFixed(1)})`);
-        }
-        // The cat nods: a spring, pushed by turns and bumps.
+        // The cat sways: a spring, pushed by turns and bumps. And it is the
+        // driver's trainer: it nods while the laser is on the wet edge, and
+        // shakes its head at a strip about to be left.
         const yaw = rz.wheel * RZ.lock * Math.min(1, Math.max(0.3, Math.abs(rz.v) / 3)) * Math.sign(rz.v || 1);
         cat.w += (-70 * cat.a - 4 * cat.w - rz.v * yaw * 0.08) * dt;
         if (rz.bonk) cat.w += 7;
         cat.a = Math.max(-0.6, Math.min(0.6, cat.a + cat.w * dt));
-        parts.cat.setAttribute("transform", `rotate(${((cat.a * 180) / Math.PI).toFixed(1)} 0 -2)`);
+        const moving = Math.abs(rz.v) > 1,
+          mood = moving ? lane.mood : null;
+        cat.t += dt;
+        cat.yes += ((mood === "yes" ? 1 : 0) - cat.yes) * Math.min(1, dt * 6);
+        cat.no += ((mood === "no" ? 1 : 0) - cat.no) * Math.min(1, dt * 6);
+        const nod = Math.max(0, Math.sin(cat.t * 9)) * 1.4 * cat.yes,
+          no = Math.sin(cat.t * 16) * 0.3 * cat.no;
+        parts.cat.setAttribute("transform", `translate(0 ${nod.toFixed(2)}) rotate(${(((cat.a + no) * 180) / Math.PI).toFixed(1)} 0 -2)`);
         // The map.
         for (; mapped < rz.track.length; mapped++)
           mapPoints += `${mapPoints ? " " : ""}${rz.track[mapped][0].toFixed(1)},${rz.track[mapped][1].toFixed(1)}`;
