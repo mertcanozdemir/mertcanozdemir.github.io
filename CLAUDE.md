@@ -268,9 +268,20 @@ Mertcan, who wanted it higher) and the crowd, the buzzer, the
 Kamboni's horn. "mute" in the HUD, remembered (`hockey-sound`). Browsers start
 it only after a click or a key, so `wake()` runs on those.
 
-**Replay**: the last 3.5 s are kept frame by frame (`record()`); 1.5 s after a
-goal they are shown again at half speed with a REPLAY badge, then play carries
-on (the faceoff, or the end). Any key or a tap skips it.
+**Replay**: the last 4.5 s are kept frame by frame (`record()`); 1.5 s after a
+goal the last 2.2 s before it are shown again with a REPLAY badge, then play
+carries on (the faceoff, or the end). Any key or a tap skips it. Mertcan asked
+for it from the scorer's eyes, like the Kamboni's cab, and slower: half speed,
+slowing to 0.28 for the shot (`showReplay()`, frames interpolated by
+`between()`), about 7 s in all. kamboni.js draws it in 3D (`prepareReplay()`,
+`replayFrame()`): the game's own drawings stand on the ice as cut-outs turned to
+the eye (`replaySprites()` in game.js: each player from the front and the back,
+then the referee), with shadows, the nets, the puck (larger than life, more so
+the further off) with its streak, the scorer's own stick at the bottom, and the
+goal light on the glass that comes on when the puck is in. The camera keeps the
+puck low in the picture and the net in it. Without WebGL it is the old replay,
+as the game is seen. Gloves on the scorer's stick looked like dark blobs and
+were dropped.
 
 The end of a period (`phase` "intermission") is not a sudden menu (Mertcan
 found the first version abrupt): the green lights come on behind both nets (in

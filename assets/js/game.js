@@ -1627,6 +1627,45 @@
       <circle cx="-0.11" cy="0.04" r="0.05" fill="#111"/><circle cx="0.11" cy="0.04" r="0.05" fill="#111"/>
     </g></g>`;
 
+  // The players and the referee for the replay in 3D (kamboni.js): each
+  // player standing at rest, from the front and from the back (the hands the
+  // other way round), then the referee. No shadows: the replay puts those on
+  // the ice.
+  function replaySprites(game) {
+    const tidy = (g) => {
+      g.querySelectorAll('[fill="var(--rink-shadow)"], [data-stars], [data-out]').forEach((e) => e.remove());
+      return g.innerHTML;
+    };
+    const set = (e, attrs) => Object.entries(attrs).forEach(([k, v]) => e.setAttribute(k, typeof v === "number" ? v.toFixed(2) : v));
+    const out = [];
+    game.players.forEach((p, i) => {
+      const goalie = p.role === "goalie";
+      for (const back of [false, true]) {
+        const g = el("g", {}),
+          hand = (i % 2 ? 1 : -1) * (back ? -1 : 1);
+        g.innerHTML = standingSVG(p.team, goalie, skinOf(i), p.number);
+        const top = goalie ? [0.95, -1.55] : [hand * 0.46, -1.58],
+          low = goalie ? top : [hand * 0.66, -1.24];
+        if (!goalie)
+          for (const [side, [hx, hy]] of [
+            [-hand, top],
+            [hand, low],
+          ]) {
+            set(g.querySelector(`[data-arm="${side}"]`), { x1: side * 0.62, y1: -1.98, x2: hx, y2: hy });
+            set(g.querySelector(`[data-glove="${side}"]`), { cx: hx, cy: hy });
+          }
+        set(g.querySelector("[data-stick]"), { x1: top[0] * TALL, y1: top[1] * TALL, x2: goalie ? 0.3 : hand * 1.25, y2: -0.02 });
+        g.querySelector("[data-face]").setAttribute("visibility", back ? "hidden" : "visible");
+        g.querySelector("[data-back]").setAttribute("visibility", back ? "visible" : "hidden");
+        out.push(tidy(g));
+      }
+    });
+    const ref = el("g", {});
+    ref.innerHTML = REF_STAND;
+    out.push(tidy(ref));
+    return out;
+  }
+
   // ——— The Kamboni, from above ———
   // Facing +x, to size: the towel trailing on the ice, the conditioner, the
   // wheels, the snow tank with the name on it, the driver up front on the left
@@ -2372,7 +2411,10 @@
     function cabView() {
       if (cab === undefined) {
         try {
-          cab = (root.KamboniCab && root.KamboniCab($(".game-stage"), { RZ, outline, frost: frostSVG() })) || null;
+          cab =
+            (root.KamboniCab &&
+              root.KamboniCab($(".game-stage"), { RZ, outline, frost: frostSVG(), goal: { x: GOAL_X, depth: NET_DEPTH, half: NET_HALF } })) ||
+            null;
         } catch (e) {
           cab = null;
         }
@@ -2431,6 +2473,7 @@
       last = null;
       sound.wake();
       fullScreen(true);
+      if (cab === undefined) setTimeout(cabView, 300);
       svg.focus({ preventScroll: true });
     }
 
@@ -2501,13 +2544,16 @@
     });
 
     // The replay: the last seconds of play, kept frame by frame, shown again
-    // after a goal (once the lamp has had a moment) at half speed, then the
-    // game carries on. A key or a tap skips it.
+    // after a goal (once the lamp has had a moment) in slow motion, then the
+    // game carries on. A key or a tap skips it. Where there is WebGL it is
+    // seen from the scorer's eyes (kamboni.js draws it), the drawings and the
+    // ice made ready just after the goal; otherwise as the game is seen.
     const tape = [],
       badge = $("[data-replay]");
     let replayAt = 0,
       goalAt = 0,
-      replay = null;
+      replay = null,
+      replayOf = null; // the scorer and the net, for the eyes
     function record(now) {
       tape.push({
         now,
@@ -2516,27 +2562,72 @@
         controlled: game.players.indexOf(game.controlled),
         ref: { ...game.ref },
       });
-      while (tape.length && now - tape[0].now > 3500) tape.shift();
+      while (tape.length && now - tape[0].now > 4500) tape.shift();
+    }
+    function prepareReplay(ev) {
+      replayOf = { by: ev.by, goalX: (Math.sign(game.puck.x) || 1) * (GOAL_X + NET_DEPTH / 2) };
+      // A moment later, so the goal itself is not held up.
+      setTimeout(() => {
+        try {
+          if (cabView()) cab.prepareReplay(replaySprites(game), svg.querySelector("[data-marks]"));
+          else replayOf = null;
+        } catch (e) {
+          replayOf = null;
+        }
+      }, 150);
     }
     function startReplay(now) {
       replayAt = 0;
       if (tape.length < 10) return;
       state = "replay";
-      replay = { from: Math.max(tape[0].now, goalAt - 2200), to: goalAt + 250, at: now, i: 0 };
+      const from = Math.max(tape[0].now, goalAt - 2200);
+      replay = { from, to: goalAt + 350, t: from, last: now, i: 0, eyes: !!(replayOf && cab && cab.replayReady) };
       badge.hidden = false;
+      if (replay.eyes) {
+        cab.mode("replay");
+        cab.show(true);
+      }
     }
     function endReplay() {
+      if (replay && replay.eyes && cab) {
+        cab.show(false);
+        cab.mode("cab");
+      }
       state = "playing";
       replay = null;
       badge.hidden = true;
       last = null;
     }
+    // Between two frames of the tape, for a smooth slow motion; whatever
+    // jumped (to a faceoff) is not slid across.
+    function between(a, b, u) {
+      if (u <= 0 || a === b) return a;
+      const mix = (p, q) => {
+        if (!q || Math.abs(q.x - p.x) + Math.abs(q.y - p.y) > 4) return p;
+        const o = { ...p, x: p.x + (q.x - p.x) * u, y: p.y + (q.y - p.y) * u };
+        if ("fx" in p) {
+          const fx = p.fx + (q.fx - p.fx) * u,
+            fy = p.fy + (q.fy - p.fy) * u,
+            l = hypot(fx, fy) || 1;
+          [o.fx, o.fy] = [fx / l, fy / l];
+        }
+        if ("h" in p) o.h = p.h + (q.h - p.h) * u;
+        return o;
+      };
+      return { ...a, players: a.players.map((p, i) => mix(p, b.players[i])), puck: mix(a.puck, b.puck), ref: mix(a.ref, b.ref) };
+    }
     function showReplay(now) {
-      const t = replay.from + (now - replay.at) * 0.5;
-      if (t >= replay.to) return endReplay();
-      while (replay.i < tape.length - 1 && tape[replay.i + 1].now <= t) replay.i++;
-      const snap = tape[replay.i],
-        players = snap.players;
+      // Half speed, slowing to under a third for the shot and the goal.
+      const k = Math.min(1, Math.max(0, (replay.t - goalAt + 1500) / 600));
+      replay.t += Math.min(50, now - replay.last) * (0.5 - 0.22 * k * k * (3 - 2 * k));
+      replay.last = now;
+      if (replay.t >= replay.to) return endReplay();
+      while (replay.i < tape.length - 1 && tape[replay.i + 1].now <= replay.t) replay.i++;
+      const a = tape[replay.i],
+        b = tape[replay.i + 1] || a,
+        snap = between(a, b, b.now > a.now ? Math.min(1, (replay.t - a.now) / (b.now - a.now)) : 0);
+      if (replay.eyes) return cab.replayFrame(snap, replayOf.by, replayOf.goalX, now, replay.t >= goalAt);
+      const players = snap.players;
       draw(
         svg,
         {
@@ -2665,9 +2756,8 @@
       state === "playing" ? pause() : state === "paused" ? start() : state === "resurfacing" ? crew() : state === "crew" ? endResurfacing(true) : null
     );
     $("[data-restart]").addEventListener("click", () => {
+      if (state === "replay") endReplay();
       newGame();
-      replay = null;
-      badge.hidden = true;
       rz = null;
       lamp = null;
       if (cab) cab.show(false);
@@ -2848,6 +2938,7 @@
         if (ev.type === "goal") {
           lamp = { side: ev.team === "a" ? 1 : -1, until: now + 2400 };
           [goalAt, replayAt] = [now, now + 1500];
+          prepareReplay(ev);
           const name = (game.players[ev.by] || {}).name;
           let msg = name ? pick(QUIPS[ev.team]).replace("%", name) : ev.team === "a" ? "Goal!" : "The computer scores.";
           if (ev.hatTrick && ev.team === "a") {

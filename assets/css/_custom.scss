@@ -1743,6 +1743,15 @@ html.game-full {
     width: 17%;
     height: auto;
   }
+
+  // A goal seen again from the scorer's eyes: no cab round the view.
+  &.is-replay {
+    .cab-frame,
+    .cab-dash,
+    .cab-map {
+      display: none;
+    }
+  }
 }
 
 .game.is-cab .game-toast {

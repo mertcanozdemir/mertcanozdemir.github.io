@@ -53,11 +53,12 @@
 uniform mat4 m; uniform float flip; varying vec2 vt; varying vec4 vc; varying float vd;
 void main() { vec4 q = m * vec4(p, 1.0); q.x *= flip; gl_Position = q; vt = t; vc = c; vd = q.w; }`;
   const FRAG = `precision mediump float;
-uniform sampler2D tex; uniform float textured; uniform vec3 haze;
+uniform sampler2D tex; uniform float textured; uniform float cut; uniform vec3 haze;
 varying vec2 vt; varying vec4 vc; varying float vd;
 void main() {
   vec4 col = vc;
   if (textured > 0.5) col *= texture2D(tex, vt);
+  if (col.a < cut) discard;
   gl_FragColor = vec4(mix(col.rgb, haze, clamp((vd - 25.0) / 110.0, 0.0, 0.5)), col.a);
 }`;
 
@@ -75,19 +76,19 @@ void main() {
 
   // An SVG drawing in rink metres, onto a 64 × 32 m canvas; the page's CSS
   // variables are put in, since an image cannot see them.
-  function rasterize(markup, canvas, done) {
+  function rasterize(markup, canvas, done, box = "-32 -16 64 32") {
     const text = markup.replace(/var\((--[\w-]+)\)/g, (m, name) => cssVar(name) || "#888");
     const img = new Image();
     img.onload = () => {
       const ctx = ctx2d(canvas);
-      ctx.clearRect(0, 0, TW, TH);
-      ctx.drawImage(img, 0, 0, TW, TH);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       done(true);
     };
     img.onerror = () => done(false);
     img.src =
       "data:image/svg+xml;charset=utf-8," +
-      encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="${TW}" height="${TH}" viewBox="-32 -16 64 32">${text}</svg>`);
+      encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="${canvas.width}" height="${canvas.height}" viewBox="${box}">${text}</svg>`);
   }
   const canvas2d = (w, h) => Object.assign(document.createElement("canvas"), { width: w, height: h });
   // A 2D context that is read back often (for WebGL), so kept off the GPU.
@@ -244,6 +245,7 @@ void main() {
       m: gl.getUniformLocation(prog, "m"),
       flip: gl.getUniformLocation(prog, "flip"),
       textured: gl.getUniformLocation(prog, "textured"),
+      cut: gl.getUniformLocation(prog, "cut"),
       haze: gl.getUniformLocation(prog, "haze"),
     };
     gl.uniform3fv(un.haze, ARENA);
@@ -276,7 +278,10 @@ void main() {
     const dirty = canvas2d(TW, TH),
       clean = canvas2d(TW, TH);
     const iceTex = texture(dirty, false);
-    let meshes = [];
+    let meshes = [],
+      boardTex = null,
+      crowdTex = null,
+      job = 0; // the latest drawing of the ice asked for: an older one finishing late is dropped
     let rz = null,
       ready = 0,
       painted = 0,
@@ -312,19 +317,66 @@ void main() {
         stands.add(P(0.4, 1.2, a), P(0.4, 1.2, b), P(24, 16.5, b), P(24, 16.5, a), [1, 1, 1, 1], [s / 10, 5.6, (s + len) / 10, 0]);
         s += len;
       }
-      const boardTex = texture(boardsTexture(), true),
-        crowdTex = texture(crowdTexture(), true);
-      meshes = [mesh(ice, iceTex), mesh(plain, null), mesh(boards, boardTex), mesh(stands, crowdTex), mesh(glass, null, true)];
+      // The nets, for the replay (the Kamboni's ice has none: the crew took
+      // them off): red posts, crossbar and base, white mesh, as in the game.
+      const frame = quads(),
+        net = quads(),
+        red = rgba(cssVar("--rink-red") || "#d33"),
+        white = [0.95, 0.96, 0.98, 0.32];
+      // A box between two corners (rink x, y and heights): its sides and top.
+      const box = (x0, x1, y0, y1, h0, h1) => {
+        frame.add([x0, h0, y0], [x1, h0, y0], [x1, h1, y0], [x0, h1, y0], red);
+        frame.add([x0, h0, y1], [x1, h0, y1], [x1, h1, y1], [x0, h1, y1], red);
+        frame.add([x0, h0, y0], [x0, h0, y1], [x0, h1, y1], [x0, h1, y0], red);
+        frame.add([x1, h0, y0], [x1, h0, y1], [x1, h1, y1], [x1, h1, y0], red);
+        frame.add([x0, h1, y0], [x1, h1, y0], [x1, h1, y1], [x0, h1, y1], red);
+      };
+      const w = 0.05;
+      for (const side of [1, -1]) {
+        const x0 = side * deps.goal.x,
+          x1 = side * (deps.goal.x + deps.goal.depth),
+          h = deps.goal.half,
+          top = 1.8,
+          low = 1.0;
+        const [xa, xb] = [Math.min(x0, x1), Math.max(x0, x1)];
+        box(x0 - w, x0 + w, -h - w, -h + w, 0, top);
+        box(x0 - w, x0 + w, h - w, h + w, 0, top);
+        box(x0 - w, x0 + w, -h - w, h + w, top - w, top + w);
+        box(xa, xb, -h - w, -h + w, 0, 2 * w);
+        box(xa, xb, h - w, h + w, 0, 2 * w);
+        box(x1 - w, x1 + w, -h - w, h + w, 0, 2 * w);
+        net.add([x1, 0, -h], [x1, 0, h], [x1, low, h], [x1, low, -h], white);
+        net.add([x0, 0, -h], [x1, 0, -h], [x1, low, -h], [x0, top, -h], white);
+        net.add([x0, 0, h], [x1, 0, h], [x1, low, h], [x0, top, h], white);
+        net.add([x0, top, -h], [x0, top, h], [x1, low, h], [x1, low, -h], white);
+      }
+      for (const t of [boardTex, crowdTex]) if (t) gl.deleteTexture(t);
+      boardTex = texture(boardsTexture(), true);
+      crowdTex = texture(crowdTexture(), true);
+      meshes = [
+        mesh(ice, iceTex),
+        mesh(plain, null),
+        mesh(boards, boardTex),
+        mesh(stands, crowdTex),
+        Object.assign(mesh(frame, null), { replay: true }),
+        mesh(glass, null, true),
+        Object.assign(mesh(net, null, true), { replay: true }),
+      ];
     }
 
-    function scene(mvp, flip) {
+    function scene(mvp, flip, replaying = false, extra = []) {
       gl.uniformMatrix4fv(un.m, false, mvp);
       gl.uniform1f(un.flip, flip);
-      for (const m of meshes) {
-        if (m.glass) {
+      gl.uniform1f(un.cut, 0);
+      for (const m of meshes.slice(0, 4).concat(extra, meshes.slice(4))) {
+        if (m.replay && !replaying) continue;
+        gl.uniform1f(un.cut, m.cut || 0);
+        const blend = m.glass || m.flat;
+        if (blend) {
           gl.enable(gl.BLEND);
           gl.depthMask(false);
         }
+        if (m.flat) gl.disable(gl.DEPTH_TEST);
         gl.bindBuffer(gl.ARRAY_BUFFER, m.buf);
         gl.enableVertexAttribArray(at.p);
         gl.enableVertexAttribArray(at.t);
@@ -335,10 +387,11 @@ void main() {
         gl.uniform1f(un.textured, m.tex ? 1 : 0);
         if (m.tex) gl.bindTexture(gl.TEXTURE_2D, m.tex);
         gl.drawArrays(gl.TRIANGLES, 0, m.n);
-        if (m.glass) {
+        if (blend) {
           gl.disable(gl.BLEND);
           gl.depthMask(true);
         }
+        if (m.flat) gl.enable(gl.DEPTH_TEST);
       }
     }
 
@@ -405,14 +458,251 @@ void main() {
       }
     }
 
+    // ——— The replay: a goal seen again from the scorer's eyes ———
+    // The players and the referee as their drawings, standing up and turned
+    // to the eye (front or back as they face it), life size, each with a
+    // shadow; the puck, facing the eye, and its streak when it flies.
+    const CELL = { w: 3, h: 4.2, foot: 3.6, cols: 9 }, // in drawing units
+      M = 0.686, // metres a drawing unit: 2.77 units of player are 1.9 m
+      ATLAS = 2048, // the drawings' texture, pixels across
+      atlas = canvas2d(1, 1),
+      dyn = { sprites: gl.createBuffer(), shadows: gl.createBuffer(), puck: gl.createBuffer(), streak: gl.createBuffer() };
+    let atlasTex = null,
+      atlasV = 1, // the texture's height in drawing units
+      sprites = 0,
+      replayReady = false,
+      cam = null;
+    function prepareReplay(markups, marks) {
+      const mine = ++job;
+      replayReady = false;
+      cam = null;
+      build(); // in the theme's colours of the moment
+      const floor = `<rect x="-32" y="-16" width="64" height="32" fill="#2a2f36"/>`,
+        rink = (root.rinkSVG ? root.rinkSVG() : "").replace(/<rect[^>]*data-rink-net[^>]*\/>/g, "");
+      let waiting = 2;
+      const done = () => --waiting || (replayReady = true);
+      rasterize(`${floor}${rink}${marks ? marks.outerHTML.replace(/ mask="[^"]*"/, "") : ""}`, dirty, (ok) => {
+        if (!ok || mine !== job) return;
+        gl.bindTexture(gl.TEXTURE_2D, iceTex);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, dirty);
+        gl.generateMipmap(gl.TEXTURE_2D);
+        done();
+      });
+      // The drawings in a grid, on a texture a power of two in size (so it
+      // can have mipmaps, and players far off do not shimmer).
+      sprites = markups.length;
+      const cols = CELL.cols,
+        px = ATLAS / (cols * CELL.w);
+      let h = 1;
+      while (h < Math.ceil(sprites / cols) * CELL.h * px) h *= 2;
+      [atlas.width, atlas.height] = [ATLAS, h];
+      atlasV = h / px;
+      const cells = markups
+        .map((m, i) => `<g transform="translate(${(i % cols) * CELL.w + CELL.w / 2} ${Math.floor(i / cols) * CELL.h + CELL.foot})">${m}</g>`)
+        .join("");
+      rasterize(
+        cells,
+        atlas,
+        (ok) => {
+          if (!ok || mine !== job) return;
+          if (atlasTex) gl.deleteTexture(atlasTex);
+          atlasTex = texture(atlas, false);
+          done();
+        },
+        `0 0 ${cols * CELL.w} ${atlasV}`
+      );
+    }
+    // A drawing standing at (x, y) on the ice, cell `i` of the texture,
+    // turned to the eye; or lying on the ice (`lie` 1 or -1: the head to the
+    // eye's right or left), a player knocked down.
+    function sprite(q, i, x, y, eye, lie = 0) {
+      const cols = CELL.cols,
+        u0 = (i % cols) / cols,
+        u1 = u0 + 1 / cols,
+        v0 = (Math.floor(i / cols) * CELL.h) / atlasV,
+        v1 = v0 + CELL.h / atlasV;
+      // The eye's right, so the drawing is not seen the wrong way round.
+      let rx = eye[2] - y,
+        ry = x - eye[0];
+      const l = Math.hypot(rx, ry) || 1;
+      [rx, ry] = [rx / l, ry / l];
+      // A point of the drawing, `a` units across it and `b` up from its feet.
+      const at = lie
+        ? (a, b) => {
+            const s = b * lie - 1.4 * lie; // along the ice: the body's middle where the player is
+            return [x + rx * s * M, 0.55 - a * lie * M, y + ry * s * M];
+          }
+        : (a, b) => [x + rx * a * M, b * M, y + ry * a * M];
+      const half = CELL.w / 2,
+        foot = CELL.h - CELL.foot;
+      q.add(at(-half, -foot), at(half, -foot), at(half, CELL.foot), at(-half, CELL.foot), [1, 1, 1, 1], [u0, v1, u1, v0]);
+    }
+    // A disc of radius `r` at `c`, either flat on the ice or facing the eye.
+    function disc(q, c, r, col, eye) {
+      let ax = [1, 0, 0],
+        ay = [0, 0, 1];
+      if (eye) {
+        const f = [c[0] - eye[0], c[1] - eye[1], c[2] - eye[2]],
+          fl = Math.hypot(...f);
+        const right = [-f[2], 0, f[0]].map((v) => v / (Math.hypot(f[0], f[2]) || 1));
+        ax = right;
+        ay = [(right[1] * f[2] - right[2] * f[1]) / fl, (right[2] * f[0] - right[0] * f[2]) / fl, (right[0] * f[1] - right[1] * f[0]) / fl];
+      }
+      const P = (a) => [0, 1, 2].map((k) => c[k] + (ax[k] * Math.cos(a) + ay[k] * Math.sin(a)) * r);
+      for (let i = 0; i < 10; i++) q.add(c, P((i / 10) * 2 * Math.PI), P(((i + 1) / 10) * 2 * Math.PI), c, col);
+    }
+    function drawDynamic(buf, q, tex, more) {
+      gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(q.v), gl.DYNAMIC_DRAW);
+      return { buf, n: q.v.length / 9, tex, ...more };
+    }
+    // A stick, or any rod from `a` to `b`, `w` thick, facing the eye.
+    function rod(q, a, b, w, col, eye) {
+      const d = [b[0] - a[0], b[1] - a[1], b[2] - a[2]],
+        m = [(a[0] + b[0]) / 2 - eye[0], (a[1] + b[1]) / 2 - eye[1], (a[2] + b[2]) / 2 - eye[2]];
+      let c = [d[1] * m[2] - d[2] * m[1], d[2] * m[0] - d[0] * m[2], d[0] * m[1] - d[1] * m[0]];
+      const l = Math.hypot(...c);
+      if (l < 1e-9) return;
+      c = c.map((v) => (v / l) * (w / 2));
+      const off = (p, s) => p.map((v, i) => v + c[i] * s);
+      q.add(off(a, -1), off(b, -1), off(b, 1), off(a, 1), col);
+    }
+    // One frame of a replay: `snap` holds the players, puck and referee as
+    // they were; the eye is in the head of player `by`, watching the puck and
+    // the net at `goalX` past it, and the goal light behind it is `lit` once
+    // the puck is in. With no scorer, a camera behind the net.
+    function replayFrame(snap, by, goalX, now, lit) {
+      const dpr = Math.min(2, root.devicePixelRatio || 1),
+        W = Math.round(view.clientWidth * dpr),
+        H = Math.round(view.clientHeight * dpr);
+      if (!W || !H) return;
+      if (view.width !== W || view.height !== H) [view.width, view.height] = [W, H];
+      const me = snap.players[by],
+        pk = snap.puck,
+        FOV = 1.1;
+      const eye = me ? [me.x - me.fx * 0.3, 1.72, me.y - me.fy * 0.3] : [goalX + Math.sign(goalX) * 2.4, 2.3, 0];
+      // Toward the puck and the net past it, and down far enough to keep the
+      // puck in sight, low in the picture (on the stick, it is close below),
+      // but not so far that the net goes out of it.
+      const [tx, tz] = me ? [pk.x + (goalX - pk.x) * 0.35, pk.y * 0.65] : [pk.x, pk.y],
+        below = Math.atan2(eye[1] - (pk.h || 0), Math.hypot(pk.x - eye[0], pk.y - eye[2]));
+      const yaw = Math.atan2(tz - eye[2], tx - eye[0]),
+        pitch = -Math.min(me ? 0.4 : 0.6, Math.max(0.06, below - FOV * 0.4));
+      const dt = cam ? Math.min(0.1, (now - cam.now) / 1000) : 1,
+        k = cam ? 1 - Math.exp(-dt * 7) : 1;
+      cam = cam || { eye: eye.slice(), yaw, pitch, now };
+      for (let i = 0; i < 3; i++) cam.eye[i] += (eye[i] - cam.eye[i]) * k;
+      const turn = Math.atan2(Math.sin(yaw - cam.yaw), Math.cos(yaw - cam.yaw));
+      cam.yaw = Math.atan2(Math.sin(cam.yaw + turn * k), Math.cos(cam.yaw + turn * k));
+      cam.pitch += (pitch - cam.pitch) * k;
+      cam.now = now;
+      const at = [
+        cam.eye[0] + Math.cos(cam.yaw) * Math.cos(cam.pitch),
+        cam.eye[1] + Math.sin(cam.pitch),
+        cam.eye[2] + Math.sin(cam.yaw) * Math.cos(cam.pitch),
+      ];
+      const people = quads(),
+        shadows = quads(),
+        shade = [0, 0, 0, 0.3];
+      snap.players.forEach((p, i) => {
+        if (i === by || p.off) return;
+        disc(shadows, [p.x, 0, p.y], p.role === "goalie" ? 0.75 : 0.55, shade);
+        // Facing away from the eye: its back.
+        const away = p.fx * (cam.eye[0] - p.x) + p.fy * (cam.eye[2] - p.y) < 0,
+          side = p.fx * (cam.eye[2] - p.y) - p.fy * (cam.eye[0] - p.x);
+        sprite(people, i * 2 + (away ? 1 : 0), p.x, p.y, cam.eye, p.down > 0 ? (side > 0 ? 1 : -1) : 0);
+      });
+      if (snap.ref) {
+        disc(shadows, [snap.ref.x, 0, snap.ref.y], 0.5, shade);
+        sprite(people, sprites - 1, snap.ref.x, snap.ref.y, cam.eye);
+      }
+      // The scorer's own stick, low in the picture: on the left or the right
+      // as the drawings hold it (half shoot left, half right).
+      const puck = quads(),
+        streak = quads();
+      if (me) {
+        const hand = by % 2 ? 1 : -1,
+          [fx, fz] = [me.fx, me.fy],
+          [sx, sz] = [fz * hand, -fx * hand], // the stick's side
+          P = (ahead, side, h) => [me.x + fx * ahead + sx * side, h, me.y + fz * ahead + sz * side];
+        const stick = rgba(cssVar("--rink-stick") || "#3b3f44"),
+          heel = P(1.12, 0.2, 0.03);
+        rod(puck, P(0.12, 0.32, 0.95), heel, 0.045, stick, cam.eye);
+        rod(puck, heel, P(1.36, -0.12, 0.03), 0.08, stick, cam.eye);
+      }
+      // The goal light on the glass behind the net: red once the puck is in.
+      const lamp = [Math.sign(goalX) * 29.75, 3.15, 0];
+      disc(puck, lamp, 0.24, lit ? [1, 0.2, 0.12, 1] : [0.32, 0.07, 0.06, 1], cam.eye);
+      if (lit) disc(streak, lamp, 0.9, [1, 0.25, 0.15, 0.3], cam.eye);
+      // The puck, bigger than a real one (which would be lost) and more so the
+      // further off it is, and a streak behind it when it is shot.
+      const R = Math.min(0.24, 0.05 + 0.014 * Math.hypot(pk.x - cam.eye[0], pk.y - cam.eye[2])),
+        T = R * 0.6,
+        h0 = pk.h || 0,
+        face = rgba(cssVar("--rink-puck") || "#e8b93a"),
+        edge = rgba(cssVar("--rink-puck-edge") || "#3a2a08");
+      disc(shadows, [pk.x, 0, pk.y], R * 1.2, [0, 0, 0, 0.35]);
+      const rim = (a, h) => [pk.x + Math.cos(a) * R, h, pk.y + Math.sin(a) * R];
+      for (let i = 0; i < 12; i++) {
+        const a0 = (i / 12) * 2 * Math.PI,
+          a1 = ((i + 1) / 12) * 2 * Math.PI;
+        puck.add([pk.x, h0 + T, pk.y], rim(a0, h0 + T), rim(a1, h0 + T), [pk.x, h0 + T, pk.y], face);
+        puck.add(rim(a0, h0), rim(a1, h0), rim(a1, h0 + T), rim(a0, h0 + T), edge);
+      }
+      const trail = (pk.trail || []).concat([[pk.x, pk.y]]),
+        shot = rgba(cssVar("--rink-shot") || "#ffd54a"),
+        hm = h0 + T / 2;
+      for (let i = 1; i < trail.length; i++) {
+        const [ax, az] = trail[i - 1],
+          [bx, bz] = trail[i],
+          // Across the streak as the eye sees it: square to its line and to the eye.
+          dx = bx - ax,
+          dz = bz - az,
+          mx = (ax + bx) / 2 - cam.eye[0],
+          my = hm - cam.eye[1],
+          mz = (az + bz) / 2 - cam.eye[2];
+        let [cx, cy, cz] = [-dz * my, dz * mx - dx * mz, dx * my];
+        const cl = Math.hypot(cx, cy, cz);
+        if (cl < 1e-6) continue;
+        [cx, cy, cz] = [cx / cl, cy / cl, cz / cl];
+        const w0 = (0.16 * (i - 1)) / trail.length,
+          w1 = (0.16 * i) / trail.length,
+          side = (x, z, w, s) => [x + cx * w * s, hm + cy * w * s, z + cz * w * s];
+        streak.add(side(ax, az, w0, -1), side(bx, bz, w1, -1), side(bx, bz, w1, 1), side(ax, az, w0, 1), [
+          shot[0],
+          shot[1],
+          shot[2],
+          (0.6 * i) / trail.length,
+        ]);
+      }
+      gl.viewport(0, 0, W, H);
+      gl.clearColor(...ARENA, 1);
+      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+      const extra = [drawDynamic(dyn.shadows, shadows, null, { flat: true }), drawDynamic(dyn.puck, puck, null)];
+      if (atlasTex) extra.push(drawDynamic(dyn.sprites, people, atlasTex, { cut: 0.45 }));
+      extra.push(drawDynamic(dyn.streak, streak, null, { glass: true }));
+      scene(mul(perspective(FOV, W / H, 0.3, 260), lookAt(cam.eye, at, [0, 1, 0])), 1, true, extra);
+    }
+
     const cat = { a: 0, w: 0 };
     let last = null,
       shake = 0;
     return {
       el,
+      prepareReplay,
+      get replayReady() {
+        return replayReady && !!atlasTex;
+      },
+      replayFrame,
+      // The cab's dashboard and frame, or nothing over the view (a replay).
+      mode(m) {
+        el.classList.toggle("is-replay", m === "replay");
+      },
       // A new intermission: the ice as the period left it (`marks`, the
       // game's skate marks), and the colours of the current theme.
       start(r, marks) {
+        const mine = ++job;
+        el.classList.remove("is-replay");
         rz = r;
         ready = painted = mapped = 0;
         mapPoints = "";
@@ -423,13 +713,13 @@ void main() {
         const rink = (root.rinkSVG ? root.rinkSVG() : "").replace(/<rect[^>]*data-rink-net[^>]*\/>/g, "");
         const shape = `x="-30" y="-15" width="60" height="30" rx="8.5"`;
         rasterize(`${floor}${rink}<rect ${shape} fill="var(--rink-wet)"/>`, clean, (ok) => {
-          if (!ok) return;
+          if (!ok || mine !== job) return;
           pattern = ctx2d(dirty).createPattern(clean, "no-repeat");
           ready++;
         });
         const frost = `<defs>${deps.frost}</defs><rect ${shape} fill="url(#rink-frost)"/>`;
         rasterize(`${floor}${rink}${marks ? marks.outerHTML.replace(/ mask="[^"]*"/, "") : ""}${frost}`, dirty, (ok) => {
-          if (!ok) return;
+          if (!ok || mine !== job) return;
           gl.bindTexture(gl.TEXTURE_2D, iceTex);
           gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, dirty);
           gl.generateMipmap(gl.TEXTURE_2D);
