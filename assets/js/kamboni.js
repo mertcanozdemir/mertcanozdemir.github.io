@@ -639,15 +639,18 @@ void main() {
       const R = Math.min(0.24, 0.05 + 0.014 * Math.hypot(pk.x - cam.eye[0], pk.y - cam.eye[2])),
         T = R * 0.6,
         h0 = pk.h || 0,
-        face = rgba(cssVar("--rink-puck") || "#e8b93a"),
-        edge = rgba(cssVar("--rink-puck-edge") || "#3a2a08");
+        body = rgba(cssVar("--rink-puck") || "#15171a"),
+        ring = rgba(cssVar("--rink-puck-ring") || "#e8b93a");
       disc(shadows, [pk.x, 0, pk.y], R * 1.2, [0, 0, 0, 0.35]);
-      const rim = (a, h) => [pk.x + Math.cos(a) * R, h, pk.y + Math.sin(a) * R];
+      // Black, with the gold ring round the edge of its top.
+      const rim = (a, h, r = R) => [pk.x + Math.cos(a) * r, h, pk.y + Math.sin(a) * r];
       for (let i = 0; i < 12; i++) {
         const a0 = (i / 12) * 2 * Math.PI,
           a1 = ((i + 1) / 12) * 2 * Math.PI;
-        puck.add([pk.x, h0 + T, pk.y], rim(a0, h0 + T), rim(a1, h0 + T), [pk.x, h0 + T, pk.y], face);
-        puck.add(rim(a0, h0), rim(a1, h0), rim(a1, h0 + T), rim(a0, h0 + T), edge);
+        puck.add([pk.x, h0 + T, pk.y], rim(a0, h0 + T, R * 0.72), rim(a1, h0 + T, R * 0.72), [pk.x, h0 + T, pk.y], body);
+        puck.add(rim(a0, h0 + T, R * 0.72), rim(a1, h0 + T, R * 0.72), rim(a1, h0 + T), rim(a0, h0 + T), ring);
+        puck.add(rim(a0, h0 + T * 0.78), rim(a1, h0 + T * 0.78), rim(a1, h0 + T), rim(a0, h0 + T), ring);
+        puck.add(rim(a0, h0), rim(a1, h0), rim(a1, h0 + T * 0.78), rim(a0, h0 + T * 0.78), body);
       }
       const trail = (pk.trail || []).concat([[pk.x, pk.y]]),
         shot = rgba(cssVar("--rink-shot") || "#ffd54a"),

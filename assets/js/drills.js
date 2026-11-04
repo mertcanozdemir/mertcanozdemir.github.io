@@ -345,15 +345,15 @@
       )
     );
 
-    // The puck sits beneath the players so it never hides a label; whoever is
-    // carrying it gets a puck-coloured ring instead.
+    // The puck (black, with a gold ring) sits beneath the players so it never
+    // hides a label; whoever is carrying it gets the gold ring instead.
     const sim = simulate(drill);
     sim.warnings.forEach((w) => console.warn(`drill ${drill.id}: ${w}`));
     sim.pucks.forEach(() =>
       gA.insertAdjacentHTML(
         "beforeend",
         `<circle data-puck r="0.42" fill="var(--rink-puck)"
-          stroke="var(--rink-puck-edge)" stroke-width="0.1"/>`
+          stroke="var(--rink-puck-ring)" stroke-width="0.12"/>`
       )
     );
     const puckEls = [...gA.querySelectorAll("[data-puck]")];
@@ -365,7 +365,7 @@
       gA.insertAdjacentHTML(
         "beforeend",
         `<g data-actor="${a.id}">
-          <circle r="1.25" fill="var(--rink-team-${a.team})" stroke="var(--rink-puck)" stroke-width="0"/>
+          <circle r="1.25" fill="var(--rink-team-${a.team})" stroke="var(--rink-puck-ring)" stroke-width="0"/>
           <text y="0.42" text-anchor="middle" font-size="1.1" fill="#fff"
             font-weight="600">${a.label}</text></g>`
       )

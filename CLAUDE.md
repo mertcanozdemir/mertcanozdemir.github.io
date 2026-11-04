@@ -191,6 +191,14 @@ cage and a paddle stick. Skin tones vary a little from player to player
 An earlier design, helmets with a dark full visor over plain bodies, looked
 like motorcycle helmets and couriers (Mertcan's words) and was replaced.
 
+The **puck** is black, as a real one, with a gold ring round its edge
+(`--rink-puck`, `--rink-puck-ring`), in the game, the replay and the drills
+alike. It was gold, and Mertcan asked whether it should be black: black alone has
+more contrast on white ice (about 17:1, gold 1.7:1) but is lost beside the dark
+sticks and skates (1.2–1.7:1) and on the dark theme's ice (1.2:1), where the
+ring is what shows it. In the TV camera's view the ring also shows through a
+player in front of it (`data-puck-ghost`).
+
 How it plays: the person controls one skater (the dashed ring) and takes over
 whoever on their team gets the puck; Space shoots or pokes, X passes or
 switches, C body checks: a short burst that knocks down an opponent it hits

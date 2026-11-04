@@ -21,11 +21,11 @@ wide: true
     skating path
   </li>
   <li>
-    <svg viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4.6" fill="var(--rink-team-a)" stroke="var(--rink-puck)" stroke-width="1.4" /></svg>
+    <svg viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4.6" fill="var(--rink-team-a)" stroke="var(--rink-puck-ring)" stroke-width="1.4" /></svg>
     has the puck
   </li>
   <li>
-    <svg viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="2" fill="var(--rink-puck)" stroke="var(--rink-puck-edge)" stroke-width=".5" /></svg>
+    <svg viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="2" fill="var(--rink-puck)" stroke="var(--rink-puck-ring)" stroke-width=".6" /></svg>
     loose puck
   </li>
   <li>

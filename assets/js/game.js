@@ -1418,7 +1418,7 @@
     `<g data-stars visibility="hidden">${[0, 120, 240]
       .map(
         (a) =>
-          `<path transform="rotate(${a}) translate(0 ${-r})" d="M 0 -0.3 L 0.08 -0.08 L 0.3 0 L 0.08 0.08 L 0 0.3 L -0.08 0.08 L -0.3 0 L -0.08 -0.08 Z" fill="var(--rink-puck)"/>`
+          `<path transform="rotate(${a}) translate(0 ${-r})" d="M 0 -0.3 L 0.08 -0.08 L 0.3 0 L 0.08 0.08 L 0 0.3 L -0.08 0.08 L -0.3 0 L -0.08 -0.08 Z" fill="var(--rink-puck-ring)"/>`
       )
       .join("")}</g>`;
   // The lamps behind the nets: red for a goal, green when time is up.
@@ -1750,7 +1750,7 @@
         el("circle", { "data-lamp": s, cx: s * (GOAL_X + NET_DEPTH * 0.6), cy: 0, r: 3.4, fill: "url(#rink-lamp)", opacity: 0 }, plane);
       el("g", { "data-hats": "" }, plane);
       el("polyline", trail, plane);
-      el("circle", { "data-puck": "", r: "0.45", fill: "var(--rink-puck)", stroke: "var(--rink-puck-edge)", "stroke-width": "0.1" }, plane);
+      el("circle", { "data-puck": "", r: "0.45", fill: "var(--rink-puck)", stroke: "var(--rink-puck-ring)", "stroke-width": "0.12" }, plane);
       el("circle", ring, plane);
       plane.insertAdjacentHTML("beforeend", `<g data-ref>${REF_TOP}</g>`);
       const layer = el("g", { "data-players": "" }, plane);
@@ -1792,7 +1792,7 @@
     things.insertAdjacentHTML("beforeend", `<g data-ref data-depth="0">${REF_STAND}</g>`);
     things.insertAdjacentHTML(
       "beforeend",
-      `<g data-puck><ellipse cy="0.08" rx="0.45" ry="${(0.45 * SQUASH).toFixed(2)}" fill="var(--rink-puck-edge)"/><ellipse rx="0.45" ry="${(0.45 * SQUASH).toFixed(2)}" fill="var(--rink-puck)"/></g>`
+      `<g data-puck><ellipse cy="0.08" rx="0.45" ry="${(0.45 * SQUASH).toFixed(2)}" fill="var(--rink-puck)"/><ellipse rx="0.45" ry="${(0.45 * SQUASH).toFixed(2)}" fill="var(--rink-puck)" stroke="var(--rink-puck-ring)" stroke-width="0.1"/></g>`
     );
     game.players.forEach((p, i) =>
       el("g", { "data-player": i }, things).insertAdjacentHTML("beforeend", standingSVG(p.team, p.role === "goalie", skinOf(i), p.number))
@@ -1806,7 +1806,7 @@
     // player, and an arrow over your skater.
     svg.insertAdjacentHTML(
       "beforeend",
-      `<ellipse data-puck-ghost rx="0.45" ry="${(0.45 * SQUASH).toFixed(2)}" fill="var(--rink-puck)" fill-opacity="0.25" stroke="var(--rink-puck)" stroke-width="0.09"/>
+      `<ellipse data-puck-ghost rx="0.45" ry="${(0.45 * SQUASH).toFixed(2)}" fill="none" stroke="var(--rink-puck-ring)" stroke-width="0.11"/>
       <g data-you-arrow><path d="M -0.42 -0.62 L 0.42 -0.62 L 0 0 Z" fill="var(--rink-team-a)" stroke="var(--global-bg-color)" stroke-width="0.09" stroke-linejoin="round"/>
         <text data-you-name y="-0.88" font-size="0.62" font-weight="700" text-anchor="middle" fill="var(--rink-team-a)" stroke="var(--global-bg-color)" stroke-width="0.14" paint-order="stroke"></text></g>`
     );
@@ -1821,7 +1821,7 @@
         <path d="M 0 -15 V 15 M -26 -13 V 13 M 26 -13 V 13" stroke="var(--rink-red)" stroke-width="0.5"/>
         <path d="M -7.5 -15 V 15 M 7.5 -15 V 15" stroke="var(--rink-blue)" stroke-width="0.6"/>
         ${game.players.map((p, i) => `<circle data-map-player="${i}" r="1.5" fill="var(--rink-team-${p.team})"/>`).join("")}
-        <circle data-map-puck r="1" fill="var(--rink-puck)" stroke="var(--rink-puck-edge)" stroke-width="0.25"/></g></g>`
+        <circle data-map-puck r="1" fill="var(--rink-puck)" stroke="var(--rink-puck-ring)" stroke-width="0.4"/></g></g>`
     );
   }
 
