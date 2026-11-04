@@ -289,10 +289,17 @@
         if (this.phase === "goal" || this.phase === "stop") {
           this.glide(dt);
           this.moveRef(dt);
+          if (this.boxBound) this.toTheBox(dt);
         }
         if (this.wait > 0) return;
         if (this.phase === "goal") return this.decided ? this.finish() : this.faceoff();
-        if (this.phase === "stop") return this.faceoff(this.stopAt);
+        if (this.phase === "stop") {
+          if (this.boxBound) {
+            this.toBox(this.boxBound);
+            this.boxBound = null;
+          }
+          return this.faceoff(this.stopAt);
+        }
         this.phase = "play";
         this.dropped = this.t || 0;
         return;
@@ -401,7 +408,9 @@
       // Any whistle calls a penalty waiting to be called.
       if (this.delayed && why !== "penalty") return this.callPenalty();
       this.phase = "stop";
-      this.wait = 1.8;
+      // Long enough to see what was called (the page shows it), and for a
+      // penalty to skate to the box.
+      this.wait = why === "penalty" ? 5 : 2.8;
       this.stopAt = at;
       this.offside = this.icing = null;
       this.ref.signal = false;
@@ -414,10 +423,40 @@
     // A penalty, called: whoever took it sits in the box for a minor, the team
     // a skater short, and the faceoff is in its own end.
     callPenalty() {
-      const { p, why } = this.delayed;
+      const { p, why, on } = this.delayed;
       this.delayed = null;
       this.whistle("penalty", p.team, [-DIR[p.team] * SPOT.end, (Math.sign(this.puck.y) || 1) * SPOT.side], p, why);
-      this.toBox(p);
+      this.events[this.events.length - 1].on = this.players.indexOf(on);
+      // Off to the box, skating: in it by the faceoff at the latest.
+      this.boxBound = p;
+      p.down = 0;
+    }
+    // The one going to the box skates to its door, across the ice.
+    toTheBox(dt) {
+      const p = this.boxBound,
+        dx = -DIR[p.team] * 5.4 - p.x,
+        dy = -W + SKATER_R + 0.4 - p.y,
+        d = hypot(dx, dy);
+      if (d < 0.8) {
+        this.boxBound = null;
+        return this.toBox(p);
+      }
+      const want = Math.min(6, d * 2),
+        ax = (dx / d) * want - p.vx,
+        ay = (dy / d) * want - p.vy,
+        al = hypot(ax, ay) || 1,
+        acc = Math.min(al, 12 * dt);
+      p.vx += (ax / al) * acc;
+      p.vy += (ay / al) * acc;
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      const sp = hypot(p.vx, p.vy);
+      if (sp > 0.5) [p.fx, p.fy] = [p.vx / sp, p.vy / sp];
+      confine(p, SKATER_R);
+    }
+    // The page's "go on": the faceoff now.
+    skipStop() {
+      if (this.phase === "stop") this.wait = 0;
     }
     // The penalty boxes are across the ice from the benches, either side of
     // the timekeeper: team a's on the left, b's on the right.
@@ -640,7 +679,7 @@
     // After a goal everyone coasts to a stop.
     glide(dt) {
       for (const p of this.players) {
-        if (p.box > 0) continue;
+        if (p.box > 0 || p === this.boxBound) continue;
         const f = Math.max(0, 1 - 2.5 * dt);
         p.vx *= f;
         p.vy *= f;
@@ -907,8 +946,15 @@
       this.events.push({ type: "hit", team: hitter.team, boards, by: this.players.indexOf(hitter), on: this.players.indexOf(victim) });
       const foul = !had ? "interference" : behind && boards ? "boarding" : null;
       if (foul && !this.delayed && this.phase === "play") {
-        this.delayed = { p: hitter, why: foul };
-        this.events.push({ type: "delayed", why: "penalty", foul, team: hitter.team, by: this.players.indexOf(hitter) });
+        this.delayed = { p: hitter, why: foul, on: victim };
+        this.events.push({
+          type: "delayed",
+          why: "penalty",
+          foul,
+          team: hitter.team,
+          by: this.players.indexOf(hitter),
+          on: this.players.indexOf(victim),
+        });
       }
     }
 
@@ -2107,6 +2153,33 @@
       <circle cx="-0.11" cy="0.04" r="0.05" fill="#111"/><circle cx="0.11" cy="0.04" r="0.05" fill="#111"/>
     </g></g>`;
 
+  // The referee's signal for a call, as the rule books draw it: fists crossed
+  // in front of the chest for interference; a fist struck into the other
+  // hand's palm for boarding; an arm along the blue line for offside; arms
+  // folded across the chest for icing; a punch to the side for fighting.
+  function signalSVG(kind) {
+    const arm = (x2, y2, side, cls = "") =>
+      `<g class="${cls}"><line x1="${side * 0.6}" y1="-1.95" x2="${x2}" y2="${y2}" stroke="#1d1f22" stroke-width="0.34" stroke-linecap="round"/>
+      <line x1="${side * 0.6}" y1="-1.95" x2="${x2}" y2="${y2}" stroke="#f4f4f2" stroke-width="0.24" stroke-linecap="round"/>
+      <circle cx="${side * 0.62}" cy="-1.86" r="0.12" fill="#f26b1d"/>
+      <circle cx="${x2}" cy="${y2}" r="0.15" fill="#e8b896" stroke="#1d1f22" stroke-width="0.04"/></g>`;
+    const arms = {
+      interference: arm(0.3, -1.45, -1) + arm(-0.3, -1.45, 1),
+      boarding: arm(0.02, -1.55, -1) + arm(0.16, -1.55, 1, "sign-strike"),
+      offside: arm(-0.74, -1.2, -1) + arm(1.55, -1.95, 1),
+      icing: arm(0.4, -1.78, -1) + arm(-0.4, -1.56, 1),
+      fighting: arm(-0.74, -1.2, -1) + arm(1.45, -1.85, 1, "sign-punch"),
+    };
+    return `<path d="M -0.42 -1.2 H 0.42 L 0.4 -0.18 H 0.06 L 0 -0.7 L -0.06 -0.18 H -0.4 Z" fill="#1d1f22"/>
+      <rect x="-0.34" y="-0.2" width="0.3" height="0.18" rx="0.06" fill="#24282e"/><rect x="0.06" y="-0.2" width="0.3" height="0.18" rx="0.06" fill="#24282e"/>
+      <path d="M -0.74 -2 Q -0.76 -2.2 -0.5 -2.2 H 0.5 Q 0.76 -2.2 0.74 -2 L 0.56 -1.16 H -0.56 Z" fill="#f4f4f2" stroke="#1d1f22" stroke-width="0.05"/>
+      <path d="M -0.4 -2.18 V -1.18 M -0.13 -2.2 V -1.16 M 0.13 -2.2 V -1.16 M 0.4 -2.18 V -1.18" stroke="#1d1f22" stroke-width="0.12"/>
+      <g transform="translate(0 -2.52)"><circle cy="0.04" r="0.32" fill="#e8b896"/>
+      <path d="M -0.38 0 Q -0.4 -0.4 0 -0.42 Q 0.4 -0.4 0.38 0 L 0.28 -0.06 Q 0 -0.22 -0.28 -0.06 Z" fill="#1d1f22"/>
+      <circle cx="-0.11" cy="0.04" r="0.05" fill="#111"/><circle cx="0.11" cy="0.04" r="0.05" fill="#111"/></g>
+      ${arms[kind] || ""}`;
+  }
+
   // The players and the referee for the replay in 3D (kamboni.js): each
   // player standing at rest, from the front and from the back (the hands the
   // other way round), then the referee. No shadows: the replay puts those on
@@ -2223,6 +2296,12 @@
     plane.appendChild(marks || el("g", { "data-marks": "", fill: "none", "stroke-linecap": "round", "stroke-linejoin": "round" }));
     // At a faceoff, a ring closing on the dot: the puck drops as it closes.
     el("circle", { "data-drop-ring": "", r: 1, fill: "none", stroke: "#f5a623", "stroke-width": 0.32, opacity: 0 }, plane);
+    // In the replay of a foul, round whoever took the penalty.
+    el(
+      "circle",
+      { "data-foul-ring": "", r: 2, fill: "none", stroke: "#e5484d", "stroke-width": 0.28, "stroke-dasharray": "0.7 0.45", style: "display: none" },
+      plane
+    );
     // Between periods the used ice is frosted over. The frost and the marks
     // are masked away along the Kamboni's track, which shows as wet ice.
     const band = `fill="none" stroke-width="${RZ.width}" stroke-linecap="round" stroke-linejoin="round"`;
@@ -2259,6 +2338,7 @@
       el("circle", { "data-puck": "", r: "0.45", fill: "var(--rink-puck)", stroke: "var(--rink-puck-ring)", "stroke-width": "0.12" }, plane);
       el("circle", ring, plane);
       plane.insertAdjacentHTML("beforeend", `<g data-ref>${REF_TOP}</g>`);
+      el("text", { "data-foul-name": "", class: "rink-foul-name", "text-anchor": "middle", "font-size": "0.9", style: "display: none" }, plane);
       const layer = el("g", { "data-players": "" }, plane);
       game.players.forEach((p, i) => {
         el("g", { "data-player": i }, layer).insertAdjacentHTML(
@@ -2311,6 +2391,7 @@
       el("g", { "data-player": i }, things).insertAdjacentHTML("beforeend", standingSVG(p.team, p.role === "goalie", skinOf(i), p.number))
     );
     svg.insertAdjacentHTML("beforeend", boardsSVG(false));
+    el("text", { "data-foul-name": "", class: "rink-foul-name", "text-anchor": "middle", "font-size": "0.9", style: "display: none" }, svg);
     for (const s of [1, -1]) {
       const [cx, cy] = TILT.at(s * (GOAL_X + NET_DEPTH * 0.5), 0, 1.2);
       el("circle", { "data-lamp": s, cx, cy, r: 3.2, fill: "url(#rink-lamp)", opacity: 0 }, svg);
@@ -2395,6 +2476,19 @@
       now = fx.now || 0;
     drawResurfacer(svg, view, fx.rz, now);
     freshIce(svg, view, fx);
+    // A foul's replay: a red ring round who took the penalty, and the name.
+    const mk = fx.mark != null ? game.players[fx.mark] : null,
+      foulRing = svg.querySelector("[data-foul-ring]"),
+      foulName = svg.querySelector("[data-foul-name]");
+    foulRing.style.display = foulName.style.display = mk ? "" : "none";
+    if (mk) {
+      foulRing.setAttribute("cx", mk.x.toFixed(2));
+      foulRing.setAttribute("cy", mk.y.toFixed(2));
+      if (foulName.textContent !== mk.name) foulName.textContent = mk.name || "";
+      const [nx, ny] = view === "top" ? [mk.x, mk.y - 2.5] : TILT.at(mk.x, mk.y, 0);
+      foulName.setAttribute("x", nx.toFixed(2));
+      foulName.setAttribute("y", (view === "top" ? ny : ny - 3.4 * TALL).toFixed(2));
+    }
     const ring = svg.querySelector("[data-drop-ring]"),
       f = game.drop;
     if (game.human && game.phase === "faceoff" && f && f.t >= 0.25 && f.t < f.release + 0.2) {
@@ -2562,21 +2656,31 @@
       }
       // The camera pans after the puck, a little ahead of it, and stops at the
       // ends of the rink. Without `follow` (the home page) it shows the lot.
+      // For a foul's replay it comes in closer (`zoom`) on a point of its own
+      // (`focus`), following it up and down the screen as well.
       const box = svg.rinkBox,
-        map = svg.querySelector("[data-map]");
+        map = svg.querySelector("[data-map]"),
+        z = fx.zoom || 1,
+        [cx, cy] = fx.focus ? TILT.at(fx.focus[0], fx.focus[1]) : [px + pk.vx * 0.35, py];
       let vx = box.x0,
-        vw = box.x1 - box.x0;
+        vw = box.x1 - box.x0,
+        vy = box.y0,
+        vh = box.y1 - box.y0;
       if (fx.follow) {
-        const want = clamp(px + pk.vx * 0.35, box.x0 + VIEW / 2, box.x1 - VIEW / 2);
+        [vw, vh] = [VIEW * z, (box.y1 - box.y0) * z];
+        const want = clamp(cx, box.x0 + vw / 2, box.x1 - vw / 2),
+          wantY = clamp(cy - 1.5, box.y0 + vh / 2, box.y1 - vh / 2);
         // Eased, in the animation; a redraw without a time jumps straight there.
         const ease = svg.camAt === undefined || !fx.now || !svg.camT ? 1 : 1 - Math.exp(-clamp((now - svg.camT) / 1000, 0, 0.1) * 3.5);
         svg.camAt = svg.camAt === undefined ? want : svg.camAt + (want - svg.camAt) * ease;
+        svg.camY = svg.camY === undefined ? wantY : svg.camY + (wantY - svg.camY) * ease;
         if (fx.now) svg.camT = now;
-        [vx, vw] = [svg.camAt - VIEW / 2, VIEW];
+        vx = svg.camAt - vw / 2;
+        if (z < 1) vy = svg.camY - vh / 2;
       }
-      svg.setAttribute("viewBox", `${vx.toFixed(2)} ${box.y0.toFixed(1)} ${vw.toFixed(2)} ${(box.y1 - box.y0).toFixed(1)}`);
-      map.style.display = fx.follow ? "" : "none";
-      if (fx.follow) {
+      svg.setAttribute("viewBox", `${vx.toFixed(2)} ${vy.toFixed(1)} ${vw.toFixed(2)} ${vh.toFixed(1)}`);
+      map.style.display = fx.follow && z === 1 ? "" : "none";
+      if (fx.follow && z === 1) {
         map.setAttribute("transform", `translate(${(vx + vw - 0.115 * 31 - 0.6).toFixed(2)} ${(box.y0 + 0.115 * 16 + 0.5).toFixed(2)})`);
         const view = map.querySelector("[data-map-view]");
         view.setAttribute("x", (vx / Math.cos(YAW)).toFixed(1));
@@ -3227,7 +3331,8 @@
         controlled: game.players.indexOf(game.controlled),
         ref: { ...game.ref },
       });
-      while (tape.length && now - tape[0].now > 4500) tape.shift();
+      // Twelve seconds: a delayed penalty's foul can be a while before its whistle.
+      while (tape.length && now - tape[0].now > 12000) tape.shift();
     }
     function prepareReplay(ev) {
       replayOf = { by: ev.by, goalX: (Math.sign(game.puck.x) || 1) * (GOAL_X + NET_DEPTH / 2) };
@@ -3260,10 +3365,58 @@
         cab.show(false);
         cab.mode("cab");
       }
+      const after = replay && replay.call;
       state = "playing";
       replay = null;
       badge.hidden = true;
+      svg.camAt = svg.camY = undefined;
       last = null;
+      if (after) showCall(after);
+    }
+    // A penalty's whistle: first the foul again, slowed down, the camera on
+    // whoever took it (ringed in red); then the call. Mertcan found penalties
+    // went by too fast to tell what had happened.
+    let foulSeen = null;
+    function startFoulReplay(now, call) {
+      const f = foulSeen;
+      foulSeen = null;
+      if (!f || f.by !== call.by || tape.length < 10 || f.at - 1400 < tape[0].now) return false;
+      state = "replay";
+      replay = { foul: f, call, to: f.at + 700, t: f.at - 1400, last: now, i: 0, eyes: false };
+      svg.camAt = svg.camY = undefined;
+      badge.hidden = false;
+      return true;
+    }
+    // The call, on a card over the rink while play is stopped: the referee's
+    // signal, what it was, who, why, and what comes of it.
+    const card = $("[data-call]");
+    function showCall(ev) {
+      const p = game.players[ev.by],
+        yours = ev.team === "a",
+        who = p ? `${p.number ? `#${p.number} ` : ""}${p.name || ""}, ${yours ? "your team" : "the computer"}` : yours ? "Your team" : "The computer";
+      const [kind, what, why, then] =
+        ev.why === "offside"
+          ? ["offside", "Offside", "Went into the zone ahead of the puck.", "Faceoff outside the blue line."]
+          : ev.why === "icing"
+            ? [
+                "icing",
+                "Icing",
+                "Sent the puck from behind the centre line over the far goal line, and nobody touched it.",
+                "Faceoff in their own end.",
+              ]
+            : [
+                ev.foul,
+                `Penalty: ${ev.foul}`,
+                ev.foul === "boarding" ? "Checked a player from behind into the boards." : "Checked a player who did not have the puck.",
+                yours ? "10 s in the box: you are a skater short." : "10 s in the box: a power play for you.",
+              ];
+      card.querySelector("[data-call-sign]").innerHTML = signalSVG(kind);
+      card.querySelector("[data-call-what]").textContent = what;
+      card.querySelector("[data-call-who]").textContent = who;
+      card.querySelector("[data-call-why]").textContent = why;
+      card.querySelector("[data-call-then]").textContent = then;
+      card.hidden = false;
+      live.textContent = `${what}. ${who}. ${why} ${then}`;
     }
     // Between two frames of the tape, for a smooth slow motion; whatever
     // jumped (to a faceoff) is not slid across.
@@ -3284,9 +3437,10 @@
       return { ...a, players: a.players.map((p, i) => mix(p, b.players[i])), puck: mix(a.puck, b.puck), ref: mix(a.ref, b.ref) };
     }
     function showReplay(now) {
-      // Half speed, slowing to under a third for the shot and the goal.
-      const k = Math.min(1, Math.max(0, (replay.t - goalAt + 1500) / 600));
-      replay.t += Math.min(50, now - replay.last) * (0.5 - 0.22 * k * k * (3 - 2 * k));
+      // Half speed, slowing to under a third for the shot and the goal (for a
+      // foul, a little under half, and a third at the hit).
+      const k = replay.foul ? Math.max(0, 1 - Math.abs(replay.t - replay.foul.at) / 500) : Math.min(1, Math.max(0, (replay.t - goalAt + 1500) / 600));
+      replay.t += Math.min(50, now - replay.last) * ((replay.foul ? 0.45 : 0.5) - (replay.foul ? 0.13 : 0.22) * k * k * (3 - 2 * k));
       replay.last = now;
       if (replay.t >= replay.to) return endReplay();
       while (replay.i < tape.length - 1 && tape[replay.i + 1].now <= replay.t) replay.i++;
@@ -3295,6 +3449,14 @@
         snap = between(a, b, b.now > a.now ? Math.min(1, (replay.t - a.now) / (b.now - a.now)) : 0);
       if (replay.eyes) return cab.replayFrame(snap, replayOf.by, replayOf.goalX, now, replay.t >= goalAt);
       const players = snap.players;
+      if (replay.foul) {
+        const by = players[replay.foul.by];
+        return draw(
+          svg,
+          { players, puck: { ...snap.puck, carrier: players[snap.puck.carrier] || null }, human: false, controlled: by, ref: snap.ref },
+          { view, now: replay.t, follow: true, zoom: 0.62, focus: by ? [by.x, by.y] : null, mark: replay.foul.by }
+        );
+      }
       draw(
         svg,
         {
@@ -3504,7 +3666,9 @@
           ? endReplay()
           : state === "leaving" || (state === "playing" && game.phase === "return")
             ? skipToFaceoff()
-            : null
+            : state === "playing" && game.phase === "stop"
+              ? (game.skipStop(), (card.hidden = true))
+              : null
     );
 
     // Input: the keyboard, and on touch screens a stick and two buttons. The
@@ -3536,6 +3700,14 @@
       if (busy && GAME_KEYS.includes(e.code)) e.preventDefault();
       // The crew at work: any key skips to the end.
       if (state === "crew" && !e.repeat && (GAME_KEYS.includes(e.code) || e.code === "Enter" || e.code === "Escape")) return endResurfacing(true);
+      // Play stopped for a call: any key goes on to the faceoff.
+      if (state === "playing" && game.phase === "stop" && !e.repeat && (GAME_KEYS.includes(e.code) || e.code === "Enter")) {
+        e.preventDefault();
+        game.skipStop();
+        card.hidden = true;
+        presses.shoot = presses.pass = presses.check = false;
+        return;
+      }
       // The Kamboni leaving, or the teams coming back: any key goes on to the faceoff.
       if (
         (state === "leaving" || (state === "playing" && game.phase === "return")) &&
@@ -3683,6 +3855,7 @@
       // No step this frame (on a fast screen that happens): keep the presses.
       if (first) for (const k of ["shoot", "pass", "check"]) presses[k] = presses[k] || held[k];
       if (state === "playing") record(now);
+      if (!card.hidden && (state !== "playing" || game.phase !== "stop")) card.hidden = true;
       const you = game.players.indexOf(game.controlled);
       for (const ev of game.events.splice(0)) {
         sfx(ev);
@@ -3705,10 +3878,14 @@
             on = game.players[ev.on].name;
           if (ev.by === you) say(ev.boards ? `${on} into the boards!` : `Checked ${on}!`, 1.2);
           else if (ev.on === you) say(ev.boards ? `${by} puts you into the boards. Ouch.` : `Ouch. ${by} got you.`, 1.2);
-        } else if (ev.type === "whistle" || ev.type === "delayed" || ev.type === "back") {
-          if (ev.type === "whistle") sound.play("whistle");
+        } else if (ev.type === "whistle") {
+          sound.play("whistle");
+          toast.hidden = true;
+          if (!(ev.why === "penalty" && startFoulReplay(now, ev))) showCall(ev);
+        } else if (ev.type === "delayed" || ev.type === "back") {
+          if (ev.type === "delayed" && ev.why === "penalty") foulSeen = { at: now, by: ev.by, on: ev.on };
           const said = ruled(ev, (game.players[ev.by] || {}).name || "");
-          if (said) say(said, ev.type === "whistle" ? 3.2 : 2.4, ev.type !== "whistle");
+          if (said) say(said, 2.4, true);
         } else if (ev.type === "shot" && ev.oneTimer && ev.you) say("One-timer!", 0.8);
         else if (ev.type === "post") say("Off the post!", 1);
         else if (ev.type === "overtime") say("Tied. Next goal wins.", 2.5);

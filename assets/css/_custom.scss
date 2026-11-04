@@ -1859,6 +1859,83 @@ html.game-full {
   top: 27%;
 }
 
+// A call, while play is stopped: the referee's signal and what it was.
+.game-call {
+  display: flex;
+  position: absolute;
+  z-index: 2;
+  bottom: 9%;
+  left: 50%;
+  gap: 0.9rem;
+  align-items: center;
+  width: min(30rem, calc(100% - 2rem));
+  padding: 0.8rem 1.1rem 0.8rem 0.7rem;
+  transform: translateX(-50%);
+  border-radius: 12px;
+  background: rgba(12, 14, 18, 0.9);
+  color: #eef1f4;
+  font-size: 0.92rem;
+  line-height: 1.35;
+  pointer-events: none;
+
+  &[hidden] {
+    display: none;
+  }
+
+  p {
+    margin: 0;
+  }
+}
+
+// (Not as wide as the stage, as its other SVGs are.)
+.game-stage .game-call-sign {
+  flex: none;
+  width: 4.6rem;
+  height: 4.6rem;
+  border-radius: 8px;
+  background: #dfe6ec;
+
+  .sign-strike,
+  .sign-punch {
+    transform-box: view-box;
+    transform-origin: 0.6px -1.95px;
+    animation: game-sign 0.55s ease-in-out infinite alternate;
+  }
+}
+
+@keyframes game-sign {
+  from {
+    transform: rotate(-14deg);
+  }
+
+  to {
+    transform: rotate(4deg);
+  }
+}
+
+.game-call-what {
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.game-call-who {
+  font-weight: 700;
+}
+
+.game-call-then {
+  color: #ffcf5a;
+}
+
+.rink-foul-name {
+  fill: #e5484d;
+  font-weight: 800;
+  paint-order: stroke;
+  stroke: var(--global-bg-color);
+  stroke-width: 0.3px;
+}
+
 // Between the Kamboni driving off and the teams coming back out: the dark.
 .game-curtain {
   position: absolute;

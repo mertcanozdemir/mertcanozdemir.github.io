@@ -358,6 +358,18 @@ shots can also be blocked, or slip past a body.
   of what was called (`ruled()`), and the seconds left of a penalty beside
   each team's score on the board ("PEN"). The checker counts the whistles and
   wants eight a game at most: offside about 1 to 3, penalties up to about 1.
+- Penalties went by too fast to tell what had happened (Mertcan). A
+  penalty's whistle now shows the foul again (`startFoulReplay()`: slowed,
+  the camera close on whoever took it, ringed in red with the name; the tape
+  is 12 s, as a delayed call can come a while after its foul), then a card
+  over the rink (`showCall()`, `[data-call]`): the referee's signal as the
+  rule books draw it (`signalSVG()`: fists crossed in front of the chest for
+  interference, a fist struck into the other palm for boarding, an arm along
+  the blue line for offside, arms folded for icing), who, what, why, and the
+  10 s; meanwhile the one going to the box skates there (`toTheBox()`).
+  Offside and icing get the card without a replay. Play stays stopped 5 s
+  after the replay for a penalty, 2.8 s for the others; a key or a tap goes
+  on to the faceoff (`skipStop()`).
 
 Against a person the computer's team is a little sharper (`sharp()`: as fast,
 keener pokes, better goalie). Three periods of a minute, then sudden-death
