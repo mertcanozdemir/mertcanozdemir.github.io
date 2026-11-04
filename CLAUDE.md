@@ -133,10 +133,9 @@ A "coming soon" placeholder was tried and dropped: a piece goes up when it works
   computer playing itself, a few seconds in, different on every visit.
 - **Hockey drills**: one real drill, the 2-on-1 Give and Go, loops through
   `drills.js` in preview mode (`data-preview`: no controls, plays only while on
-  screen, a still frame for reduced motion). In preview the players are the
-  game's helmets instead of numbered discs, facing where they skate (goalies and
-  anyone standing face the puck) and watching the puck; the drills page keeps
-  its numbers, which the steps refer to.
+  screen, a still frame for reduced motion). Its players are the same numbered
+  discs as on the drills page: drill drawings have their conventions (Mertcan
+  asked for them to stay round after a version with the game's helmets).
 
 ### The comparison graph moved to the lab's site
 

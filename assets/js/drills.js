@@ -358,36 +358,18 @@
     );
     const puckEls = [...gA.querySelectorAll("[data-puck]")];
 
-    // A preview (the home page) draws its players as helmets instead of
-    // numbered discs, as the game does: they face where they skate (goalies
-    // and anyone standing face the puck) and watch the puck. The first circle
-    // is the ring a carrier gets either way.
-    const faces = card.hasAttribute("data-preview");
+    // Players are numbered discs, as in a coaching diagram, here and in the
+    // home page's preview alike: drill drawings have their conventions. (The
+    // game draws its own players.)
     drill.actors.forEach((a) =>
       gA.insertAdjacentHTML(
         "beforeend",
-        faces
-          ? `<g data-actor="${a.id}"><circle r="1.4" fill="none" stroke="var(--rink-puck)" stroke-width="0"/>${helmetSVG(a.team, a.label === "G", SKINS[drill.actors.indexOf(a) % SKINS.length])}</g>`
-          : `<g data-actor="${a.id}">
+        `<g data-actor="${a.id}">
           <circle r="1.25" fill="var(--rink-team-${a.team})" stroke="var(--rink-puck)" stroke-width="0"/>
           <text y="0.42" text-anchor="middle" font-size="1.1" fill="#fff"
             font-weight="600">${a.label}</text></g>`
       )
     );
-
-    function look(a, t, pucks) {
-      const [x, y] = along(a, t),
-        [x1, y1] = along(a, Math.min(1, t + 0.03)),
-        [x0, y0] = along(a, Math.max(0, t - 0.03));
-      let dx = x1 - x0,
-        dy = y1 - y0;
-      const toPuck = pucks.length ? [pucks[0].pos[0] - x, pucks[0].pos[1] - y] : [dx, dy];
-      if (a.label === "G" || Math.hypot(dx, dy) < 0.2) [dx, dy] = toPuck;
-      const angle = Math.hypot(dx, dy) > 1e-6 ? Math.atan2(dy, dx) : a._angle || 0;
-      a._angle = angle;
-      const [lx, ly] = pucks.some((p) => p.carrier === a) ? [Math.cos(angle), Math.sin(angle)] : toPuck;
-      helmetLook(gA.querySelector(`[data-actor="${a.id}"]`), angle, lx, ly, false);
-    }
 
     function frame(t) {
       drill.actors.forEach((a) => {
@@ -415,7 +397,6 @@
       drill.actors.forEach((a) =>
         gA.querySelector(`[data-actor="${a.id}"] circle`).setAttribute("stroke-width", pucks.some((p) => p.carrier === a) ? "0.35" : "0")
       );
-      if (faces) drill.actors.forEach((a) => look(a, t, pucks));
 
       // The current step is the last one that has started.
       let current = -1;
