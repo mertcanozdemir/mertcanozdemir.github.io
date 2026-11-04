@@ -98,7 +98,10 @@
       <path data-out d="M ${x - 0.08} ${y - 0.08} l 0.16 0.16 m 0 -0.16 l -0.16 0.16" stroke="#111" stroke-width="0.06" stroke-linecap="round" visibility="hidden"/>`;
     if (goalie) {
       return `<g data-helmet>
-      <path d="M 0.1 1.05 L 1.3 0.55 L 1.42 -0.3" stroke="var(--rink-stick)" stroke-width="0.34" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+      <path d="M 0.1 1.05 L 0.72 0.8" stroke="var(--rink-stick)" stroke-width="0.17" stroke-linecap="round" fill="none"/>
+      <path d="M 0.72 0.8 L 1.3 0.55" stroke="var(--rink-stick)" stroke-width="0.32" stroke-linecap="round" fill="none"/>
+      <path d="M 1.3 0.55 Q 1.42 0.12 1.36 -0.34" stroke="var(--rink-stick)" stroke-width="0.34" stroke-linecap="round" fill="none"/>
+      <path d="M 1.37 0.32 L 1.4 0.02" stroke="var(--rink-tape)" stroke-width="0.16" stroke-linecap="round" opacity="0.9"/>
       <g data-stance="ready">
       <rect x="0.3" y="-0.98" width="0.7" height="0.86" rx="0.26" fill="var(--rink-mask)" ${edge}/>
       <rect x="0.3" y="0.12" width="0.7" height="0.86" rx="0.26" fill="var(--rink-mask)" ${edge}/>
@@ -118,7 +121,9 @@
       <path d="M 0.3 -0.44 Q 0.72 0 0.3 0.44 M 0.4 -0.46 V 0.46 M 0.52 -0.38 V 0.38" fill="none" stroke="var(--rink-cage)" stroke-width="0.05"/></g>`;
     }
     return `<g data-helmet>
-      <path d="M 0.42 0.66 L 1.45 0.3 L 1.52 -0.12" stroke="var(--rink-stick)" stroke-width="0.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+      <path d="M 0.42 0.66 L 1.42 0.31" stroke="var(--rink-stick)" stroke-width="0.15" stroke-linecap="round" fill="none"/>
+      <path d="M 1.42 0.31 Q 1.56 0.12 1.5 -0.2" stroke="var(--rink-stick)" stroke-width="0.24" stroke-linecap="round" fill="none"/>
+      <path d="M 1.5 0.18 L 1.53 -0.02" stroke="var(--rink-tape)" stroke-width="0.11" stroke-linecap="round" opacity="0.9"/>
       <ellipse cx="-0.12" rx="0.66" ry="1.12" fill="${jersey}" ${edge}/>
       <path d="M -0.6 -0.78 Q -0.12 -1 0.3 -0.78 M -0.6 0.78 Q -0.12 1 0.3 0.78" fill="none" stroke="#fff" stroke-width="0.1" opacity="0.6"/>
       <circle cx="0.42" cy="0.62" r="0.17" fill="var(--rink-glove)" ${edge}/>

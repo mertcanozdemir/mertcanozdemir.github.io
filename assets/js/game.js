@@ -1700,6 +1700,46 @@
   // A goalie is another shape: big pads, a wide chest protector, a blocker and
   // a catching glove, a painted mask with a cage and a paddle stick. The parts
   // that turn with the player (face, arms, stick) are set by draw().
+  // A hockey stick standing up from the ice: the shaft from the top hand, and
+  // the blade flat on the ice, tape round its middle, the toe turned up a
+  // little; a goalie's has the wide paddle low on the shaft and a bigger
+  // blade. setStick() puts it where it is held.
+  function stickSVG(goalie) {
+    const line = `stroke="var(--rink-stick)" stroke-linecap="round"`;
+    return `<g data-sticks>
+      <line data-stick ${line} stroke-width="${goalie ? 0.12 : 0.11}"/>
+      ${goalie ? `<line data-paddle ${line} stroke-width="0.26"/>` : ""}
+      <path data-blade fill="none" ${line} stroke-width="${goalie ? 0.26 : 0.17}"/>
+      <path data-tape fill="none" stroke="var(--rink-tape)" stroke-width="${goalie ? 0.12 : 0.08}" stroke-linecap="round" opacity="0.9"/></g>`;
+  }
+  // From the top hand (x1, y1) to the middle of the blade (bx, by), on the
+  // ice; the toe out away from the shaft, `toe` 1 to the right, -1 left.
+  function setStick(g, x1, y1, bx, by, toe, goalie) {
+    const f = (v) => v.toFixed(2),
+      back = goalie ? 0.34 : 0.22,
+      ahead = goalie ? 0.42 : 0.34,
+      hx = bx - toe * back,
+      tx = bx + toe * ahead,
+      ty = by - (goalie ? 0.08 : 0.1),
+      stick = g.querySelector("[data-stick]");
+    stick.setAttribute("x1", f(x1));
+    stick.setAttribute("y1", f(y1));
+    stick.setAttribute("x2", f(hx));
+    stick.setAttribute("y2", f(by));
+    const paddle = g.querySelector("[data-paddle]");
+    if (paddle) {
+      paddle.setAttribute("x1", f(x1 + (hx - x1) * 0.55));
+      paddle.setAttribute("y1", f(y1 + (by - y1) * 0.55));
+      paddle.setAttribute("x2", f(hx));
+      paddle.setAttribute("y2", f(by));
+    }
+    g.querySelector("[data-blade]").setAttribute("d", `M ${f(hx)} ${f(by)} Q ${f(bx + toe * ahead * 0.6)} ${f(by + 0.03)} ${f(tx)} ${f(ty)}`);
+    g.querySelector("[data-tape]").setAttribute(
+      "d",
+      `M ${f(bx - toe * back * 0.35)} ${f(by + 0.01)} L ${f(bx + toe * ahead * 0.45)} ${f(by + 0.01)}`
+    );
+  }
+
   function standingSVG(team, goalie, skin, number = "") {
     const shirt = `var(--rink-team-${team})`;
     const digits = (y) => `<text y="${y}" font-size="0.48" font-weight="800" text-anchor="middle" fill="#fff">${number}</text>`;
@@ -1722,7 +1762,7 @@
         <rect x="0.04" y="-0.6" width="1.36" height="0.58" rx="0.2" fill="var(--rink-mask)" ${edge}/>
         <rect x="0.38" y="-0.6" width="0.08" height="0.58" fill="${shirt}"/><rect x="0.86" y="-0.6" width="0.08" height="0.58" fill="${shirt}"/>
         <rect x="1.34" y="-0.42" width="0.24" height="0.32" rx="0.08" fill="var(--rink-boot)"/></g>`;
-      return `<line data-stick stroke="var(--rink-stick)" stroke-width="0.24" stroke-linecap="round"/>
+      return `${stickSVG(true)}
       <g transform="scale(${TALL})">
       <ellipse rx="1.1" ry="${(1.1 * SQUASH).toFixed(2)}" fill="var(--rink-shadow)"/>
       <g data-figure>
@@ -1754,7 +1794,7 @@
     const sock = (x) =>
       `<rect x="${x}" y="-0.74" width="0.24" height="0.56" rx="0.07" fill="${shirt}"/>
       <rect x="${x}" y="-0.52" width="0.24" height="0.08" fill="#fff" opacity="0.85"/>`;
-    return `<line data-stick stroke="var(--rink-stick)" stroke-width="0.13" stroke-linecap="round"/>
+    return `${stickSVG(false)}
       <g transform="scale(${TALL})">
       <ellipse rx="0.85" ry="${(0.85 * SQUASH).toFixed(2)}" fill="var(--rink-shadow)"/>
       <g data-figure>
@@ -1890,7 +1930,8 @@
             set(g.querySelector(`[data-arm="${side}"]`), { x1: side * 0.62, y1: -1.98, x2: hx, y2: hy });
             set(g.querySelector(`[data-glove="${side}"]`), { cx: hx, cy: hy });
           }
-        set(g.querySelector("[data-stick]"), { x1: top[0] * TALL, y1: top[1] * TALL, x2: goalie ? 0.3 : hand * 1.25, y2: -0.02 });
+        const [x1, y1, bx] = [top[0] * TALL, top[1] * TALL, goalie ? 0.3 : hand * 1.25];
+        setStick(g, x1, y1, bx, -0.02, Math.sign(bx - x1) || hand, goalie);
         g.querySelector("[data-face]").setAttribute("visibility", back ? "hidden" : "visible");
         g.querySelector("[data-back]").setAttribute("visibility", back ? "visible" : "hidden");
         out.push(tidy(g));
@@ -2257,11 +2298,8 @@
         const r = (lean * Math.PI) / 180,
           tx = (top[0] * Math.cos(r) - top[1] * Math.sin(r) + sway) * TALL,
           ty = (top[0] * Math.sin(r) + top[1] * Math.cos(r) + bob) * TALL;
-        const stick = g.querySelector("[data-stick]");
-        stick.setAttribute("x1", (down ? sx * 0.6 : tx).toFixed(2));
-        stick.setAttribute("y1", (down ? -0.25 : ty).toFixed(2));
-        stick.setAttribute("x2", bx.toFixed(2));
-        stick.setAttribute("y2", by.toFixed(2));
+        const x1 = down ? sx * 0.6 : tx;
+        setStick(g, x1, down ? -0.25 : ty, bx, by, Math.sign(bx - x1) || hand, goalie);
         const lie = down ? (sx >= 0 ? 80 : -80) : 0;
         g.querySelector("[data-figure]").setAttribute(
           "transform",
