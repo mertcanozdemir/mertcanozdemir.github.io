@@ -271,7 +271,8 @@ player in front of it (`data-puck-ghost`).
 
 How it plays: the person controls one skater (the dashed ring) and takes over
 whoever on their team gets the puck; Space shoots or pokes, X passes or
-switches, C body checks: a short burst that knocks down an opponent it hits
+switches (also while knocked down; the switch counts from the next step, as the
+same press once switched straight back), C body checks: a short burst that knocks down an opponent it hits
 hard enough (`CHECK`), who drops the puck and lies there for a second with
 crosses for eyes and stars; the computer checks too. A shot straight off a
 pass is a one-timer: harder, and harder to save. A goal lights the lamp behind
@@ -405,10 +406,11 @@ house-painting games; he named it Kamboni (not Zamboni, which is a brand). The
 person drives it over the cut-up ice, or "lets the crew do it". About life size
 (`RZ`: 5.2 × 2.6 m, cleaning a 3 m band behind it; the first one was so big it
 could not get behind the nets), and the crew takes the nets off the ice first,
-as in a real arena. Its physics is `Resurfacer` in the simulation: from above it
-drives toward the arrows; from the cab it keeps going at a cruise, ← → steer and
-↑ ↓ change speed (easier: the first controls were found hard). Its body is three
-circles against the boards. The ice is counted in 1 m cells and 65% is enough.
+as in a real arena. Its physics is `Resurfacer` in the simulation, driven the
+same way in both views: it keeps going at a cruise, ← → steer and ↑ ↓ change
+speed (easier: the first controls were found hard). From above it used to drive
+toward the arrow pressed, ↑ up the screen; Mertcan wanted ↑ to go forward. Its
+body is three circles against the boards. The ice is counted in 1 m cells and 65% is enough.
 The crew's way (`autopilot()`) is rows along the rink, shown ten times as fast;
 the pause button becomes "let the crew finish", then "skip". The time is kept
 against the best in the browser (`kamboni-best`). Space honks; boards bonk.

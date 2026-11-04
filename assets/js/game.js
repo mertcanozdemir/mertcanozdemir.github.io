@@ -281,6 +281,9 @@
       pk.rebound = Math.max(0, pk.rebound - dt);
       for (const team of ["a", "b"]) this.plan(team);
       this.t = (this.t || 0) + dt;
+      // The person's skater as the step begins: a switch hands over the next
+      // step, so the press that made it is not taken twice.
+      const you = this.human ? this.controlled : null;
       for (const p of this.players) {
         p.cool = Math.max(0, p.cool - dt);
         p.noTouch = Math.max(0, p.noTouch - dt);
@@ -288,13 +291,15 @@
         p.oneTimer = Math.max(0, p.oneTimer - dt);
         p.dash = Math.max(0, p.dash - dt);
         if (p.down > 0) {
-          // Knocked down: slides to a stop, then gets up.
+          // Knocked down: slides to a stop, then gets up. The person can
+          // switch to someone still standing.
           p.down = Math.max(0, p.down - dt);
           p.wx = p.wy = 0;
+          if (p === you && input.pass) this.switchPlayer();
           continue;
         }
         if (p.role === "goalie") this.keepGoal(p, dt);
-        else if (this.human && p === this.controlled) this.obey(p, input);
+        else if (p === you) this.obey(p, input);
         else this.think(p, dt);
       }
       this.move(dt);
@@ -1158,7 +1163,7 @@
     width: 3, // the band the conditioner cleans, its middle `rear` behind the Kamboni's
     rear: 2.85,
     speed: 16, // flat out
-    cruise: 12, // from the cab with no keys pressed: it keeps going
+    cruise: 12, // with no keys pressed: it keeps going
     turn: 3.2, // rad/s, steering toward a direction, from above
     lock: 2.4, // rad/s at full lock, from the cab
     done: 0.65, // how much of the ice is enough
@@ -1185,11 +1190,11 @@
       return this.part >= RZ.done;
     }
 
-    // `input` is the person's. From above, {x, y}: the way to go, on the ice;
-    // it turns that way like a vehicle, slowing for a sharp turn, and stops
-    // when let go. From the cab, {drive: true, steer, throttle}: it keeps
-    // going at a cruise, `steer` turns the wheel (smoothly, as hands do) and
-    // `throttle` goes faster or slower, down to reversing.
+    // `input` is the person's, in both views {drive: true, steer, throttle}:
+    // it keeps going at a cruise, `steer` turns the wheel (smoothly, as hands
+    // do) and `throttle` goes faster or slower, down to reversing. The crew's
+    // is {x, y}, the way to go on the ice: it turns that way like a vehicle,
+    // slowing for a sharp turn, and stops when let go.
     step(dt, input = {}) {
       if (input.drive) {
         const thr = clamp(input.throttle || 0, -1, 1),
@@ -2621,14 +2626,9 @@
       if (!inCab) draw(svg, game, { view: "top", now, rz });
       fit();
     }
-    const controls = () =>
-      rzView === "cab"
-        ? touchy()
-          ? "Steer with the stick; push it up to go faster."
-          : "← and → steer. ↑ goes faster, ↓ slower."
-        : touchy()
-          ? "Drive with the stick."
-          : "Drive with the arrows.";
+    // Driven as a vehicle in both views: from above too, ↑ is ahead of the
+    // driver, not up the screen.
+    const controls = () => (touchy() ? "Steer with the stick; push it up to go faster." : "← and → steer. ↑ goes faster, ↓ slower.");
     $("[data-view]").addEventListener("click", () => {
       if (state === "crew") return;
       if (state === "resurfacing") {
@@ -2937,7 +2937,7 @@
       }
       if (!rz.started && !inp.x && !inp.y) return;
       rz.started = true;
-      rz.step(dt, rzView === "cab" ? { drive: true, steer: inp.x, throttle: -inp.y } : inp);
+      rz.step(dt, { drive: true, steer: inp.x, throttle: -inp.y });
       if (rz.bonk) {
         say("Bonk.", 0.7);
         sound.play("thud", true);
