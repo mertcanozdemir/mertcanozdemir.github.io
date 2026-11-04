@@ -22,6 +22,16 @@
   // A body check: the burst's speed (m/s) and length (s), how long whoever it
   // knocks down stays down, and the closing speed it takes to knock them down.
   const CHECK = { speed: 10.5, time: 0.3, down: 1.2, hard: 3.5 };
+  // Skating, in m/s²: speeding up and turning, coasting to a stop once the
+  // keys are let go (about a second from full speed), and a hockey stop:
+  // skating the other way brakes hard.
+  const SKATE = { push: 13, coast: 7.5, brake: 20 };
+  // Whether a skater wants to go roughly the other way from where it is going.
+  const reversing = (p) => {
+    const sp = hypot(p.vx, p.vy),
+      w = hypot(p.wx, p.wy);
+    return sp > 3 && w > 0.5 && p.vx * p.wx + p.vy * p.wy < -0.4 * sp * w;
+  };
   const DIR = { a: 1, b: -1 }; // the way each team attacks
 
   const hypot = Math.hypot;
@@ -339,6 +349,7 @@
       p.wx = d > 1e-6 ? (dx / d) * v : 0;
       p.wy = d > 1e-6 ? (dy / d) * v : 0;
       p.idle = false;
+      p.braking = reversing(p);
     }
 
     think(p, dt) {
@@ -418,6 +429,7 @@
       p.idle = il < 0.15;
       p.wx = p.idle ? 0 : (ix / il) * max * Math.min(1, il);
       p.wy = p.idle ? 0 : (iy / il) * max * Math.min(1, il);
+      p.braking = reversing(p);
       const pk = this.puck;
       if (input.shoot) {
         if (pk.carrier === p) this.shoot(p, il > 0.3 && Math.abs(iy / il) > 0.35 ? Math.sign(iy) * NET_HALF * 0.7 : null);
@@ -604,7 +616,7 @@
         if (p.dash > 0) [p.wx, p.wy] = [p.dashX, p.dashY];
         let dvx = p.wx - p.vx,
           dvy = p.wy - p.vy;
-        const acc = (p.dash > 0 ? 60 : p.down > 0 ? 6 : p.role === "goalie" ? 20 : p.idle ? 3 : 13) * dt,
+        const acc = (p.dash > 0 ? 60 : p.down > 0 ? 6 : p.role === "goalie" ? 20 : p.braking ? SKATE.brake : p.idle ? SKATE.coast : SKATE.push) * dt,
           dl = hypot(dvx, dvy);
         if (dl > acc) [dvx, dvy] = [(dvx * acc) / dl, (dvy * acc) / dl];
         p.vx += dvx;
@@ -992,39 +1004,86 @@
       <path d="M ${pt(x0, -h, 0)} L ${pt(x0, -h, top)} L ${pt(x0, h, top)} L ${pt(x0, h, 0)}" fill="none" stroke="var(--rink-red)" stroke-width="0.17" stroke-linejoin="round" stroke-linecap="round"/></g>`;
   }
 
-  // A player standing up, its feet at (0, 0): skates and pants, a jersey in the
-  // team's colour and the helmet, with the visor and eyes turned the way the
-  // player faces. A goalie has pads, a wider body and a caged mask.
-  function standingSVG(team, goalie) {
+  // A hockey player standing up, its feet at (0, 0): skates with blades,
+  // striped socks, hockey pants, a jersey over shoulder pads, gloves on the
+  // stick, and an open helmet with a half visor, ear guards and a chin strap.
+  // A goalie is another shape: big pads, a wide chest protector, a blocker and
+  // a catching glove, a painted mask with a cage and a paddle stick. The parts
+  // that turn with the player (face, arms, stick) are set by draw().
+  function standingSVG(team, goalie, skin) {
     const shirt = `var(--rink-team-${team})`;
-    const w = goalie ? 0.8 : 0.62;
-    const leg = (x) =>
-      goalie
-        ? `<rect x="${x}" y="-0.8" width="0.55" height="0.8" rx="0.18" fill="var(--rink-mask)" stroke="var(--rink-helmet-edge)" stroke-width="0.05"/>`
-        : `<rect x="${x}" y="-0.66" width="0.3" height="0.66" rx="0.13" fill="var(--rink-pants)"/>`;
-    const eye = (s) =>
-      `<circle data-white="${s}" r="0.14" fill="#fff"/><circle data-pupil="${s}" r="0.07" fill="#111"/>
-      <path data-out="${s}" d="M -0.08 -0.08 L 0.08 0.08 M 0.08 -0.08 L -0.08 0.08" stroke="#111" stroke-width="0.05" stroke-linecap="round" visibility="hidden"/>`;
-    return `<line data-stick stroke="var(--rink-stick)" stroke-width="${goalie ? 0.22 : 0.14}" stroke-linecap="round"/>
+    const edge = `stroke="var(--rink-helmet-edge)" stroke-width="0.05"`;
+    const eye = (x) =>
+      `<circle cx="${x}" cy="0.03" r="0.1" fill="#fff"/>
+      <circle data-pupil data-cx="${x}" data-cy="0.03" cx="${x}" cy="0.03" r="0.05" fill="#111"/>
+      <path data-out d="M ${x - 0.06} -0.03 l 0.12 0.12 m 0 -0.12 l -0.12 0.12" stroke="#111" stroke-width="0.04" stroke-linecap="round" visibility="hidden"/>`;
+    const skate = (x) =>
+      `<rect x="${x}" y="-0.2" width="0.3" height="0.18" rx="0.06" fill="var(--rink-boot)"/>
+      <line x1="${x - 0.02}" y1="0.01" x2="${x + 0.34}" y2="0.01" stroke="var(--rink-blade)" stroke-width="0.05" stroke-linecap="round"/>`;
+    if (goalie) {
+      const pad = (x) =>
+        `<rect x="${x}" y="-1.05" width="0.6" height="1.02" rx="0.2" fill="var(--rink-mask)" ${edge}/>
+        <rect x="${x}" y="-0.8" width="0.6" height="0.08" fill="${shirt}"/><rect x="${x}" y="-0.45" width="0.6" height="0.08" fill="${shirt}"/>`;
+      return `<line data-stick stroke="var(--rink-stick)" stroke-width="0.24" stroke-linecap="round"/>
+      <g transform="scale(${TALL})">
+      <ellipse rx="1.1" ry="${(1.1 * SQUASH).toFixed(2)}" fill="var(--rink-shadow)"/>
+      <g data-figure>
+        ${skate(-0.62)}${skate(0.32)}
+        ${pad(-0.68)}${pad(0.08)}
+        <path d="M -0.7 -1.45 H 0.7 L 0.74 -1.05 H -0.74 Z" fill="var(--rink-pants)"/>
+        <path d="M -1.02 -2 Q -1.05 -2.3 -0.7 -2.3 H 0.7 Q 1.05 -2.3 1.02 -2 L 0.86 -1.4 H -0.86 Z" fill="${shirt}" ${edge}/>
+        <rect x="-0.86" y="-1.62" width="1.72" height="0.09" fill="#fff" opacity="0.8"/>
+        <rect x="0.78" y="-1.78" width="0.36" height="0.5" rx="0.07" fill="var(--rink-mask)" ${edge}/>
+        <circle cx="-0.98" cy="-1.6" r="0.34" fill="var(--rink-mask)" ${edge}/>
+        <circle cx="-0.98" cy="-1.6" r="0.16" fill="${shirt}" opacity="0.85"/>
+        <g transform="translate(0 -2.62)">
+          <g data-back><circle r="0.46" fill="var(--rink-mask)" ${edge}/><rect x="-0.08" y="-0.44" width="0.16" height="0.86" rx="0.08" fill="${shirt}"/></g>
+          <g data-face>
+            <circle r="0.46" fill="var(--rink-mask)" ${edge}/>
+            <path d="M -0.4 -0.26 Q 0 -0.62 0.4 -0.26" fill="none" stroke="${shirt}" stroke-width="0.12" stroke-linecap="round"/>
+            <ellipse cy="0.08" rx="0.3" ry="0.26" fill="${skin}"/>
+            ${eye(-0.11)}${eye(0.11)}
+            <path d="M -0.3 0 H 0.3 M -0.28 0.16 H 0.28 M -0.12 -0.14 V 0.32 M 0.12 -0.14 V 0.32" stroke="var(--rink-cage)" stroke-width="0.04"/>
+          </g>
+        </g>
+      </g>
+      ${starsSVG(1)}</g>`;
+    }
+    const sock = (x) =>
+      `<rect x="${x}" y="-0.74" width="0.24" height="0.56" rx="0.07" fill="${shirt}"/>
+      <rect x="${x}" y="-0.52" width="0.24" height="0.08" fill="#fff" opacity="0.85"/>`;
+    return `<line data-stick stroke="var(--rink-stick)" stroke-width="0.13" stroke-linecap="round"/>
       <g transform="scale(${TALL})">
       <ellipse rx="0.85" ry="${(0.85 * SQUASH).toFixed(2)}" fill="var(--rink-shadow)"/>
       <g data-figure>
-        ${goalie ? leg(-0.62) + leg(0.07) : leg(-0.38) + leg(0.08)}
-        <rect x="${-w}" y="-1.9" width="${2 * w}" height="1.42" rx="0.5" fill="${shirt}" stroke="var(--rink-helmet-edge)" stroke-width="0.05"/>
-        <rect x="${-w}" y="-0.98" width="${2 * w}" height="0.44" rx="0.2" fill="var(--rink-pants)"/>
-        <g transform="translate(0 -2.4)">
-          <circle r="0.64" fill="${goalie ? "var(--rink-mask)" : shirt}" stroke="var(--rink-helmet-edge)" stroke-width="0.05"/>
-          <rect x="-0.1" y="-0.62" width="0.2" height="0.7" rx="0.1" fill="${goalie ? shirt : "#fff"}" opacity="${goalie ? 0.95 : 0.45}"/>
-          <ellipse cx="-0.22" cy="-0.3" rx="0.2" ry="0.1" fill="#fff" opacity="0.3"/>
+        ${skate(-0.34)}${skate(0.06)}
+        ${sock(-0.31)}${sock(0.09)}
+        <path d="M -0.5 -1.22 H 0.5 L 0.55 -0.78 Q 0.55 -0.7 0.46 -0.7 H -0.46 Q -0.55 -0.7 -0.55 -0.78 Z" fill="var(--rink-pants)"/>
+        <path d="M -0.8 -1.98 Q -0.82 -2.2 -0.56 -2.2 H 0.56 Q 0.82 -2.2 0.8 -1.98 L 0.62 -1.14 H -0.62 Z" fill="${shirt}" ${edge}/>
+        <rect x="-0.62" y="-1.36" width="1.24" height="0.09" fill="#fff" opacity="0.85"/>
+        <line data-arm="-1" stroke="${shirt}" stroke-width="0.26" stroke-linecap="round"/>
+        <line data-arm="1" stroke="${shirt}" stroke-width="0.26" stroke-linecap="round"/>
+        <circle data-glove="-1" r="0.15" fill="var(--rink-glove)"/>
+        <circle data-glove="1" r="0.15" fill="var(--rink-glove)"/>
+        <g transform="translate(0 -2.52)">
+          <g data-back><circle r="0.4" fill="${shirt}" ${edge}/><rect x="-0.07" y="-0.38" width="0.14" height="0.62" rx="0.07" fill="#fff" opacity="0.5"/></g>
           <g data-face>
-            <rect x="-0.42" y="-0.17" width="0.84" height="0.44" rx="0.21" fill="var(--rink-visor)"/>
-            ${eye(-1)}${eye(1)}
-            ${goalie ? '<path d="M -0.26 -0.15 V 0.25 M 0 -0.15 V 0.25 M 0.26 -0.15 V 0.25" stroke="var(--rink-mask)" stroke-width="0.05"/>' : ""}
+            <circle cy="0.04" r="0.34" fill="${skin}"/>
+            <path d="M -0.42 0.02 Q -0.44 -0.42 0 -0.44 Q 0.44 -0.42 0.42 0.02 L 0.3 -0.04 Q 0 -0.24 -0.3 -0.04 Z" fill="${shirt}" ${edge}/>
+            <circle cx="-0.38" cy="0.04" r="0.1" fill="${shirt}"/><circle cx="0.38" cy="0.04" r="0.1" fill="${shirt}"/>
+            ${eye(-0.12)}${eye(0.12)}
+            <path d="M -0.32 -0.06 Q 0 0.16 0.32 -0.06 L 0.3 0.1 Q 0 0.28 -0.3 0.1 Z" fill="var(--rink-visor-clear)"/>
+            <path d="M -0.3 0.12 Q 0 0.52 0.3 0.12" fill="none" stroke="var(--rink-strap)" stroke-width="0.04"/>
           </g>
         </g>
       </g>
       ${starsSVG(0.9)}</g>`;
   }
+
+  const skinOf = (i) => {
+    const skins = root.RINK_SKINS || ["#e2ad86"];
+    return skins[(i * 3) % skins.length];
+  };
 
   function build(svg, game, view) {
     // The marks on the ice stay with the ice through a change of view.
@@ -1056,7 +1115,7 @@
       el("circle", ring, plane);
       const layer = el("g", { "data-players": "" }, plane);
       game.players.forEach((p, i) => {
-        el("g", { "data-player": i }, layer).insertAdjacentHTML("beforeend", root.helmetSVG(p.team, p.role === "goalie") + starsSVG(1.5));
+        el("g", { "data-player": i }, layer).insertAdjacentHTML("beforeend", root.helmetSVG(p.team, p.role === "goalie", skinOf(i)) + starsSVG(1.5));
       });
       return;
     }
@@ -1087,7 +1146,9 @@
       "beforeend",
       `<g data-puck><ellipse cy="0.08" rx="0.45" ry="${(0.45 * SQUASH).toFixed(2)}" fill="var(--rink-puck-edge)"/><ellipse rx="0.45" ry="${(0.45 * SQUASH).toFixed(2)}" fill="var(--rink-puck)"/></g>`
     );
-    game.players.forEach((p, i) => el("g", { "data-player": i }, things).insertAdjacentHTML("beforeend", standingSVG(p.team, p.role === "goalie")));
+    game.players.forEach((p, i) =>
+      el("g", { "data-player": i }, things).insertAdjacentHTML("beforeend", standingSVG(p.team, p.role === "goalie", skinOf(i)))
+    );
     svg.insertAdjacentHTML("beforeend", boardsSVG(false));
     for (const s of [1, -1]) {
       const [cx, cy] = TILT.at(s * (GOAL_X + NET_DEPTH * 0.5), 0, 1.2);
@@ -1132,31 +1193,51 @@
           sy = fy0 / fl,
           down = p.down > 0;
         const [bx, by] = TILT.at(p.fx * REACH, p.fy * REACH);
+        // Hands: a skater holds the stick at its side, half the players
+        // shooting left and half right, a little toward where it faces; a
+        // goalie's stick comes from the blocker.
+        const goalie = p.role === "goalie",
+          hand = i % 2 ? 1 : -1;
+        const top = goalie ? [0.95, -1.55] : [hand * 0.46 + sx * 0.22, -1.58],
+          low = goalie ? top : [hand * 0.66 + sx * 0.3, -1.24];
+        if (!goalie) {
+          for (const [s, [hx, hy]] of [
+            [-hand, top],
+            [hand, low],
+          ]) {
+            const arm = g.querySelector(`[data-arm="${s}"]`);
+            arm.setAttribute("x1", s * 0.62);
+            arm.setAttribute("y1", -1.98);
+            arm.setAttribute("x2", hx.toFixed(2));
+            arm.setAttribute("y2", hy.toFixed(2));
+            const glove = g.querySelector(`[data-glove="${s}"]`);
+            glove.setAttribute("cx", hx.toFixed(2));
+            glove.setAttribute("cy", hy.toFixed(2));
+          }
+        }
         const stick = g.querySelector("[data-stick]");
-        stick.setAttribute("x1", (sx * 0.55 * TALL).toFixed(2));
-        stick.setAttribute("y1", ((down ? -0.2 : -1.2) * TALL).toFixed(2));
+        stick.setAttribute("x1", (down ? sx * 0.6 : top[0] * TALL).toFixed(2));
+        stick.setAttribute("y1", (down ? -0.25 : top[1] * TALL).toFixed(2));
         stick.setAttribute("x2", bx.toFixed(2));
         stick.setAttribute("y2", by.toFixed(2));
         const lie = down ? (sx >= 0 ? 80 : -80) : 0;
         g.querySelector("[data-figure]").setAttribute("transform", lie ? `rotate(${lie})` : "");
+        // Skating away up the screen, the back of the helmet shows instead.
+        const away = sy < -0.55 && !down;
         const face = g.querySelector("[data-face]");
-        face.setAttribute("visibility", sy < -0.55 && !down ? "hidden" : "visible");
-        face.setAttribute("transform", `translate(${(sx * 0.2).toFixed(2)} 0)`);
+        face.setAttribute("visibility", away ? "hidden" : "visible");
+        g.querySelector("[data-back]").setAttribute("visibility", away ? "visible" : "hidden");
+        face.setAttribute("transform", `translate(${(sx * 0.08).toFixed(2)} 0)`);
         // The eyes watch the puck, or look ahead with it.
-        const [lx, ly] = pk.carrier === p ? [sx, sy] : [px - x, py - (y - 2.4)];
+        const [lx, ly] = pk.carrier === p ? [sx, sy] : [px - x, py - (y - 2.5 * TALL)];
         const ll = hypot(lx, ly) || 1;
-        for (const s of [-1, 1]) {
-          const ex = s * 0.17;
-          face.querySelector(`[data-white="${s}"]`).setAttribute("cx", ex);
-          const pupil = face.querySelector(`[data-pupil="${s}"]`);
-          pupil.setAttribute("cx", (ex + (lx / ll) * 0.06).toFixed(3));
-          pupil.setAttribute("cy", ((ly / ll) * 0.06).toFixed(3));
+        face.querySelectorAll("[data-pupil]").forEach((e) => {
+          e.setAttribute("cx", (+e.dataset.cx + (lx / ll) * 0.045).toFixed(3));
+          e.setAttribute("cy", (+e.dataset.cy + (ly / ll) * 0.045).toFixed(3));
           // "inherit", not "visible", so a face turned away hides its pupils too.
-          pupil.setAttribute("visibility", down ? "hidden" : "inherit");
-          const out = face.querySelector(`[data-out="${s}"]`);
-          out.setAttribute("transform", `translate(${ex} 0)`);
-          out.setAttribute("visibility", down ? "inherit" : "hidden");
-        }
+          e.setAttribute("visibility", down ? "hidden" : "inherit");
+        });
+        face.querySelectorAll("[data-out]").forEach((e) => e.setAttribute("visibility", down ? "inherit" : "hidden"));
         const stars = g.querySelector("[data-stars]");
         stars.setAttribute("visibility", down ? "visible" : "hidden");
         if (down) {
@@ -1239,6 +1320,9 @@
           // A jump (the faceoff after a goal) starts afresh, with no line across the ice.
           if (hypot(p.x - m.x, p.y - m.y) > 3) Object.assign(m, { x: p.x, y: p.y, tracks: null });
           const sp = hypot(p.vx, p.vy);
+          // A hockey stop sprays snow as it starts, whenever that is.
+          if (p.braking && !m.braking && sp > 3) spray(p, p.vx, p.vy);
+          m.braking = p.braking;
           if (now - m.t > 120) {
             const was = hypot(m.vx, m.vy);
             const turn = was > 4 && sp > 2 ? Math.acos(clamp((m.vx * p.vx + m.vy * p.vy) / (was * sp), -1, 1)) : 0;

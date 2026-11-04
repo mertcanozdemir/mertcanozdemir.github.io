@@ -80,30 +80,54 @@
         fill="var(--rink-net)" stroke="var(--rink-red)" stroke-width="0.16"/></g>`;
   }
 
-  // A player seen from above, facing +x: a helmet in the team's colour with a
-  // dark visor at the front and two eyes looking out of it, and a stick. A
-  // goalie wears a light mask with a cage. helmetLook() turns it and moves the
-  // eyes; `out` crosses them, for a player knocked down.
-  function helmetSVG(team, goalie) {
-    const shell = goalie ? "var(--rink-mask)" : `var(--rink-team-${team})`;
-    const stripe = goalie ? `var(--rink-team-${team})` : "#fff";
-    const eye = (s) =>
-      `<circle cx="0.66" cy="${s * 0.31}" r="0.25" fill="#fff"/>
-      <circle data-pupil="${s}" cx="0.66" cy="${s * 0.31}" r="0.13" fill="#111"/>
-      <path data-out d="M 0.52 ${s * 0.31 - 0.14} l 0.28 0.28 m 0 -0.28 l -0.28 0.28" stroke="#111" stroke-width="0.08" stroke-linecap="round" visibility="hidden"/>`;
-    const cage = goalie ? `<path d="M 0.5 -0.66 V 0.66 M 0.84 -0.6 V 0.6 M 0.3 0 H 1.15" stroke="var(--rink-mask)" stroke-width="0.07"/>` : "";
+  // Skin tones, one per player in turn.
+  const SKINS = ["#f1c8a6", "#e2ad86", "#c68e68", "#9a6644", "#6e4a33"];
+
+  // A hockey player seen from above, facing +x: shoulder pads in the team's
+  // jersey, the helmet on top, open at the front where the face and eyes are,
+  // gloves on the stick. A goalie is wider, with big pads, a blocker and a
+  // catching glove, a painted mask with a cage and a paddle stick.
+  // helmetLook() turns it and moves the eyes; `out` crosses them, for a player
+  // knocked down.
+  function helmetSVG(team, goalie, skin = SKINS[0]) {
+    const jersey = `var(--rink-team-${team})`;
+    const edge = `stroke="var(--rink-helmet-edge)" stroke-width="0.07"`;
+    const eye = (x, y) =>
+      `<circle cx="${x}" cy="${y}" r="0.14" fill="#fff"/>
+      <circle data-pupil data-cx="${x}" data-cy="${y}" cx="${x}" cy="${y}" r="0.075" fill="#111"/>
+      <path data-out d="M ${x - 0.08} ${y - 0.08} l 0.16 0.16 m 0 -0.16 l -0.16 0.16" stroke="#111" stroke-width="0.06" stroke-linecap="round" visibility="hidden"/>`;
+    if (goalie) {
+      return `<g data-helmet>
+      <path d="M 0.1 1.05 L 1.3 0.55 L 1.42 -0.3" stroke="var(--rink-stick)" stroke-width="0.34" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+      <rect x="0.3" y="-0.98" width="0.7" height="0.86" rx="0.26" fill="var(--rink-mask)" ${edge}/>
+      <rect x="0.3" y="0.12" width="0.7" height="0.86" rx="0.26" fill="var(--rink-mask)" ${edge}/>
+      <path d="M 0.62 -0.98 V -0.12 M 0.62 0.12 V 0.98" stroke="${jersey}" stroke-width="0.12"/>
+      <ellipse cx="-0.1" rx="0.78" ry="1.32" fill="${jersey}" ${edge}/>
+      <rect x="0.1" y="0.88" width="0.6" height="0.44" rx="0.1" fill="var(--rink-mask)" ${edge}/>
+      <circle cx="0.3" cy="-1.12" r="0.42" fill="var(--rink-mask)" ${edge}/>
+      <circle cx="0.3" cy="-1.12" r="0.2" fill="${jersey}" opacity="0.85"/>
+      <circle cx="0.05" r="0.56" fill="var(--rink-mask)" ${edge}/>
+      <rect x="-0.5" y="-0.1" width="0.62" height="0.2" rx="0.1" fill="${jersey}"/>
+      <path d="M 0.28 -0.4 A 0.56 0.56 0 0 1 0.28 0.4 Z" fill="${skin}"/>
+      ${eye(0.4, -0.15)}${eye(0.4, 0.15)}
+      <path d="M 0.3 -0.44 Q 0.72 0 0.3 0.44 M 0.4 -0.46 V 0.46 M 0.52 -0.38 V 0.38" fill="none" stroke="var(--rink-cage)" stroke-width="0.05"/></g>`;
+    }
     return `<g data-helmet>
-      <path d="M 0.05 0.85 L 1.45 0.28 M 1.45 0.28 L 1.52 -0.12" stroke="var(--rink-stick)" stroke-width="${goalie ? 0.3 : 0.2}" stroke-linecap="round" fill="none"/>
-      <ellipse rx="1.12" ry="0.98" fill="${shell}" stroke="var(--rink-helmet-edge)" stroke-width="0.09"/>
-      <ellipse cx="0.12" cy="-0.9" rx="0.3" ry="0.15" fill="var(--rink-helmet-edge)"/>
-      <ellipse cx="0.12" cy="0.9" rx="0.3" ry="0.15" fill="var(--rink-helmet-edge)"/>
-      <rect x="-1.02" y="-0.12" width="1.12" height="0.24" rx="0.12" fill="${stripe}" opacity="${goalie ? 0.95 : 0.45}"/>
-      <ellipse cx="-0.38" cy="-0.38" rx="0.36" ry="0.17" fill="#fff" opacity="0.25"/>
-      <path d="M 0.28 -0.7 C 0.8 -0.76 1.12 -0.48 1.14 0 C 1.12 0.48 0.8 0.76 0.28 0.7 C 0.38 0.26 0.38 -0.26 0.28 -0.7 Z" fill="var(--rink-visor)"/>
-      ${eye(-1)}${eye(1)}${cage}</g>`;
+      <path d="M 0.42 0.66 L 1.45 0.3 L 1.52 -0.12" stroke="var(--rink-stick)" stroke-width="0.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+      <ellipse cx="-0.12" rx="0.66" ry="1.12" fill="${jersey}" ${edge}/>
+      <path d="M -0.6 -0.78 Q -0.12 -1 0.3 -0.78 M -0.6 0.78 Q -0.12 1 0.3 0.78" fill="none" stroke="#fff" stroke-width="0.1" opacity="0.6"/>
+      <circle cx="0.42" cy="0.62" r="0.17" fill="var(--rink-glove)" ${edge}/>
+      <circle cx="0.5" cy="0.12" r="0.17" fill="var(--rink-glove)" ${edge}/>
+      <circle cx="0.02" r="0.5" fill="${jersey}" ${edge}/>
+      <path d="M -0.44 0 H -0.06" stroke="#fff" stroke-width="0.14" stroke-linecap="round" opacity="0.5"/>
+      <circle cx="0.04" cy="-0.47" r="0.12" fill="${jersey}" ${edge}/>
+      <circle cx="0.04" cy="0.47" r="0.12" fill="${jersey}" ${edge}/>
+      <path d="M 0.24 -0.44 A 0.5 0.5 0 0 1 0.24 0.44 Z" fill="${skin}"/>
+      ${eye(0.36, -0.15)}${eye(0.36, 0.15)}
+      <path d="M 0.3 -0.42 A 0.48 0.48 0 0 1 0.3 0.42" fill="none" stroke="var(--rink-visor-clear)" stroke-width="0.1"/></g>`;
   }
 
-  // Turns a helmet to `angle` (radians, 0 = +x) and points its eyes along
+  // Turns a player to `angle` (radians, 0 = +x) and points its eyes along
   // (lx, ly), in rink coordinates.
   function helmetLook(g, angle, lx, ly, out) {
     const h = g.querySelector("[data-helmet]");
@@ -113,18 +137,20 @@
     let x = lx * c + ly * s,
       y = ly * c - lx * s;
     const l = Math.hypot(x, y) || 1;
-    [x, y] = [(x / l) * 0.11, (y / l) * 0.11];
+    [x, y] = [(x / l) * 0.06, (y / l) * 0.06];
     h.querySelectorAll("[data-pupil]").forEach((p) => {
-      p.setAttribute("cx", (0.66 + x).toFixed(3));
-      p.setAttribute("cy", (+p.dataset.pupil * 0.31 + y).toFixed(3));
-      p.setAttribute("visibility", out ? "hidden" : "visible");
+      p.setAttribute("cx", (+p.dataset.cx + x).toFixed(3));
+      p.setAttribute("cy", (+p.dataset.cy + y).toFixed(3));
+      p.setAttribute("visibility", out ? "hidden" : "inherit");
     });
-    h.querySelectorAll("[data-out]").forEach((p) => p.setAttribute("visibility", out ? "visible" : "hidden"));
+    h.querySelectorAll("[data-out]").forEach((p) => p.setAttribute("visibility", out ? "inherit" : "hidden"));
   }
+
   // The game (game.js) plays on the same rink, with the same players.
   window.rinkSVG = rinkSVG;
   window.helmetSVG = (...a) => helmetSVG(...a);
   window.helmetLook = (...a) => helmetLook(...a);
+  window.RINK_SKINS = SKINS;
   window.RINK_NET = NET;
 
   // A point on the Catmull-Rom curve through k, between k[i] and k[i + 1].
@@ -341,7 +367,7 @@
       gA.insertAdjacentHTML(
         "beforeend",
         faces
-          ? `<g data-actor="${a.id}"><circle r="1.4" fill="none" stroke="var(--rink-puck)" stroke-width="0"/>${helmetSVG(a.team, a.label === "G")}</g>`
+          ? `<g data-actor="${a.id}"><circle r="1.4" fill="none" stroke="var(--rink-puck)" stroke-width="0"/>${helmetSVG(a.team, a.label === "G", SKINS[drill.actors.indexOf(a) % SKINS.length])}</g>`
           : `<g data-actor="${a.id}">
           <circle r="1.25" fill="var(--rink-team-${a.team})" stroke="var(--rink-puck)" stroke-width="0"/>
           <text y="0.42" text-anchor="middle" font-size="1.1" fill="#fff"

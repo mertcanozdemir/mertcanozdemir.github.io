@@ -174,11 +174,17 @@ mouth acting as a wall, defenders pushing a carrier along instead of reaching
 the puck, carriers parking in the slot, and an asymmetric collision that made
 one computer team three times as good as the other.
 
-The players are helmets seen from above (`helmetSVG` and `helmetLook` in
-drills.js, shared with the home page's drill): a shell in the team's colour with
-a dark visor the eyes look out of, and a stick; goalies wear a light mask with a
-cage. They turn to face where they skate and watch the puck. They replaced plain
-discs with eyes, on request ("like helmets, without changing the theme much").
+The players are drawn as hockey players. From above (`helmetSVG` and
+`helmetLook` in drills.js, shared with the home page's drill): shoulder pads in
+the team's jersey, a helmet open at the front where the face and eyes are,
+gloves and a stick. Standing, in the tilted view (`standingSVG`): skates with
+blades, striped socks, hockey pants, a jersey over shoulder pads, gloves on the
+stick at the player's side (half shoot left, half right) and an open helmet with
+ear guards, a half visor and a chin strap. Goalies are another shape: big pads,
+a wide chest protector, a blocker and a catching glove, a painted mask with a
+cage and a paddle stick. Skin tones vary from player to player (`RINK_SKINS`).
+An earlier design, helmets with a dark full visor over plain bodies, looked
+like motorcycle helmets and couriers (Mertcan's words) and was replaced.
 
 How it plays: the person controls one skater (the dashed ring) and takes over
 whoever on their team gets the puck; Space shoots or pokes, X passes or
@@ -188,7 +194,10 @@ crosses for eyes and stars; the computer checks too. A shot straight off a
 pass is a one-timer: harder, and harder to save. A goal lights the lamp behind
 the net; a hat trick (`goals` per player) brings hats down onto the ice, but
 only for the person ("nobody throws a hat" for the computer); own goals get
-their own line. Goalies sit on an arc in front of the net and save with a chance that
+their own line. Skating (`SKATE`): let go of the keys and a player coasts to a
+stop in about a second (it was 2.6 s and 10 m, too long to control); skate the
+other way and it is a hockey stop, braking hard with a spray of snow. The
+computer's skaters brake the same way. Goalies sit on an arc in front of the net and save with a chance that
 falls with shot speed, rebounds, close range and their own sideways motion;
 fast shots can also be blocked, or slip past a body. Against a person the
 computer's team is a little sharper (`sharp()`: as fast, keener pokes, better

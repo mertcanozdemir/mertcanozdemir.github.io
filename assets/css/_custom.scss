@@ -1257,6 +1257,12 @@ a.piece:hover .piece-more {
   --rink-wall: #fdfefe;
   --rink-mesh: rgba(150, 160, 172, 0.18);
   --rink-mesh-line: rgba(120, 130, 142, 0.55);
+  --rink-glove: #3a3530;
+  --rink-boot: #24282e;
+  --rink-blade: #aab4bf;
+  --rink-cage: #7b848f;
+  --rink-visor-clear: rgba(150, 200, 240, 0.55);
+  --rink-strap: rgba(0, 0, 0, 0.45);
   --game-veil: rgba(255, 255, 255, 0.82);
 }
 
@@ -1270,6 +1276,12 @@ html[data-theme="dark"] {
   --rink-wall: #2e353d;
   --rink-mesh: rgba(220, 226, 232, 0.1);
   --rink-mesh-line: rgba(220, 226, 232, 0.4);
+  --rink-glove: #2a2622;
+  --rink-boot: #0c0f12;
+  --rink-blade: #8d98a3;
+  --rink-cage: #a3acb6;
+  --rink-visor-clear: rgba(150, 200, 240, 0.45);
+  --rink-strap: rgba(0, 0, 0, 0.6);
   --game-veil: rgba(22, 24, 26, 0.85);
 }
 
