@@ -907,6 +907,7 @@
   function draw(svg, game, fx = {}) {
     if (!svg.querySelector("[data-players]")) {
       svg.insertAdjacentHTML("afterbegin", root.rinkSVG ? root.rinkSVG() : "");
+      el("g", { "data-marks": "", fill: "none", "stroke-linecap": "round", "stroke-linejoin": "round" }, svg);
       svg.insertAdjacentHTML(
         "beforeend",
         `<defs><radialGradient id="rink-lamp"><stop offset="0" stop-color="#ff3b30" stop-opacity="0.85"/><stop offset="1" stop-color="#ff3b30" stop-opacity="0"/></radialGradient></defs>`
@@ -975,6 +976,82 @@
     });
   }
 
+  // Skate marks: twin tracks carved into the ice as players skate, and a fan of
+  // snow where they stop hard, turn sharply or get knocked down. They build up
+  // through a game (goalies scratch up their creases), the oldest going once
+  // there are too many, and the ice is clean again for the next game.
+  function skateMarks(svg) {
+    const layer = svg.querySelector("[data-marks]");
+    const LIMIT = 420; // elements kept: tracks come in pairs
+    const seen = new Map();
+    const add = (name, attrs) => {
+      const e = el(name, attrs, layer);
+      while (layer.childElementCount > LIMIT) layer.firstChild.remove();
+      return e;
+    };
+    function spray(p, vx, vy) {
+      const sp = hypot(vx, vy) || 1,
+        a = Math.atan2(vy, vx);
+      const d = [];
+      for (let i = 0; i < 5; i++) {
+        const b = a + (i - 2) * 0.32,
+          r0 = 0.7 + Math.random() * 0.2,
+          r1 = r0 + 0.45 + Math.random() * 0.5;
+        const [ox, oy] = [p.x + (vx / sp) * 0.4, p.y + (vy / sp) * 0.4];
+        d.push(
+          `M ${(ox + Math.cos(b) * r0).toFixed(2)} ${(oy + Math.sin(b) * r0).toFixed(2)} L ${(ox + Math.cos(b) * r1).toFixed(2)} ${(oy + Math.sin(b) * r1).toFixed(2)}`
+        );
+      }
+      add("path", { d: d.join(" "), stroke: "var(--rink-snow)", "stroke-width": "0.16" });
+    }
+    return {
+      update(game, now) {
+        for (const p of game.players) {
+          let m = seen.get(p);
+          if (!m) seen.set(p, (m = { x: p.x, y: p.y, vx: p.vx, vy: p.vy, t: now, down: false, tracks: null, n: 0 }));
+          // A jump (the faceoff after a goal) starts afresh, with no line across the ice.
+          if (hypot(p.x - m.x, p.y - m.y) > 3) Object.assign(m, { x: p.x, y: p.y, tracks: null });
+          const sp = hypot(p.vx, p.vy);
+          if (now - m.t > 120) {
+            const was = hypot(m.vx, m.vy);
+            const turn = was > 4 && sp > 2 ? Math.acos(clamp((m.vx * p.vx + m.vy * p.vy) / (was * sp), -1, 1)) : 0;
+            if ((was > 5 && was - sp > 3.2) || turn > 0.9) spray(p, m.vx, m.vy);
+            if (p.down > 0 && !m.down) spray(p, p.vx || m.vx, p.vy || m.vy);
+            Object.assign(m, { vx: p.vx, vy: p.vy, t: now, down: p.down > 0 });
+          }
+          if (sp < 1) {
+            m.tracks = null;
+            continue;
+          }
+          if (m.tracks && hypot(p.x - m.x, p.y - m.y) < 0.6) continue;
+          // The two blades, either side of the line of travel.
+          const nx = (-p.vy / sp) * 0.22,
+            ny = (p.vx / sp) * 0.22;
+          const at = (x, y, k) => `${(x + k * nx).toFixed(2)},${(y + k * ny).toFixed(2)}`;
+          if (!m.tracks || m.n > 24) {
+            const from = m.tracks ? [m.x, m.y] : [p.x, p.y];
+            m.tracks = [-1, 1].map((k) => ({
+              pts: [at(from[0], from[1], k)],
+              e: add("polyline", { stroke: "var(--rink-mark)", "stroke-width": "0.09" }),
+              k,
+            }));
+            m.n = 0;
+          }
+          for (const t of m.tracks) {
+            t.pts.push(at(p.x, p.y, t.k));
+            t.e.setAttribute("points", t.pts.join(" "));
+          }
+          Object.assign(m, { x: p.x, y: p.y });
+          m.n++;
+        }
+      },
+      clear() {
+        layer.replaceChildren();
+        seen.clear();
+      },
+    };
+  }
+
   const HAT_COLOURS = ["var(--rink-team-a)", "var(--rink-team-b)", "#2b2f36", "#c9ced4", "#b3261e", "#3d7a4f"];
   function throwHats(svg, now) {
     const layer = svg.querySelector("[data-hats]");
@@ -1014,6 +1091,7 @@
     // The running game, for tests and the console.
     rootEl.hockey = { game: () => game };
     draw(svg, game);
+    const marks = skateMarks(svg);
 
     function show(t, body, label) {
       title.textContent = t;
@@ -1037,7 +1115,10 @@
     }
 
     function start() {
-      if (state === "over") game = new Game();
+      if (state === "over") {
+        game = new Game();
+        marks.clear();
+      }
       if (state === "over" || state === "ready") draw(svg, game);
       state = "playing";
       overlay.hidden = true;
@@ -1056,6 +1137,7 @@
     $("[data-pause]").addEventListener("click", () => (state === "playing" ? pause() : state === "paused" ? start() : null));
     $("[data-restart]").addEventListener("click", () => {
       game = new Game();
+      marks.clear();
       draw(svg, game);
       state = "playing";
       overlay.hidden = true;
@@ -1198,6 +1280,7 @@
           show(`You ${a}, computer ${b}`, verdict, "play again");
         }
       }
+      marks.update(game, now);
       draw(svg, game, { now, lamp });
       hud();
     }

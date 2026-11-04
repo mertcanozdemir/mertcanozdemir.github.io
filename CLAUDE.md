@@ -159,7 +159,7 @@ The papers/results browser (`_pages/results.md`, `assets/js/recon.js`) is
 ## The game — /play/
 
 `assets/js/game.js`: three on three against the computer on the drills' rink
-(drills.js sets `window.rinkSVG` for it), with the same round players with eyes.
+(drills.js sets `window.rinkSVG` for it).
 An original game: an earlier idea was to embed King of 94, an online arena
 for the original NHL '94; it forbids framing (`X-Frame-Options: DENY`) and the
 game is EA's, so that was not done, and nothing of NHL '94 (name, look) is here.
@@ -193,7 +193,14 @@ falls with shot speed, rebounds, close range and their own sideways motion;
 fast shots can also be blocked, or slip past a body. Against a person the
 computer's team is a little sharper (`sharp()`: as fast, keener pokes, better
 goalie). Three minutes, then sudden-death overtime if tied. Touch screens get a
-stick and two buttons, shown by `(pointer: coarse)` or after the first touch.
+stick and three buttons (pass, check, shoot), shown by `(pointer: coarse)` or
+after the first touch.
+
+Skate marks (`skateMarks()`, page side only): every player leaves twin blade
+tracks, and a fan of snow where they stop hard, turn sharply or go down. They
+build up through a game, so the ice looks used by the end (goalies scratch up
+their creases), with the oldest dropped past a cap of 420 elements; a new game
+starts on clean ice.
 
 ## Hockey drills — /drills/
 

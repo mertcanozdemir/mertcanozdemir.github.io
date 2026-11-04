@@ -43,6 +43,8 @@
   --rink-pass: #e8b93a;
   --rink-shot: #e05555;
   --rink-net: rgba(211, 51, 51, 0.1);
+  --rink-mark: rgba(96, 122, 150, 0.16); // skate marks in the game
+  --rink-snow: rgba(110, 140, 170, 0.32);
 }
 
 html[data-theme="dark"] {
@@ -56,6 +58,8 @@ html[data-theme="dark"] {
   --rink-team-b: #ef7a4a;
   --rink-team-n: #6c757e;
   --rink-net: rgba(224, 85, 85, 0.16);
+  --rink-mark: rgba(200, 215, 232, 0.11);
+  --rink-snow: rgba(225, 235, 245, 0.3);
 }
 
 // Key to the diagrams, above the drills: a small sample of each mark.
