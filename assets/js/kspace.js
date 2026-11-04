@@ -332,6 +332,98 @@
     return maps;
   }
 
+  // Every coil's view of a scan: for each line measured (rows[k] not 0), that
+  // line of the k-space of `imageOf(k)` (the patient as it was when the line
+  // was measured), weighted by the coil, with the coil's noise.
+  function coilScan(maps, rows, imageOf) {
+    const seen = new Map(); // each picture's k-space through each coil, made once
+    const view = (img) => {
+      if (!seen.has(img))
+        seen.set(
+          img,
+          maps.map(([sr, si]) => {
+            const re = new Float64Array(N * N),
+              im = new Float64Array(N * N);
+            for (let i = 0; i < N * N; i++) {
+              re[i] = img[i] * sr[i];
+              im[i] = img[i] * si[i];
+            }
+            fft2(re, im, false);
+            return [re, im];
+          })
+        );
+      return seen.get(img);
+    };
+    const out = maps.map(() => [new Float64Array(N * N), new Float64Array(N * N)]);
+    for (let k = 0; k < N; k++) {
+      if (!rows[k]) continue;
+      view(imageOf(k)).forEach(([re, im], c) => {
+        for (let i = k * N; i < (k + 1) * N; i++) {
+          out[c][0][i] = re[i] + COIL_NOISE * gauss();
+          out[c][1][i] = im[i] + COIL_NOISE * gauss();
+        }
+      });
+    }
+    return out;
+  }
+  // SENSE. Every coil sees the patient folded into R copies, but each copy
+  // weighted by that coil's sensitivity where it came from, so the copies
+  // fall differently in every coil's view. For each pixel of the folded
+  // image, the R places that folded onto it are solved for from the eight
+  // coils: eight equations, R unknowns, least squares, with a little
+  // regularisation. With R = 8 there is just one equation for every unknown.
+  // `rows` must be every R-th line, starting at 0.
+  function unfold(maps, scanned, rows, R) {
+    const M = N / R;
+    const folded = scanned.map(([kr, ki]) => {
+      const re = Float64Array.from(kr),
+        im = Float64Array.from(ki);
+      fft2(re, im, true, rows);
+      for (let i = 0; i < N * N; i++) {
+        re[i] /= N * N;
+        im[i] /= N * N;
+      }
+      return [re, im];
+    });
+    const out = [new Float64Array(N * N), new Float64Array(N * N)],
+      G = new Float64Array(2 * R * R),
+      b = new Float64Array(2 * R);
+    for (let y = 0; y < M; y++)
+      for (let x = 0; x < N; x++) {
+        G.fill(0);
+        b.fill(0);
+        for (let c = 0; c < COILS; c++) {
+          const [sr, si] = maps[c],
+            [ar, ai] = folded[c],
+            here = y * N + x;
+          for (let j = 0; j < R; j++) {
+            const pj = (y + j * M) * N + x,
+              jr = sr[pj] / R,
+              ji = si[pj] / R;
+            b[2 * j] += jr * ar[here] + ji * ai[here];
+            b[2 * j + 1] += jr * ai[here] - ji * ar[here];
+            for (let l = 0; l < R; l++) {
+              const pl = (y + l * M) * N + x,
+                lr = sr[pl] / R,
+                li = si[pl] / R;
+              G[2 * (j * R + l)] += jr * lr + ji * li;
+              G[2 * (j * R + l) + 1] += jr * li - ji * lr;
+            }
+          }
+        }
+        let trace = 0;
+        for (let j = 0; j < R; j++) trace += G[2 * (j * R + j)];
+        for (let j = 0; j < R; j++) G[2 * (j * R + j)] += 1e-4 * trace;
+        solve(G, b, R);
+        for (let j = 0; j < R; j++) {
+          const p = (y + j * M) * N + x;
+          out[0][p] = b[2 * j];
+          out[1][p] = b[2 * j + 1];
+        }
+      }
+    return out;
+  }
+
   // Solves G m = b for complex G (n × n, Hermitian and positive definite, so
   // no pivoting is needed) and b, stored as re, im pairs; b becomes m.
   function solve(G, b, n) {
@@ -682,80 +774,16 @@
       return K;
     }
 
-    // The coils (SENSE). Every coil sees the cat folded into R copies, but
-    // each copy weighted by that coil's sensitivity where it came from, so
-    // the copies fall differently in every coil's view. For each pixel of
-    // the folded image, the R places that folded onto it are solved for from
-    // the eight coils: eight equations, R unknowns, least squares, with a
-    // little regularisation. With R = 8 there is just one equation for every
-    // unknown, and the noise is magnified many times.
+    // The coils (SENSE: unfold(), above), on the cat as it sat.
     let maps = null;
     function unfoldWithCoils() {
       maps = maps || coilMaps();
-      const R = PLANS[plan].R,
-        M = N / R;
-      const folded = maps.map(([sr, si]) => {
-        const re = A(),
-          im = A();
-        for (let i = 0; i < N * N; i++) {
-          re[i] = images[0][i] * sr[i];
-          im[i] = images[0][i] * si[i];
-        }
-        fft2(re, im, false);
-        for (let k = 0; k < N; k++)
-          if (source[k]) {
-            for (let c = k * N; c < (k + 1) * N; c++) {
-              re[c] += COIL_NOISE * gauss();
-              im[c] += COIL_NOISE * gauss();
-            }
-          } else {
-            re.fill(0, k * N, k * N + N);
-            im.fill(0, k * N, k * N + N);
-          }
-        fft2(re, im, true, source);
-        for (let i = 0; i < N * N; i++) {
-          re[i] /= N * N;
-          im[i] /= N * N;
-        }
-        return [re, im];
-      });
-      const out = [A(), A()],
-        G = new Float64Array(2 * R * R),
-        b = new Float64Array(2 * R);
-      for (let y = 0; y < M; y++)
-        for (let x = 0; x < N; x++) {
-          G.fill(0);
-          b.fill(0);
-          for (let c = 0; c < COILS; c++) {
-            const [sr, si] = maps[c],
-              [ar, ai] = folded[c],
-              here = y * N + x;
-            for (let j = 0; j < R; j++) {
-              const pj = (y + j * M) * N + x,
-                jr = sr[pj] / R,
-                ji = si[pj] / R;
-              b[2 * j] += jr * ar[here] + ji * ai[here];
-              b[2 * j + 1] += jr * ai[here] - ji * ar[here];
-              for (let l = 0; l < R; l++) {
-                const pl = (y + l * M) * N + x,
-                  lr = sr[pl] / R,
-                  li = si[pl] / R;
-                G[2 * (j * R + l)] += jr * lr + ji * li;
-                G[2 * (j * R + l) + 1] += jr * li - ji * lr;
-              }
-            }
-          }
-          let trace = 0;
-          for (let j = 0; j < R; j++) trace += G[2 * (j * R + j)];
-          for (let j = 0; j < R; j++) G[2 * (j * R + j)] += 1e-4 * trace;
-          solve(G, b, R);
-          for (let j = 0; j < R; j++) {
-            const p = (y + j * M) * N + x;
-            out[0][p] = b[2 * j];
-            out[1][p] = b[2 * j + 1];
-          }
-        }
-      return out;
+      return unfold(
+        maps,
+        coilScan(maps, source, () => images[0]),
+        source,
+        PLANS[plan].R
+      );
     }
 
     // ——— What is shown: as measured, or filled in ———
@@ -903,6 +931,9 @@
     // It opens on a quick scan, done: every fourth line, the cat folded.
     scan("fourth", true);
   }
+
+  // What the Hold still page (holdstill.js) uses of this.
+  window.kspace = { N, TR, NOISE, COILS, fft2, coilMaps, coilScan, unfold, think, NET_URL, gauss, drawCat, render };
 
   document.addEventListener("DOMContentLoaded", () => {
     document.querySelectorAll("[data-kspace]").forEach((root) => {

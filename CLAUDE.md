@@ -181,6 +181,32 @@ A "coming soon" placeholder was tried and dropped: a piece goes up when it works
   discs as on the drills page: drill drawings have their conventions (Mertcan
   asked for them to stay round after a version with the game's helmets).
 
+### Hold still — /hold-still/
+
+Where the MRI piece leads ("Now be the patient yourself →"): the visitor is
+the patient (`_pages/hold-still.md`, markup in `_includes/holdstill/scan.liquid`,
+`assets/js/holdstill.js`, which uses kspace.js through `window.kspace`: the
+FFT, `coilMaps()`, `coilScan()`, `unfold()` and the network). The camera's
+picture, grey, mirrored and faded to dark at the edges like an MR slice, with
+its k-space live; the same three scans in real time (1:04, 0:16, 0:08), each
+line taken from the picture of its moment, so moving makes ghosts. How far the
+visitor moved is measured by phase correlation against the first picture
+(`MM`, 2 mm a pixel for a square about 25 cm across); lines measured after
+moving more than 3 mm (`STILL`) show in orange, and the full scan's verdict
+says how far. After a quick scan the coils and the network fill in, as on the
+home page; the cat-trained network makes a mess of a face at 8× (extra eyes),
+which its words own up to. "save the scan" downloads a PNG with a scanner
+viewer's corner notes (PATIENT: YOU, the date, T1 SE TR 500, the scan). The
+picture never leaves the device. No camera, or not allowed: the home page's
+cat sits in. Not in the menu. Tested with Chromium's fake camera fed a drawn
+face (`--use-file-for-fake-video-capture`, a y4m), still and moving. The
+claude.ai preview cannot use a camera (no such capability), so there it shows
+the cat; downloads are blocked there too.
+
+Mertcan's first ask was to bring the game's updates to the MRI piece; a
+version with them was set aside ("buz hokeyi ayrı, MRI ayrı"), and this page
+came out of the ideas for where the piece should lead.
+
 ### The comparison graph moved to the lab's site
 
 It is at <https://icon-lab.github.io/mri-recon-comparison-graph/> (repository

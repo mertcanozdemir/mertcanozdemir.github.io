@@ -1272,6 +1272,42 @@ html[data-theme="dark"] .kspace {
   color: var(--kspace-moved);
 }
 
+// Hold still (/hold-still/, holdstill.js): the visitor's own scan, in the
+// home page's k-space piece's clothes.
+.hold {
+  max-width: 46rem;
+  margin: 0 auto;
+}
+
+.hold-title {
+  margin: 0 0 0.6rem;
+}
+
+.hold-lead {
+  margin: 0 0 1.2rem;
+  color: var(--global-text-color-light);
+}
+
+.hold-camera {
+  button {
+    font-weight: 600;
+  }
+}
+
+.hold-more {
+  margin: 1.2rem 0 0;
+
+  a {
+    color: var(--global-theme-color);
+    font-weight: 500;
+    text-decoration: none;
+  }
+
+  a:hover {
+    text-decoration: underline;
+  }
+}
+
 // The drill playing on its own in the drills piece.
 .piece-drill {
   padding: 4px;

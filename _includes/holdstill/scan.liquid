@@ -1,0 +1,40 @@
+{% comment %}
+  The Hold still page (holdstill.js): the visitor's own scan. Kept out of
+  _pages/hold-still.md so prettier leaves its HTML indented.
+{% endcomment %}
+<div class="hold" data-hold>
+  <h1 class="hold-title">Hold still</h1>
+  <p class="hold-lead">
+    In a scanner you are asked to keep still, and here is why. The scanner measures k‑space, the image's frequencies, one line every half second, and
+    every line comes from wherever you are at that moment. Be the patient: your camera stands in for the scanner. The picture stays on this device;
+    nothing is recorded or sent.
+  </p>
+  <div class="piece-art kspace hold-art">
+    <figure>
+      <canvas data-k role="img" aria-label="Your k-space"></canvas>
+      <figcaption>k-space</figcaption>
+    </figure>
+    <figure>
+      <canvas data-img role="img" aria-label="You, rebuilt from the lines measured"></canvas>
+      <figcaption data-caption>you</figcaption>
+    </figure>
+    <div class="kspace-controls">
+      <p class="hold-camera"><button type="button" data-camera>use the camera</button></p>
+      <p class="kspace-plans" role="group" aria-label="Scan">
+        <button type="button" data-plan="full">every line <span data-time></span></button>
+        <button type="button" data-plan="fourth">every fourth line <span data-time></span></button>
+        <button type="button" data-plan="eighth">every eighth line <span data-time></span></button>
+      </p>
+      <p class="kspace-status">
+        <span data-clock></span>
+        <span data-status aria-live="polite">Use the camera to be the patient, or scan the cat.</span>
+      </p>
+      <p class="kspace-fill" role="group" aria-label="Fill in the missing lines">
+        <button type="button" data-coils aria-pressed="false" hidden>unfold with 8 coils</button>
+        <button type="button" data-net aria-pressed="false" hidden>coils and a network</button>
+        <button type="button" data-save hidden>save the scan</button>
+      </p>
+    </div>
+  </div>
+  <p class="hold-more"><a href="{{ '/' | relative_url }}">The cat that started it, on the home page&nbsp;→</a></p>
+</div>
