@@ -25,11 +25,11 @@ function mulberry32(seed) {
 // A person who skates at the puck, and with it straight for the net, shooting
 // from close in. Not clever, but it should be able to score.
 function scripted(game) {
-  // At a faceoff, the stick comes down a quarter of a second after the
-  // referee lets the puck go (about how quick a person is).
+  // At a faceoff, the stick comes down a tenth of a second after the ring
+  // closes and the referee lets the puck go (a person watching the ring).
   if (game.phase === "faceoff") {
     const f = game.drop;
-    return { pass: f.you === null && f.t >= f.release + 0.25 };
+    return { pass: f.you === null && f.t >= f.release + 0.1 };
   }
   const p = game.controlled,
     pk = game.puck;

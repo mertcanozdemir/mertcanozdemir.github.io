@@ -233,15 +233,18 @@ drawings. Commercial games license real names, so this was raised with him.
 **Faceoffs** (Mertcan's rule): a referee (striped shirt, orange armbands; only
 drawn, `game.ref`, who then follows play along the far boards) holds the puck
 over the dot and lets it go at a moment of its own (`dropPuck()`); the quicker
-stick wins the draw and draws it back to a teammate. For the person that is
-pressing pass or shoot once the puck has left the referee's hand: pressing
-before is early and loses (the rule). The computer's centre reacts in
-`REACTION` seconds for the level. A first version counted from the puck
-landing and gave the computer 0.1 s after it: Mertcan could not win a draw,
-since a person sees the landing and is already too late. Computer against
-computer it is a toss-up. The checker's scripted person presses 0.25 s after
-the release (about a person's reaction) and wins about 100%, 80% and 40% of
-draws on easy, normal and hard.
+stick wins the draw and draws it back to a teammate. For the person: an amber
+ring closes on the dot as the moment comes, and pressing pass or shoot once it
+has closed and the puck is out of the referee's hand wins if quicker than the
+computer's centre (`REACTION` seconds for the level); pressing before is early
+and loses (the rule). Two versions before the ring could not be won (Mertcan,
+twice): counting from the landing, which a person sees too late, then from the
+release, which was too small a movement to see. Computer against computer it is
+a toss-up. The checker's scripted person presses 0.1 s after the ring closes
+and wins about 100%, 87% and 35% of draws on easy, normal and hard.
+
+A press in a frame with no simulation step (on a 120 Hz screen that happens)
+was lost; `frame()` now keeps it for the next step.
 
 **Levels**: easy, normal, hard, chosen on the start and final screens and
 remembered (`hockey-level`). `sharp()` is how far the computer's team is ahead
@@ -259,8 +262,9 @@ rink's corners. Before this the rink did not fit a laptop's window (its bottom
 phone held sideways.
 
 **Sound** (`sounds()`): WebAudio, no files: puck off a stick, the post, saves,
-checks and boards, the goal horn (a ship's horn, as in the big arenas, which
-Mertcan asked for) and the crowd, the buzzer, the
+checks and boards, the goal horn (an arena's air horn, three trumpets in a
+chord around 260–390 Hz for 1.6 s: a deep ship's horn was too much for
+Mertcan, who wanted it higher) and the crowd, the buzzer, the
 Kamboni's horn. "mute" in the HUD, remembered (`hockey-sound`). Browsers start
 it only after a click or a key, so `wake()` runs on those.
 

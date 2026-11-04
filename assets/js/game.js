@@ -137,7 +137,7 @@
   // How much the computer's team is ahead of the person's at each level, and
   // how soon after the puck lands at a faceoff its centre's stick comes down (s).
   const LEVELS = { easy: -0.5, normal: 1, hard: 1.6 };
-  const REACTION = { easy: [0.35, 0.65], normal: [0.22, 0.45], hard: [0.16, 0.32] };
+  const REACTION = { easy: [0.2, 0.45], normal: [0.09, 0.26], hard: [0.04, 0.15] };
 
   class Game {
     constructor(opts = {}) {
@@ -229,7 +229,7 @@
       Object.assign(this.ref, { x: 0, y: -0.9, vx: 0, vy: 0, fx: 0, fy: 1, arm: 1 });
       const release = 0.7 + this.random() * 0.9,
         [lo, hi] = REACTION[this.level] || REACTION.normal;
-      this.drop = { t: 0, release, land: release + 0.32, you: null, cpu: lo + this.random() * (hi - lo), winner: null, why: "" };
+      this.drop = { t: 0, release, land: release + 0.32, you: null, cpu: lo + this.random() * (hi - lo), winner: null, why: "", gone: false };
       if (this.human) this.controlled = this.players[0];
       this.phase = "faceoff";
       this.events.push({ type: "faceoff", n: ++this.draws });
@@ -346,9 +346,10 @@
 
     // A faceoff: the referee lets the puck go, and the quicker stick wins the
     // draw. For the person that is pressing pass (or shoot) once the puck has
-    // left the referee's hand: before that is early, and loses (the rule); the
-    // computer's centre reacts in REACTION seconds for the level. Two computer
-    // teams toss for it. The draw happens once the puck is down.
+    // left the referee's hand, which the page shows coming with a ring closing
+    // on the dot: before that is early, and loses (the rule). The computer's
+    // centre reacts in REACTION seconds for the level. Two computer teams
+    // toss for it. The draw happens once the puck is down.
     dropPuck(dt, input) {
       const f = this.drop,
         pk = this.puck;
@@ -358,10 +359,14 @@
       pk.h = 1.3 * (1 - fall * fall);
       this.ref.arm = since < 0 ? 1 : Math.max(0, 1 - since * 3);
       if (this.human && (input.pass || input.shoot) && f.you === null) f.you = since;
+      if (since >= 0 && !f.gone) {
+        f.gone = true;
+        this.events.push({ type: "release" });
+      }
       if (!f.winner) {
         if (!this.human) {
           if (since >= 0) f.winner = this.random() < 0.5 ? "a" : "b";
-        } else if (f.you !== null && f.you < 0) [f.winner, f.why] = ["b", "early"];
+        } else if (f.you !== null && f.you < -0.05) [f.winner, f.why] = ["b", "early"];
         else if (f.you !== null && f.you <= f.cpu) f.winner = "a";
         else if (since >= f.cpu) [f.winner, f.why] = ["b", "slow"];
       }
@@ -1671,6 +1676,8 @@
     const plane = el("g", { "data-plane": "" }, svg);
     plane.insertAdjacentHTML("afterbegin", root.rinkSVG ? root.rinkSVG() : "");
     plane.appendChild(marks || el("g", { "data-marks": "", fill: "none", "stroke-linecap": "round", "stroke-linejoin": "round" }));
+    // At a faceoff, a ring closing on the dot: the puck drops as it closes.
+    el("circle", { "data-drop-ring": "", r: 1, fill: "none", stroke: "#f5a623", "stroke-width": 0.32, opacity: 0 }, plane);
     // Between periods the used ice is frosted over. The frost and the marks
     // are masked away along the Kamboni's track, which shows as wet ice.
     const band = `fill="none" stroke-width="${RZ.width}" stroke-linecap="round" stroke-linejoin="round"`;
@@ -1811,6 +1818,14 @@
     const pk = game.puck,
       now = fx.now || 0;
     drawResurfacer(svg, view, fx.rz, now);
+    const ring = svg.querySelector("[data-drop-ring]"),
+      f = game.drop;
+    if (game.human && game.phase === "faceoff" && f && f.t >= 0.25 && f.t < f.release + 0.2) {
+      const k = clamp((f.release - f.t) / Math.max(0.1, f.release - 0.25), 0, 1);
+      ring.setAttribute("r", (0.55 + 3.4 * k).toFixed(2));
+      ring.setAttribute("opacity", f.t < f.release ? "0.95" : (1 - (f.t - f.release) / 0.2).toFixed(2));
+      ring.setAttribute("stroke", f.t < f.release ? "#f5a623" : "#fff");
+    } else if (ring.getAttribute("opacity") !== "0") ring.setAttribute("opacity", "0");
     // By player, not by place in the drawing: tilted, that order changes.
     const groups = game.players.map((p, i) => svg.querySelector(`[data-player="${i}"]`));
     if (view === "top") {
@@ -2179,48 +2194,42 @@
         noise(t, 0.2, 260, 0.7, hard ? 1 : 0.6, "lowpass");
         tone(t, 0.18, 95, "sine", hard ? 0.55 : 0.35, 0.004, 50);
       },
-      // The goal horn, a ship's horn as in the big arenas: one long, deep
-      // blast, two notes a hair apart so it wavers, its octave, a brassy
-      // middle, sliding up to pitch as it starts.
+      // The goal horn, an arena's air horn: three trumpets sounding a chord
+      // (as the horns arenas buy do, a few hundred hertz each), brassy, for a
+      // second and a half, sliding up to pitch as the air comes.
       horn: (t) => {
-        const dur = 2.8,
+        const dur = 1.6,
           low = ctx.createBiquadFilter(),
           brass = ctx.createBiquadFilter(),
           g = ctx.createGain();
         low.type = "lowpass";
-        low.frequency.value = 1400;
+        low.frequency.value = 2600;
         brass.type = "peaking";
-        brass.frequency.value = 420;
-        brass.Q.value = 1.2;
-        brass.gain.value = 9;
+        brass.frequency.value = 1100;
+        brass.Q.value = 1;
+        brass.gain.value = 6;
         g.gain.setValueAtTime(0.0001, t);
-        g.gain.exponentialRampToValueAtTime(0.55, t + 0.14);
-        g.gain.setValueAtTime(0.55, t + dur - 0.6);
+        g.gain.exponentialRampToValueAtTime(0.36, t + 0.06);
+        g.gain.setValueAtTime(0.36, t + dur - 0.35);
         g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
         low.connect(brass);
         brass.connect(g);
         g.connect(master);
-        for (const [hz, kind, level] of [
-          [92, "sawtooth", 1],
-          [92.7, "sawtooth", 1],
-          [184.5, "sawtooth", 0.45],
-          [138.5, "square", 0.25],
-        ]) {
+        for (const hz of [262, 263, 330, 392]) {
           const o = ctx.createOscillator(),
             v = ctx.createGain();
-          o.type = kind;
-          o.frequency.setValueAtTime(hz * 0.93, t);
-          o.frequency.exponentialRampToValueAtTime(hz, t + 0.18);
-          o.frequency.setValueAtTime(hz, t + dur - 0.5);
-          o.frequency.exponentialRampToValueAtTime(hz * 0.97, t + dur);
-          v.gain.value = level * 0.3;
+          o.type = "sawtooth";
+          o.frequency.setValueAtTime(hz * 0.96, t);
+          o.frequency.exponentialRampToValueAtTime(hz, t + 0.1);
+          v.gain.value = 0.16;
           o.connect(v);
           v.connect(low);
           o.start(t);
           o.stop(t + dur + 0.05);
         }
       },
-      cheer: (t) => noise(t, 2.4, 1100, 0.6, 0.35, "bandpass", 0.35),
+      cheer: (t) => noise(t, 2.4, 1100, 0.6, 0.3, "bandpass", 0.35),
+      click: (t) => noise(t, 0.03, 3200, 2, 0.5),
       buzzer: (t) => tone(t, 1.1, 196, "square", 0.12, 0.01),
       beep: (t) => {
         tone(t, 0.14, 440, "square", 0.12);
@@ -2830,6 +2839,8 @@
         first = false;
         spare -= STEP;
       }
+      // No step this frame (on a fast screen that happens): keep the presses.
+      if (first) for (const k of ["shoot", "pass", "check"]) presses[k] = presses[k] || held[k];
       if (state === "playing") record(now);
       const you = game.players.indexOf(game.controlled);
       for (const ev of game.events.splice(0)) {
@@ -2856,7 +2867,7 @@
         else if (ev.type === "post") say("Off the post!", 1);
         else if (ev.type === "overtime") say("Tied. Next goal wins.", 2.5);
         else if (ev.type === "faceoff" && ev.n <= 2)
-          say(touchy() ? "Faceoff: tap pass as the referee drops the puck." : "Faceoff: press X as the referee drops the puck.", 2.4, true);
+          say(touchy() ? "Faceoff: tap pass as the ring closes." : "Faceoff: press X as the ring closes.", 2.4, true);
         else if (ev.type === "draw")
           say(
             ev.team === "a" ? "You win the draw." : ev.why === "early" ? "Too early: wait for the drop." : "Too slow: the computer wins the draw.",
@@ -2884,6 +2895,7 @@
     // What each event sounds like.
     function sfx(ev) {
       if (ev.type === "pass" || ev.type === "draw") sound.play("stick", false);
+      else if (ev.type === "release") sound.play("click");
       else if (ev.type === "shot") sound.play("stick", true);
       else if (ev.type === "post") sound.play("post");
       else if (ev.type === "save" || ev.type === "block") sound.play("pad");
