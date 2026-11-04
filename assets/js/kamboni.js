@@ -380,23 +380,34 @@ void main() {
       for (const t of [boardTex, crowdTex]) if (t) gl.deleteTexture(t);
       boardTex = texture(boardsTexture(), true);
       crowdTex = texture(crowdTexture(), true);
+      // The Kamboni's gate in the middle of the left-hand end boards, as the
+      // game has it: open, a dark way out, as it drives off the ice.
+      const gate = quads(),
+        g = deps.RZ.gate,
+        gx = -30 + 0.04;
+      gate.add([gx, 0, -g], [gx, 0, g], [gx, 2.95, g], [gx, 2.95, -g], [0.05, 0.06, 0.08, 1]);
+      gate.add([gx + 0.01, 0, -g - 0.12], [gx + 0.01, 0, -g], [gx + 0.01, 2.95, -g], [gx + 0.01, 2.95, -g - 0.12], trim);
+      gate.add([gx + 0.01, 0, g], [gx + 0.01, 0, g + 0.12], [gx + 0.01, 2.95, g + 0.12], [gx + 0.01, 2.95, g], trim);
       meshes = [
         mesh(ice, iceTex),
         mesh(plain, null),
         mesh(boards, boardTex),
         mesh(stands, crowdTex),
+        Object.assign(mesh(gate, null), { gate: true }),
         Object.assign(mesh(frame, null), { replay: true }),
         mesh(glass, null, true),
         Object.assign(mesh(net, null, true), { replay: true }),
       ];
     }
 
+    let gateOpen = false;
     function scene(mvp, flip, replaying = false, extra = []) {
       gl.uniformMatrix4fv(un.m, false, mvp);
       gl.uniform1f(un.flip, flip);
       gl.uniform1f(un.cut, 0);
       for (const m of meshes.slice(0, 4).concat(extra, meshes.slice(4))) {
         if (m.replay && !replaying) continue;
+        if (m.gate && !gateOpen) continue;
         gl.uniform1f(un.cut, m.cut || 0);
         const blend = m.glass || m.flat;
         if (blend) {
@@ -846,6 +857,10 @@ void main() {
       },
       show(on) {
         el.hidden = !on;
+      },
+      // The gate in the end boards, open while the Kamboni drives off.
+      gate(open) {
+        gateOpen = open;
       },
       frame(now) {
         const dt = last === null ? 0 : Math.min(0.05, (now - last) / 1000);

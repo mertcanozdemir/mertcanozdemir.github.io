@@ -63,12 +63,18 @@ function run(seed, mode, level = "normal", size = 3) {
     t = 0;
   const counts = { save: 0, post: 0, steal: 0, block: 0, pass: 0, hit: 0 },
     draws = { a: 0, b: 0 };
+  let back = 0; // how long the teams take to come back out after an intermission
   while (game.phase !== "over" && t < 600) {
     // Between periods everyone skates off, then the next one starts.
     if (game.phase === "intermission" && game.benched) game.nextPeriod();
     const input = mode === "script" ? scripted(game) : {};
     game.step(STEP, input);
     t += STEP;
+    if (game.phase === "return") back += STEP;
+    else if (back) {
+      if (back > 9.5) problems.push(`the teams took ${back.toFixed(1)} s to come back at ${t.toFixed(1)} s`);
+      back = 0;
+    }
     for (const ev of game.events.splice(0)) {
       if (ev.type in counts) counts[ev.type]++;
       if (ev.type === "draw") draws[ev.team]++;
@@ -120,7 +126,24 @@ function kamboni(seed, how) {
     if (problems.length > 5) break;
   }
   if (how === "crew" && !rz.done) problems.push(`not clean after ${rz.time.toFixed(0)} s (${(100 * rz.part).toFixed(0)}%)`);
-  return { time: rz.time, part: rz.part, problems };
+  // Then off the ice through its gate, from wherever it has got to, in good
+  // time, and on the ice until it is at the gate.
+  const time = rz.time,
+    part = rz.part;
+  let off = 0;
+  while (!rz.driveOff(STEP) && off < 20) {
+    off += STEP;
+    if (!rz.through)
+      for (const o of [-1.6, 1.6]) {
+        const end = { x: rz.x + Math.cos(rz.h) * o, y: rz.y + Math.sin(rz.h) * o };
+        if (!inside(end, RZ.body / 2 - 0.1)) problems.push(`off the ice on the way to the gate at ${off.toFixed(1)} s`);
+      }
+    else if (rz.x + Math.cos(rz.h) * RZ.length * 0.5 < -29.7 && Math.abs(rz.y) > RZ.gate - RZ.body / 2 + 0.15)
+      problems.push(`through the boards beside the gate (y ${rz.y.toFixed(2)})`);
+    if (problems.length > 5) break;
+  }
+  if (off > 9) problems.push(`${off.toFixed(1)} s to drive off the ice`);
+  return { time, part, off, problems };
 }
 
 const games = +process.argv[2] || 12;
@@ -201,13 +224,15 @@ for (const [mode, size] of [
 {
   let time = 0,
     part = 0,
-    slowest = 0;
+    slowest = 0,
+    offSlowest = 0;
   for (let i = 1; i <= games; i++) {
     const crew = kamboni(i, "crew"),
       anyhow = kamboni(i, "above"),
       cab = kamboni(i, "cab");
     time += crew.time;
     slowest = Math.max(slowest, crew.time);
+    offSlowest = Math.max(offSlowest, crew.off, anyhow.off, cab.off);
     part += anyhow.part;
     for (const [how, r] of [
       ["the crew's way", crew],
@@ -221,7 +246,7 @@ for (const [mode, size] of [
     }
   }
   console.log(
-    `kamboni, the crew's way: ${(100 * RZ.done).toFixed(0)}% clean in ${(time / games).toFixed(1)} s; anyhow: ${((100 * part) / games).toFixed(0)}% clean after a minute`
+    `kamboni, the crew's way: ${(100 * RZ.done).toFixed(0)}% clean in ${(time / games).toFixed(1)} s; anyhow: ${((100 * part) / games).toFixed(0)}% clean after a minute; off the ice in ${offSlowest.toFixed(1)} s at most`
   );
   // The crew's way should take well under a minute: the intermission is a break.
   if (slowest > 45) {

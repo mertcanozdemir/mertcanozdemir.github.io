@@ -1852,6 +1852,22 @@ html.game-full {
   top: 27%;
 }
 
+// Between the Kamboni driving off and the teams coming back out: the dark.
+.game-curtain {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  border-radius: 8px;
+  background: #05070a;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.7s ease;
+
+  &.is-down {
+    opacity: 1;
+  }
+}
+
 .game-touch {
   display: none;
 }

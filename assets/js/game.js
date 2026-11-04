@@ -214,20 +214,25 @@
       return { x: p.x + p.fx * REACH, y: p.y + p.fy * REACH };
     }
 
-    faceoff() {
-      // The centre at the dot, then a wing and a defender; five a side add the
-      // other wing and the other defender.
-      const spots = [
+    // Where each lines up for a faceoff: the centre at the dot, then a wing
+    // and a defender; five a side add the other wing and the other defender.
+    spotOf(p) {
+      const s = DIR[p.team];
+      if (p.role === "goalie") return [-s * (GOAL_X - 1), 0];
+      const [x, y] = [
         [-1.6, 0],
         [-6, -6],
         [-12, 4],
         [-6, 6],
         [-12, -4],
-      ];
+      ][p.slot];
+      return [s * x, s * y];
+    }
+
+    faceoff() {
       for (const p of this.players) {
         const s = DIR[p.team];
-        if (p.role === "goalie") [p.x, p.y] = [-s * (GOAL_X - 1), 0];
-        else [p.x, p.y] = [s * spots[p.slot][0], s * spots[p.slot][1]];
+        [p.x, p.y] = this.spotOf(p);
         Object.assign(p, { vx: 0, vy: 0, fx: s, fy: 0, wx: 0, wy: 0, noTouch: 0, cool: 0, down: 0, dash: 0, checkCool: 0, oneTimer: 0, off: false });
       }
       // The referee holds the puck over the dot, between the centres, and
@@ -247,6 +252,7 @@
     step(dt, input = {}) {
       if (this.phase === "over") return;
       if (this.phase === "intermission") return this.leave(dt);
+      if (this.phase === "return") return this.comeOn(dt);
       if (this.phase === "faceoff") return this.dropPuck(dt, input);
       if (this.phase !== "play") {
         this.wait -= dt;
@@ -429,7 +435,69 @@
       this.benched = false;
       this.period++;
       this.clock = this.periodLength;
-      this.faceoff();
+      this.comeBack();
+    }
+
+    // After the intermission the teams come back out through their bench
+    // doors onto the fresh ice, a few at a time, and skate to their places
+    // for the faceoff; the goalies go to their nets and scrape the crease
+    // (goalies do, to take the shine off the new ice), and the referee brings
+    // the puck to the dot. The faceoff once all are there, or after a while.
+    comeBack() {
+      this.phase = "return";
+      this.wait = 0;
+      this.players.forEach((p) => {
+        // Out of the door in turn, a goalie first, as teams come out.
+        p.cue = 0.5 + (p.role === "goalie" ? 0 : 0.35 + p.slot * 0.3) + (p.team === "b" ? 0.15 : 0);
+        p.scrape = 0;
+        Object.assign(p, { vx: 0, vy: 0, down: 0, dash: 0, braking: false });
+      });
+      Object.assign(this.puck, { carrier: null, vx: 0, vy: 0, h: 1.3, trail: [] });
+      this.events.push({ type: "return", period: this.period });
+    }
+    comeOn(dt) {
+      this.wait += dt;
+      this.moveRef(dt, 0, -0.9);
+      Object.assign(this.puck, { x: this.ref.x, y: this.ref.y + 0.9 });
+      let ready = true;
+      for (const p of this.players) {
+        if (this.wait < p.cue) {
+          ready = false;
+          continue;
+        }
+        p.off = false;
+        const [hx, hy] = this.spotOf(p),
+          s = DIR[p.team];
+        let [tx, ty] = [hx, hy];
+        // The scrape: side to side across the crease, three times.
+        if (p.role === "goalie" && p.scrape < 1.8) {
+          if (hypot(hx - p.x, hy - p.y) < 1.2 || p.scrape > 0) p.scrape += dt;
+          if (p.scrape > 0) ty = Math.sin(p.scrape * 5.2) > 0 ? 1.1 : -1.1;
+          ready = false;
+        }
+        const dx = tx - p.x,
+          dy = ty - p.y,
+          d = hypot(dx, dy);
+        if (d > 0.3) ready = false;
+        const want = Math.min(p.role === "goalie" && p.scrape > 0 ? 3.5 : 6.5, d * 2),
+          ax = (d ? (dx / d) * want : 0) - p.vx,
+          ay = (d ? (dy / d) * want : 0) - p.vy,
+          al = hypot(ax, ay) || 1,
+          acc = Math.min(al, 12 * dt);
+        p.vx += (ax / al) * acc;
+        p.vy += (ay / al) * acc;
+        p.braking = d < 1.5 && hypot(p.vx, p.vy) > 2.5;
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        const sp = hypot(p.vx, p.vy);
+        // Facing the way they skate; once there, the play.
+        if (sp > 1.2 && d > 1) [p.fx, p.fy] = [p.vx / sp, p.vy / sp];
+        else [p.fx, p.fy] = [s, 0];
+        const r = p.role === "goalie" ? GOALIE_R : SKATER_R;
+        confine(p, r);
+        outOfNet(p, r);
+      }
+      if ((ready && this.wait > 2) || this.wait > 9) this.faceoff();
     }
 
     finish() {
@@ -1167,6 +1235,7 @@
     turn: 3.2, // rad/s, steering toward a direction, from above
     lock: 2.4, // rad/s at full lock, from the cab
     done: 0.65, // how much of the ice is enough
+    gate: 1.8, // half the width of its gate, in the middle of the left-hand end boards
   };
 
   // The ice as 1 m cells, to measure how much of it is clean.
@@ -1255,6 +1324,33 @@
           this.clean++;
         }
       }
+    }
+
+    // Off the ice, once it is done: it drives itself to the gate in the
+    // middle of the left-hand end boards, first to the middle of the rink in
+    // front of it, then along the middle and out through it (the boards no
+    // matter there). True once it is through.
+    driveOff(dt) {
+      if (!this.through) {
+        if (this.lined && Math.abs(this.y) > 3.5) this.lined = false;
+        if (!this.lined && hypot(this.x + 14, this.y) < 3) this.lined = true;
+        // At half speed, so it turns tight. Along the middle: a point on it a
+        // little ahead, so it comes onto it.
+        const [tx, ty] = this.lined ? [this.x - 6, 0] : [-14, 0],
+          d = (hypot(tx - this.x, ty - this.y) || 1) / 0.55;
+        this.step(dt, { x: (tx - this.x) / d, y: (ty - this.y) / d });
+        if (this.lined && this.x < -23.5 && Math.abs(this.y) < 0.5 && Math.cos(this.h) < -0.97) this.through = true;
+        return false;
+      }
+      // Through the gate: aimed at a point beyond it, at a steady speed.
+      const want = Math.atan2(-this.y, -L - 6 - this.x),
+        turn = Math.atan2(Math.sin(want - this.h), Math.cos(want - this.h));
+      this.h += clamp(turn, -3 * dt, 3 * dt);
+      this.v = 6;
+      this.x += Math.cos(this.h) * this.v * dt;
+      this.y += Math.sin(this.h) * this.v * dt;
+      this.time += dt;
+      return this.x < -L - 4;
     }
 
     // The crew's way, as input from above: rows along the rink, turning at the
@@ -1869,8 +1965,14 @@
     svg.replaceChildren();
     svg.dataset.view = view;
     svg.camAt = undefined; // a new view: the camera starts where it should be
+    svg.netsOff = svg.shine = undefined;
     const plane = el("g", { "data-plane": "" }, svg);
     plane.insertAdjacentHTML("afterbegin", root.rinkSVG ? root.rinkSVG() : "");
+    // Fresh ice shines wet for a while after the Kamboni, then freezes.
+    plane.insertAdjacentHTML(
+      "beforeend",
+      `<rect data-sheen x="-30" y="-15" width="60" height="30" rx="${CORNER}" fill="var(--rink-wet)" opacity="0"/>`
+    );
     plane.appendChild(marks || el("g", { "data-marks": "", fill: "none", "stroke-linecap": "round", "stroke-linejoin": "round" }));
     // At a faceoff, a ring closing on the dot: the puck drops as it closes.
     el("circle", { "data-drop-ring": "", r: 1, fill: "none", stroke: "#f5a623", "stroke-width": 0.32, opacity: 0 }, plane);
@@ -1919,7 +2021,12 @@
             (p.number ? `<text class="rink-number" y="2.25" font-size="0.95" text-anchor="middle">${p.number}</text>` : "")
         );
       });
-      plane.insertAdjacentHTML("beforeend", `<g data-rz style="display: none">${KAMBONI_TOP}</g>`);
+      // The Kamboni's gate in the left-hand end boards, open as it drives off.
+      plane.insertAdjacentHTML(
+        "beforeend",
+        `<rect data-gate x="-31" y="${-RZ.gate}" width="1.1" height="${2 * RZ.gate}" rx="0.2" fill="#1c2026" style="display: none"/>
+        <g data-rz style="display: none">${KAMBONI_TOP}</g>`
+      );
       return;
     }
     // Tilted: the ice and what lies on it are one plane, drawn through the
@@ -2006,6 +2113,30 @@
     g.setAttribute("transform", `translate(${rz.x.toFixed(2)} ${rz.y.toFixed(2)}) rotate(${((rz.h * 180) / Math.PI).toFixed(1)})`);
   }
 
+  // After the Kamboni (`fx.fresh`, milliseconds since the teams began to come
+  // back): the crew pushes the nets back onto their pegs from behind the goal
+  // lines, and the new ice shines wet, then freezes. And its gate (`fx.gate`).
+  function freshIce(svg, view, fx) {
+    const gate = svg.querySelector("[data-gate]");
+    if (gate) gate.style.display = fx.gate ? "" : "none";
+    const t = fx.fresh ?? 1e9,
+      k = clamp((t - 250) / 1300, 0, 1),
+      off = +(1.9 * (1 - k * k * (3 - 2 * k))).toFixed(2),
+      shine = +clamp(1 - t / 7000, 0, 1).toFixed(2);
+    if (svg.netsOff !== off) {
+      svg.netsOff = off;
+      for (const n of svg.querySelectorAll(view === "top" ? "[data-rink-net]" : "[data-net]")) {
+        const dx = view === "top" ? -off : +n.dataset.net * off;
+        if (off) n.setAttribute("transform", `translate(${dx} 0)`);
+        else n.removeAttribute("transform");
+      }
+    }
+    if (svg.shine !== shine) {
+      svg.shine = shine;
+      svg.querySelector("[data-sheen]").setAttribute("opacity", shine);
+    }
+  }
+
   // `fx` carries what only the page knows: the view, the time, a lit lamp,
   // the Kamboni when it is out.
   function draw(svg, game, fx = {}) {
@@ -2014,6 +2145,7 @@
     const pk = game.puck,
       now = fx.now || 0;
     drawResurfacer(svg, view, fx.rz, now);
+    freshIce(svg, view, fx);
     const ring = svg.querySelector("[data-drop-ring]"),
       f = game.drop;
     if (game.human && game.phase === "faceoff" && f && f.t >= 0.25 && f.t < f.release + 0.2) {
@@ -2462,6 +2594,29 @@
         }
       },
       cheer: (t) => noise(t, 2.4, 1100, 0.6, 0.3, "bandpass", 0.35),
+      // Hands clapping all round the arena, a few seconds of it, over a murmur.
+      applause: (t) => {
+        for (let i = 0; i < 110; i++)
+          noise(t + 2.8 * Math.random() ** 1.4, 0.025, 1200 + Math.random() * 2000, 1.1, 0.05 + Math.random() * 0.09, "bandpass", 0.001);
+        noise(t, 3, 900, 0.5, 0.07, "bandpass", 0.5);
+      },
+      // The arena's organ as the teams come out: the old bugle call to charge.
+      organ: (t) => {
+        for (const [hz, at, len] of [
+          [392, 0, 0.13],
+          [523, 0.15, 0.13],
+          [659, 0.3, 0.13],
+          [784, 0.45, 0.32],
+          [659, 0.85, 0.13],
+          [784, 1, 0.7],
+        ])
+          for (const [k, type, peak] of [
+            [1, "sine", 0.11],
+            [2, "sine", 0.045],
+            [0.5, "triangle", 0.05],
+          ])
+            tone(t + at, len, hz * k, type, peak, 0.012);
+      },
       click: (t) => noise(t, 0.03, 3200, 2, 0.5),
       buzzer: (t) => tone(t, 1.1, 196, "square", 0.12, 0.01),
       beep: (t) => {
@@ -2514,7 +2669,8 @@
     }
     let game = lineUp(new Game({ size }));
     // ready, playing, paused, buzzer (a period has just ended), intermission
-    // (the choice), resurfacing (the person drives the Kamboni), crew, over
+    // (the choice), resurfacing (the person drives the Kamboni), crew,
+    // leaving (the Kamboni drives off), over
     let state = "ready"; // and replay, a goal shown again
     let view = chosenView();
     let lamp = null,
@@ -2523,8 +2679,18 @@
     let rz = null, // the Kamboni, between periods
       rzView = "top", // seen from its cab, or from above
       cab; // the cab, made when first wanted; null without WebGL
+    // After the Kamboni (state "leaving": it drives itself off through its
+    // gate) the view goes dark behind this, and lights again on the teams
+    // coming back out (the game's phase "return"); `back` is when they began.
+    const curtain = document.createElement("div");
+    curtain.className = "game-curtain";
+    toast.before(curtain);
+    let leaveAt = 0,
+      darkAt = 0,
+      back = 0,
+      organ = false;
     // The running game and the Kamboni, for tests and the console.
-    rootEl.hockey = { game: () => game, rz: () => rz, view: () => (rz ? rzView : view), state: () => state };
+    rootEl.hockey = { game: () => game, rz: () => rz, cab: () => cab, view: () => (rz ? rzView : view), state: () => state };
     draw(svg, game, { view, follow: true });
     const marks = skateMarks(svg);
     const sound = sounds();
@@ -2602,7 +2768,7 @@
     const minutes = (t) => `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
     const board = scoreboard($("[data-board]"));
     function hud() {
-      const out = state === "resurfacing" || state === "crew",
+      const out = state === "resurfacing" || state === "crew" || state === "leaving",
         lit = lamp && !lamp.green && performance.now() < lamp.until;
       const clock = out
         ? { time: String(Math.floor(100 * rz.part)).padStart(4) }
@@ -2624,9 +2790,9 @@
       $("[data-sound]").textContent = sound.on ? "mute" : "unmute";
       const pauseButton = $("[data-pause]"),
         viewButton = $("[data-view]");
-      pauseButton.textContent = { paused: "resume", resurfacing: "let the crew finish", crew: "skip" }[state] || "pause";
+      pauseButton.textContent = { paused: "resume", resurfacing: "let the crew finish", crew: "skip", leaving: "skip" }[state] || "pause";
       viewButton.textContent = out ? (rzView === "cab" ? "view from above" : "from the cab") : view === "tilt" ? "view from above" : "TV camera";
-      viewButton.disabled = out && (state === "crew" || !cab);
+      viewButton.disabled = out && (state === "crew" || state === "leaving" || !cab);
     }
 
     // The cab, made the first time it is wanted.
@@ -2937,18 +3103,63 @@
         }
         msg = `Fresh ice, in ${minutes(t)}.` + (best && t < best ? " Your best yet." : best ? ` Best: ${minutes(best)}.` : "");
       }
-      if (cab) cab.show(false);
+      // Off the ice by itself, twice as fast as life, out through its gate
+      // to applause (the crew's from above); then the dark, and the teams.
+      state = "leaving";
+      leaveAt = performance.now();
+      darkAt = 0;
+      if (!cab) rzView = "top";
+      if (cab) cab.gate(true);
+      overlay.hidden = true;
+      showKamboni(leaveAt);
+      say(msg, 3);
+      sound.play("applause");
+      hud();
+    }
+    function leavingStep(dt, now) {
+      // Twice as fast as life to the gate, then in at its own pace.
+      for (let i = 0; i < (rz.through ? 1 : 2); i++) if (rz.driveOff(dt)) break;
+      // Dark as it drives in at the gate (or anyhow after a while).
+      if (!darkAt && ((rz.lined && rz.x < -20) || rz.through || now - leaveAt > 6000)) {
+        darkAt = now;
+        curtain.classList.add("is-down");
+      }
+      if (darkAt && now - darkAt > 1100) return teamsBack(now);
+      // From the cab, nothing past the gate (inside the stands) is drawn.
+      if (rzView === "cab" && cab) {
+        if (rz.x > -28.8) cab.frame(now);
+      } else draw(svg, game, { view: "top", now, rz, gate: true });
+    }
+    // In the dark: the Kamboni put away, the ice fresh; then the light comes
+    // up on the teams coming back out (see draw() for the nets and the shine).
+    function teamsBack(now) {
+      if (cab) {
+        cab.show(false);
+        cab.gate(false);
+      }
       rootEl.classList.remove("is-cab");
       rz = null;
+      darkAt = 0;
       marks.clear();
       game.nextPeriod();
       state = "playing";
-      overlay.hidden = true;
+      back = now;
+      organ = false;
       last = null;
-      draw(svg, game, { view, follow: true, now: performance.now() });
+      draw(svg, game, { view, follow: true, now, fresh: 0 });
       fit();
-      say(msg, 2.6);
+      curtain.classList.remove("is-down");
+      say(`The teams come back out for the ${ordinal(game.period)} period.`, 3);
       hud();
+    }
+    // A key or a tap, while the Kamboni leaves or the teams come back: on to
+    // the faceoff. The press is not taken for the faceoff as well.
+    function skipToFaceoff() {
+      if (state === "leaving") teamsBack(performance.now());
+      if (game.phase === "return") game.faceoff();
+      back = performance.now() - 1e4;
+      organ = true;
+      presses.shoot = presses.pass = presses.check = false;
     }
     function resurfaceStep(dt) {
       if (state === "crew") {
@@ -2972,15 +3183,30 @@
       if (rz.done) endResurfacing(false);
     }
     $("[data-pause]").addEventListener("click", () =>
-      state === "playing" ? pause() : state === "paused" ? start() : state === "resurfacing" ? crew() : state === "crew" ? endResurfacing(true) : null
+      state === "playing"
+        ? pause()
+        : state === "paused"
+          ? start()
+          : state === "resurfacing"
+            ? crew()
+            : state === "crew"
+              ? endResurfacing(true)
+              : state === "leaving"
+                ? skipToFaceoff()
+                : null
     );
     $("[data-restart]").addEventListener("click", () => {
       if (state === "replay") endReplay();
       newGame();
       rz = null;
       lamp = null;
-      if (cab) cab.show(false);
+      if (cab) {
+        cab.show(false);
+        cab.gate(false);
+      }
       rootEl.classList.remove("is-cab");
+      curtain.classList.remove("is-down");
+      back = darkAt = 0;
       draw(svg, game, { view, follow: true });
       state = "playing";
       overlay.hidden = true;
@@ -2989,7 +3215,15 @@
       hud();
     });
     document.addEventListener("visibilitychange", () => document.hidden && pause());
-    $(".game-stage").addEventListener("pointerdown", () => (state === "crew" ? endResurfacing(true) : state === "replay" ? endReplay() : null));
+    $(".game-stage").addEventListener("pointerdown", () =>
+      state === "crew"
+        ? endResurfacing(true)
+        : state === "replay"
+          ? endReplay()
+          : state === "leaving" || (state === "playing" && game.phase === "return")
+            ? skipToFaceoff()
+            : null
+    );
 
     // Input: the keyboard, and on touch screens a stick and two buttons. The
     // first touch shows those, for touch screens the media query misses.
@@ -3015,10 +3249,20 @@
     window.addEventListener("keydown", (e) => {
       if (e.target.closest && e.target.closest("input, textarea, select")) return;
       sound.wake();
-      const busy = state === "playing" || state === "buzzer" || state === "resurfacing" || state === "crew" || state === "replay";
+      const busy =
+        state === "playing" || state === "buzzer" || state === "resurfacing" || state === "crew" || state === "replay" || state === "leaving";
       if (busy && GAME_KEYS.includes(e.code)) e.preventDefault();
       // The crew at work: any key skips to the end.
       if (state === "crew" && !e.repeat && (GAME_KEYS.includes(e.code) || e.code === "Enter" || e.code === "Escape")) return endResurfacing(true);
+      // The Kamboni leaving, or the teams coming back: any key goes on to the faceoff.
+      if (
+        (state === "leaving" || (state === "playing" && game.phase === "return")) &&
+        !e.repeat &&
+        (GAME_KEYS.includes(e.code) || e.code === "Enter")
+      ) {
+        e.preventDefault();
+        return skipToFaceoff();
+      }
       // A goal shown again: any key skips it.
       if (state === "replay" && !e.repeat && (GAME_KEYS.includes(e.code) || e.code === "Enter" || e.code === "Escape")) {
         e.preventDefault();
@@ -3086,7 +3330,8 @@
       $(`[data-${name}]`).addEventListener("pointerdown", (e) => {
         e.preventDefault();
         sound.wake();
-        if (state === "playing" || state === "resurfacing") presses[name] = true;
+        if (state === "leaving" || (state === "playing" && game.phase === "return")) skipToFaceoff();
+        else if (state === "playing" || state === "resurfacing") presses[name] = true;
         else if (state === "crew") endResurfacing(true);
         else if (state === "replay") endReplay();
         else if (state === "intermission") resurface();
@@ -3130,6 +3375,11 @@
           hud();
           return;
         }
+      }
+      if (state === "leaving") {
+        leavingStep(dt, now);
+        hud();
+        return;
       }
       if (state === "replay") return showReplay(now);
       if (state === "playing" && replayAt && now >= replayAt) {
@@ -3199,7 +3449,14 @@
         }
       }
       marks.update(game, now);
-      draw(svg, game, { now, lamp, view, follow: true });
+      // The teams back out: the organ plays them on, and the crowd.
+      if (back && !organ && now - back > 900) {
+        organ = true;
+        sound.play("organ");
+        sound.play("cheer");
+      }
+      if (back && now - back > 8000) back = 0;
+      draw(svg, game, { now, lamp, view, follow: true, fresh: back ? now - back : null });
       hud();
     }
     // What each event sounds like.

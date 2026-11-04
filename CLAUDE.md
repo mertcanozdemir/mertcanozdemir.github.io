@@ -417,6 +417,22 @@ The crew's way (`autopilot()`) is rows along the rink, shown ten times as fast;
 the pause button becomes "let the crew finish", then "skip". The time is kept
 against the best in the browser (`kamboni-best`). Space honks; boards bonk.
 
+When the ice is done the game does not start straight away (Mertcan found the
+cut abrupt). The Kamboni drives itself off (`driveOff()`: twice as fast as life
+to the middle of the rink in front of its gate, lined up there, then in at its
+own pace) through a gate in the middle of the left-hand end boards (`RZ.gate`;
+a dark opening, `cab.gate()` in the cab and `[data-gate]` from above), to
+applause. The view goes dark (`.game-curtain`) and lights again on the teams
+coming back out (`comeBack()`, the game's phase `return`): the crew pushes the
+nets back onto their pegs, the new ice shines wet and then freezes
+(`freshIce()`, `[data-sheen]`), the players come out of their bench doors a few
+at a time and skate to their faceoff places, the goalies scrape their creases,
+the referee brings the puck to the dot, and the organ plays the old bugle call
+to charge. About 9 s in all; a key or a tap goes straight to the faceoff (the
+press is not taken for the draw). The checker drives the Kamboni off from
+wherever its runs end (8.5 s at most at its own pace, through the gate and not
+the boards beside it) and wants the teams back within 9.5 s.
+
 From above, the page frosts the used ice (a scratched pattern) and masks the
 frost and the skate marks away along the track, which shows as wet ice; the
 players, puck and nets are hidden (`is-resurfacing`); the drawing
