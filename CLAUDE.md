@@ -240,8 +240,9 @@ snow tank, the conditioner and towel behind. The HUD's clock becomes a bar
 
 **From the cab** (`assets/js/kamboni.js`, WebGL; loaded on /play/ only): Mertcan
 asked to drive from inside after the Kamboni did not work on the TV camera, so
-it is the TV camera's replacement between periods (the view button switches to
-from above). The ice texture is the game's own rink drawing with the period's
+it is how the Kamboni is driven, whichever view the game was in (the view
+button switches to from above; at first it started from above when the game
+was, and Mertcan could not find the cab). The ice texture is the game's own rink drawing with the period's
 marks and the frost, drawn into a canvas through an SVG data URL (CSS variables
 substituted, since an image cannot see them); the clean, wet ice is painted onto
 it along the track and only that patch is uploaded. Round it: boards with

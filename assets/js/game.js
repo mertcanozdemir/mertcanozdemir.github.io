@@ -1947,14 +1947,20 @@
       );
       hud();
     }
-    // The person drives: from the cab if the game was being watched on the
-    // TV camera (and there is WebGL), else from above. It waits for them.
+    // The person drives: from the cab, whichever view the game was in (from
+    // above if there is no WebGL, or the cab fails). It waits for them.
     function resurface() {
       overlay.hidden = true;
       rz = new Resurfacer();
       rz.started = false;
-      rzView = view === "tilt" && cabView() ? "cab" : "top";
-      if (cab) cab.start(rz, svg.querySelector("[data-marks]"));
+      rzView = cabView() ? "cab" : "top";
+      try {
+        if (cab) cab.start(rz, svg.querySelector("[data-marks]"));
+      } catch (e) {
+        if (cab) cab.show(false);
+        cab = null;
+        rzView = "top";
+      }
       state = "resurfacing";
       last = null;
       showKamboni(performance.now());

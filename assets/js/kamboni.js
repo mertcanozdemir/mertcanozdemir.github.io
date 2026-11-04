@@ -128,7 +128,8 @@ void main() {
         const px = x + (rnd() - 0.5) * 4;
         g.fillStyle = shirts[Math.floor(rnd() * shirts.length)];
         g.beginPath();
-        g.roundRect(px - 7, y1 - 26, 14, 18, 5);
+        if (g.roundRect) g.roundRect(px - 7, y1 - 26, 14, 18, 5);
+        else g.rect(px - 7, y1 - 26, 14, 18);
         g.fill();
         g.fillStyle = skins[Math.floor(rnd() * skins.length)];
         g.beginPath();
