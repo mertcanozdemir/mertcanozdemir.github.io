@@ -1149,8 +1149,10 @@ a.piece:hover .piece-more {
   text-decoration: underline;
 }
 
-// The k-space demo (kspace.js): k-space and the image rebuilt from it.
+// The k-space demo (kspace.js): k-space and the image rebuilt from it, and
+// under them the scans to choose from and how the last one went.
 .kspace {
+  --kspace-moved: #c2410c; // the cat's move, in the status line
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
@@ -1170,8 +1172,6 @@ a.piece:hover .piece-more {
 
   canvas[data-k] {
     image-rendering: pixelated;
-    cursor: crosshair;
-    touch-action: none; // a finger on k-space measures lines instead of scrolling
   }
 
   figcaption {
@@ -1182,15 +1182,21 @@ a.piece:hover .piece-more {
   }
 }
 
-.kspace-status {
+html[data-theme="dark"] .kspace {
+  --kspace-moved: #f0875a;
+}
+
+.kspace-controls {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.4rem 0.8rem;
-  margin: 0;
+  grid-column: 1 / -1;
+  flex-direction: column;
+  gap: 0.5rem;
   color: var(--global-text-color-light);
   font-size: 0.9rem;
-  font-variant-numeric: tabular-nums;
+
+  p {
+    margin: 0;
+  }
 
   button {
     padding: 0.15rem 0.6rem;
@@ -1205,13 +1211,58 @@ a.piece:hover .piece-more {
       border-color: var(--global-theme-color);
       color: var(--global-theme-color);
     }
+
+    &[aria-pressed="true"] {
+      border-color: var(--global-theme-color);
+      background: var(--global-theme-color);
+      color: #fff;
+    }
+
+    &[hidden] {
+      display: none;
+    }
   }
 }
 
-// The cat's mood in the status line, once it starts to fidget.
-.is-restless [data-status],
+.kspace-plans {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+
+  // On a phone, two a row, so the four take two rows and not four.
+  @media (max-width: 40rem) {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+
+    button {
+      border-radius: 0.8rem;
+      text-align: left;
+    }
+  }
+
+  [data-time] {
+    margin-left: 0.2rem;
+    opacity: 0.7;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.kspace-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.3rem 0.6rem;
+
+  [data-clock] {
+    color: var(--global-text-color);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+// The cat's move, in the status line, once it happens.
 .is-moved [data-status] {
-  color: var(--rink-team-b);
+  color: var(--kspace-moved);
 }
 
 // The drill playing on its own in the drills piece.

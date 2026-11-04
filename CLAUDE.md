@@ -117,18 +117,32 @@ A "coming soon" placeholder was tried and dropped: a piece goes up when it works
 
 - **Why does an MRI take so long?** (`assets/js/kspace.js`): the patient is a
   cat, drawn in code as an MR scan might show it. k-space sits beside the image
-  rebuilt from the measured lines alone (zero-filled inverse FFT, 128×128, in
+  rebuilt from the lines measured so far (zero-filled inverse FFT, 128×128, in
   the browser, each line density compensated, the display windowed to the
-  brightest pixel). It opens with every fourth line measured, so the cat folds
-  over itself; moving over k-space measures the lines under the pointer. After
-  84 lines the cat moves, and lines measured after that come from the moved
-  cat, so a full scan has motion ghosts: the case for scanning fast. Filling
-  only the centre brings the cat back with ghosted edges and the whiskers (the
-  finest detail) go last. `data-image` on the piece swaps in any picture, such
-  as a real MR slice; it moves the same way. (The old `mybrain.gif` in git
-  history is a rotating 3D surface render, not a slice.) A Shepp–Logan phantom
-  was tried first and was too sober. The piece links to the comparison graph on
-  the lab's site; the article behind it is still to be written.
+  brightest pixel). The visitor chooses one of four scans and the scanner
+  measures it on its own, a line a TR (0.5 s, as in a T1 spin echo, shown eight
+  times as fast: `SPEED`), the line being measured in blue: every line top to
+  bottom or centre first (1:04 each), every fourth line or only the centre
+  (0:16 each). The cat keeps still for 30 s of scanning (`PATIENCE`), then
+  moves; lines measured after that come from the moved cat (orange in k-space),
+  so both full scans have motion ghosts: top to bottom the centre comes after
+  the move and the whole cat ghosts, centre first only its edges do. The quick
+  scans are over before the cat moves, but every fourth line folds the cat over
+  itself, which "unfold with 8 coils" undoes (SENSE: eight simulated receiver
+  coils, a least-squares solve for each pixel, faded in), and the centre alone
+  loses the whiskers. It opens on the every-fourth-line scan, done. An earlier
+  version had the visitor measure lines by moving over k-space, the cat moving
+  after 84 of them: Mertcan found the move read as caused by his own moving, not
+  by the time it took, and asked whether k-space really fills like that (a
+  scanner sets the order beforehand and measures on its own). A version with the
+  hockey game's ideas (an LED scan clock like its scoreboard, scanner sounds, a
+  shake when the cat moved) was dropped: "buz hokeyi ayrı, MRI ayrı", the game
+  and the MRI piece are kept apart. `data-image` on the piece swaps in any
+  picture, such as a real MR slice; it moves the same way. (The old
+  `mybrain.gif` in git history is a rotating 3D surface render, not a slice.) A
+  Shepp–Logan phantom was tried first and was too sober. The piece links to the
+  comparison graph on the lab's site; the article behind it is still to be
+  written.
 - **Three on three** links to the game (below); its picture is one frame of the
   computer playing itself, a few seconds in, different on every visit, always
   drawn from above (Mertcan asked), whatever view the game was last played in.

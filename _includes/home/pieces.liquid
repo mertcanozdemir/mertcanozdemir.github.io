@@ -11,24 +11,33 @@
     <section class="piece is-lead" aria-labelledby="piece-kspace" data-kspace>
       <div class="piece-art kspace">
         <figure>
-          <canvas data-k aria-label="k-space: move over it to measure more lines"></canvas>
+          <canvas data-k role="img" aria-label="k-space, filled line by line as the scan goes"></canvas>
           <figcaption>k-space</figcaption>
         </figure>
         <figure>
-          <canvas data-img role="img" aria-label="The cat, rebuilt from the measured lines"></canvas>
-          <figcaption>the cat</figcaption>
+          <canvas data-img role="img" aria-label="The cat, rebuilt from the lines measured"></canvas>
+          <figcaption data-caption>the cat</figcaption>
         </figure>
+        <div class="kspace-controls">
+          <p class="kspace-plans" role="group" aria-label="Scan">
+            <button type="button" data-plan="linear">every line, top to bottom <span data-time></span></button>
+            <button type="button" data-plan="centric">every line, centre first <span data-time></span></button>
+            <button type="button" data-plan="fourth">every fourth line <span data-time></span></button>
+            <button type="button" data-plan="centre">only the centre <span data-time></span></button>
+          </p>
+          <p class="kspace-status">
+            <span data-clock></span>
+            <span data-status aria-live="polite"></span>
+            <button type="button" data-unfold aria-pressed="false" hidden>unfold with 8 coils</button>
+          </p>
+        </div>
       </div>
       <div class="piece-text">
         <h2 class="piece-title" id="piece-kspace">Why does an MRI take so long?</h2>
         <p class="piece-desc">
-          A scanner does not take a picture: it measures k‑space, the image's frequencies, one line at a time. Today's patient is a cat. We measured
-          only every fourth line, so the scan was quick, and the cat folds over itself. Move over k‑space to measure the rest, but be quick: cats do
-          not wait.
-        </p>
-        <p class="kspace-status">
-          <span data-status aria-live="polite"></span>
-          <button type="button" data-reset>start again</button>
+          A scanner does not take a picture: it measures k‑space, the image's frequencies, one line at a time, and each line takes half a second (here
+          they go eight times as fast). Today's patient is a cat, and it keeps still for about half a minute. Scan every line and it takes over a
+          minute; scan fewer and see what it costs.
         </p>
         <a class="piece-more" href="https://icon-lab.github.io/mri-recon-comparison-graph/"
           >How the methods that fill in the missing lines compare&nbsp;→</a
